@@ -1,7 +1,7 @@
 import React, { useMemo, useRef } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, useTexture } from "@react-three/drei"
-import { DataTexture, RGBAFormat, UnsignedByteType } from "three"
+import { DataTexture, DoubleSide, RGBAFormat, UnsignedByteType } from "three"
 
 const vertexShader = `
   uniform float uTime;
@@ -44,6 +44,8 @@ const fragmentShader = `
   }
 `
 
+const CAMERA_CONFIG = { position: [0.2, 0.1, 4], fov: 45 }
+
 function BaseFlagMaterial({ uniforms }) {
   const materialRef = useRef(null)
 
@@ -59,7 +61,7 @@ function BaseFlagMaterial({ uniforms }) {
       vertexShader={vertexShader}
       fragmentShader={fragmentShader}
       uniforms={uniforms}
-      side={2}
+      side={DoubleSide}
     />
   )
 }
@@ -112,7 +114,7 @@ function ShimmerFlag() {
 
 export default function UclFlag({ logoTextureUrl }) {
   return (
-    <Canvas camera={{ position: [0.2, 0.1, 4], fov: 45 }}>
+    <Canvas camera={CAMERA_CONFIG}>
       <ambientLight intensity={0.45} />
       <directionalLight position={[3, 2, 4]} intensity={1.2} />
       <directionalLight position={[-3, -1, -2]} intensity={0.2} />
