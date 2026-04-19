@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1000" viewBox="0 0 1500 1000">
+  <title>UCL Volunteering flag</title>
+
+  <!-- Left quarter: lavender -->
+  <rect x="0" y="0" width="375" height="1000" fill="#9B5DE5"/>
+
+  <!-- Middle half (two merged quarters): cyan -->
+  <rect x="375" y="0" width="750" height="1000" fill="#10C4C0"/>
+
+  <!-- Right quarter, split into halves -->
+  <rect x="1125" y="0"   width="375" height="500" fill="#FFD23F"/>
+  <rect x="1125" y="500" width="375" height="500" fill="#FF99C8"/>
+
+  <!-- Linen strip straddling the lavender / cyan seam (1/18 of flag width) -->
+  <rect x="333.333" y="0" width="83.333" height="1000" fill="#FEEFE5"/>
+</svg>

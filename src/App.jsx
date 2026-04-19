@@ -1,4 +1,4 @@
-import VolunteeringWebsite from "../VolunteeringWebsite"
+import VolunteeringWebsite from "./VolunteeringWebsite"
 
 function App() {
   return <VolunteeringWebsite />
