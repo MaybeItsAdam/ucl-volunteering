@@ -1,9 +1,7 @@
 import React, { useMemo, useRef } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { OrbitControls, useTexture } from "@react-three/drei"
-
-const PLACEHOLDER_TEXTURE =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WnPZXQAAAAASUVORK5CYII="
+import { DataTexture, RGBAFormat, UnsignedByteType } from "three"
 
 const vertexShader = `
   uniform float uTime;
@@ -46,19 +44,8 @@ const fragmentShader = `
   }
 `
 
-function Flag({ logoTextureUrl }) {
+function BaseFlagMaterial({ uniforms }) {
   const materialRef = useRef(null)
-  const texture = useTexture(logoTextureUrl || PLACEHOLDER_TEXTURE)
-
-  const uniforms = useMemo(
-    () => ({
-      uTime: { value: 0 },
-      uUseMap: { value: Boolean(logoTextureUrl) },
-      uMap: { value: texture },
-      uBaseColor: { value: [0.41, 0.17, 0.57] }
-    }),
-    [logoTextureUrl, texture]
-  )
 
   useFrame((state) => {
     if (materialRef.current) {
@@ -67,15 +54,58 @@ function Flag({ logoTextureUrl }) {
   })
 
   return (
+    <shaderMaterial
+      ref={materialRef}
+      vertexShader={vertexShader}
+      fragmentShader={fragmentShader}
+      uniforms={uniforms}
+      side={2}
+    />
+  )
+}
+
+function TexturedFlag({ logoTextureUrl }) {
+  const texture = useTexture(logoTextureUrl)
+
+  const uniforms = useMemo(
+    () => ({
+      uTime: { value: 0 },
+      uUseMap: { value: true },
+      uMap: { value: texture },
+      uBaseColor: { value: [0.41, 0.17, 0.57] }
+    }),
+    [texture]
+  )
+
+  return (
     <mesh>
       <planeGeometry args={[3, 2, 32, 32]} />
-      <shaderMaterial
-        ref={materialRef}
-        vertexShader={vertexShader}
-        fragmentShader={fragmentShader}
-        uniforms={uniforms}
-        side={2}
-      />
+      <BaseFlagMaterial uniforms={uniforms} />
+    </mesh>
+  )
+}
+
+function ShimmerFlag() {
+  const fallbackMap = useMemo(() => {
+    const map = new DataTexture(new Uint8Array([255, 255, 255, 255]), 1, 1, RGBAFormat, UnsignedByteType)
+    map.needsUpdate = true
+    return map
+  }, [])
+
+  const uniforms = useMemo(
+    () => ({
+      uTime: { value: 0 },
+      uUseMap: { value: false },
+      uMap: { value: fallbackMap },
+      uBaseColor: { value: [0.41, 0.17, 0.57] }
+    }),
+    [fallbackMap]
+  )
+
+  return (
+    <mesh>
+      <planeGeometry args={[3, 2, 32, 32]} />
+      <BaseFlagMaterial uniforms={uniforms} />
     </mesh>
   )
 }
@@ -91,7 +121,7 @@ export default function UclFlag({ logoTextureUrl }) {
           <cylinderGeometry args={[0.03, 0.03, 2.4, 24]} />
           <meshStandardMaterial color="#002147" metalness={0.2} roughness={0.4} />
         </mesh>
-        <Flag logoTextureUrl={logoTextureUrl} />
+        {logoTextureUrl ? <TexturedFlag logoTextureUrl={logoTextureUrl} /> : <ShimmerFlag />}
       </group>
       <OrbitControls enablePan={false} />
     </Canvas>

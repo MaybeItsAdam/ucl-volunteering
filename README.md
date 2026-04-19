@@ -3,7 +3,7 @@ The home of UCL Volunteering Society on the internet, the one stop shop to find 
 
 ## Starter 3D flag component
 
-`/home/runner/work/ucl-volunteering/ucl-volunteering/UclFlag.jsx` provides a single-file React component that renders a waving 3D flag using `@react-three/fiber` and `@react-three/drei`
+`UclFlag.jsx` provides a single-file React component that renders a waving 3D flag using `@react-three/fiber` and `@react-three/drei`
 
 - Uses a high-segment plane geometry (`[3, 2, 32, 32]`)
 - Uses a custom shader with animated horizontal wave motion and a pinned left edge
