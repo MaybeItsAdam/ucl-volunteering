@@ -1,21 +1,16 @@
-# ucl-volunteering
-The home of UCL Volunteering Society on the internet, the one stop shop to find all volunteering opportunities and more
+# React + Vite
 
-## Starter 3D flag component
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-`UclFlag.jsx` provides a single-file React component that renders a waving 3D flag using `@react-three/fiber` and `@react-three/drei`
+Currently, two official plugins are available:
 
-- Uses a high-segment plane geometry (`[3, 2, 32, 32]` = width, height, widthSegments, heightSegments)
-- Uses a custom shader with animated horizontal wave motion and a pinned left edge
-- Supports logo textures via `useTexture`
-- Falls back to a UCL purple shimmer if no logo texture URL is provided
-- Includes ambient and directional lighting plus orbit controls
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-## Website layout component
+## React Compiler
 
-`VolunteeringWebsite.jsx` provides a brand aligned site layout that:
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-- Uses the existing `UclFlag` component in a side panel
-- Presents project structure for SLP GLP and ELP
-- Includes palette guidance and operating mode cards
-- Applies styling from `volunteeringWebsite.css`
+## Expanding the ESLint configuration
+
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
