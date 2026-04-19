@@ -7,7 +7,7 @@ const PROJECT_TYPES = [
     title: "Student Led Projects",
     short: "SLP",
     className: "slp",
-    description: "The heart of the UCL led by students for local impact"
+    description: "The heart of UCL Volunteering led by students for local impact"
   },
   {
     title: "Group Led Projects",
