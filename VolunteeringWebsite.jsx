@@ -32,17 +32,17 @@ const OPERATION_MODES = [
     note: "Approachable and welcoming to all experience levels"
   },
   {
-    label: "Student led projects",
+    label: "Student Led Projects",
     className: "slp",
     note: "Lavender purple for the student voice"
   },
   {
-    label: "Group led projects",
+    label: "Group Led Projects",
     className: "glp",
     note: "Golden pollen for missions that spread far"
   },
   {
-    label: "External led projects",
+    label: "External Led Projects",
     className: "elp",
     note: "Brick red for city establishments and partners"
   }
