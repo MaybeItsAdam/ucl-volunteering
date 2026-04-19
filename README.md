@@ -10,3 +10,12 @@ The home of UCL Volunteering Society on the internet, the one stop shop to find 
 - Supports logo textures via `useTexture`
 - Falls back to a UCL purple shimmer if no logo texture URL is provided
 - Includes ambient and directional lighting plus orbit controls
+
+## Website layout component
+
+`VolunteeringWebsite.jsx` provides a brand aligned site layout that:
+
+- Uses the existing `UclFlag` component in a side panel
+- Presents project structure for SLP GLP and ELP
+- Includes palette guidance and operating mode cards
+- Applies styling from `volunteeringWebsite.css`
