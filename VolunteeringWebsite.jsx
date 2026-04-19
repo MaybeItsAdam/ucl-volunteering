@@ -13,7 +13,7 @@ const PROJECT_TYPES = [
     title: "Group Led Projects",
     short: "GLP",
     className: "glp",
-    description: "Clubs societies networks and the Union helping missions spread far"
+    description: "Clubs, societies, networks, and the Union helping missions spread far"
   },
   {
     title: "External Led Projects",
@@ -63,7 +63,7 @@ export default function VolunteeringWebsite({ logoTextureUrl }) {
         </header>
 
         <section className="uvs-section">
-          <h2>Opportunities to Volunteering</h2>
+          <h2>Volunteering opportunities</h2>
           <div className="uvs-card-grid">
             {PROJECT_TYPES.map((project) => (
               <article key={project.short} className={`uvs-card ${project.className}`}>
