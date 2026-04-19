@@ -112,9 +112,9 @@ function ShimmerFlag() {
   )
 }
 
-export default function UclFlag({ logoTextureUrl }) {
+export default function UclFlag({ logoTextureUrl, className, style, interactive = true }) {
   return (
-    <Canvas camera={CAMERA_CONFIG}>
+    <Canvas camera={CAMERA_CONFIG} className={className} style={style}>
       <ambientLight intensity={0.45} />
       <directionalLight position={[3, 2, 4]} intensity={1.2} />
       <directionalLight position={[-3, -1, -2]} intensity={0.2} />
@@ -125,7 +125,7 @@ export default function UclFlag({ logoTextureUrl }) {
         </mesh>
         {logoTextureUrl ? <TexturedFlag logoTextureUrl={logoTextureUrl} /> : <ShimmerFlag />}
       </group>
-      <OrbitControls enablePan={false} />
+      {interactive ? <OrbitControls enablePan={false} /> : null}
     </Canvas>
   )
 }

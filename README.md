@@ -1,12 +1,26 @@
-# ucl-volunteering
-The home of UCL Volunteering Society on the internet, the one stop shop to find all volunteering opportunities and more
+# UCL Volunteering website
 
-## Starter 3D flag component
+React + Vite website scaffold for UCL Volunteering Society.
 
-`UclFlag.jsx` provides a single-file React component that renders a waving 3D flag using `@react-three/fiber` and `@react-three/drei`
+## Run locally
 
-- Uses a high-segment plane geometry (`[3, 2, 32, 32]` = width, height, widthSegments, heightSegments)
-- Uses a custom shader with animated horizontal wave motion and a pinned left edge
-- Supports logo textures via `useTexture`
-- Falls back to a UCL purple shimmer if no logo texture URL is provided
-- Includes ambient and directional lighting plus orbit controls
+```bash
+npm install
+npm run dev
+```
+
+Open the local URL shown in terminal (usually `http://localhost:5173`).
+
+## Build and lint
+
+```bash
+npm run lint
+npm run build
+```
+
+## Main files
+
+- `src/App.jsx` renders the site entry
+- `VolunteeringWebsite.jsx` contains the website content and layout
+- `UclFlag.jsx` contains the 3D flag component used in the side panel
+- `volunteeringWebsite.css` contains site branding and layout styles
