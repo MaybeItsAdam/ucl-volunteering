@@ -7,7 +7,7 @@ const PROJECT_TYPES = [
     title: "Student Led Projects",
     short: "SLP",
     className: "slp",
-    description: "The heart of UCL led by students for local impact"
+    description: "The heart of the UCL led by students for local impact"
   },
   {
     title: "Group Led Projects",
@@ -59,7 +59,7 @@ export default function VolunteeringWebsite({ logoTextureUrl }) {
         <header className="uvs-header">
           <p className="uvs-kicker">UCL Volunteering Society</p>
           <h1>Operational guidelines and structure</h1>
-          <p>Clear direct kind instructions</p>
+          <p>Clear, direct, kind instructions</p>
         </header>
 
         <section className="uvs-section">
