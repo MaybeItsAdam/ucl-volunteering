@@ -14,6 +14,8 @@ const OPPORTUNITY_TYPE_META = {
   elp: { tone: "brick" }
 }
 
+const DEFAULT_OPPORTUNITY_TYPE_LABEL = "Other opportunity"
+
 const SUBTYPE_META = {
   social: { label: "Social", tone: "lavender" },
   education: { label: "Education", tone: "gold" },
@@ -112,7 +114,8 @@ const SUBTYPE_KEYS = Object.keys(SUBTYPE_META)
 const getSearchText = (project) => {
   const subtypeMeta = SUBTYPE_META[project.subtype] ?? DEFAULT_SUBTYPE_META
   const template = PROJECT_TEMPLATES[project.subtype] ?? { fields: [] }
-  const opportunityTypeLabel = OPPORTUNITY_TYPES[project.opportunityType] ?? "Unknown"
+  const opportunityTypeLabel =
+    OPPORTUNITY_TYPES[project.opportunityType] ?? DEFAULT_OPPORTUNITY_TYPE_LABEL
   const templateValues = template.fields
     .map((field) => project[field.key])
     .filter((value) => value !== undefined && value !== null)
@@ -121,7 +124,7 @@ const getSearchText = (project) => {
   return [
     project.title,
     project.summary,
-    subtypeMeta?.label ?? "",
+    subtypeMeta.label,
     opportunityTypeLabel,
     templateValues
   ]
@@ -235,7 +238,8 @@ function ProjectGrid({ projects }) {
       {projects.map((project) => {
         const subtypeMeta = SUBTYPE_META[project.subtype] ?? DEFAULT_SUBTYPE_META
         const template = PROJECT_TEMPLATES[project.subtype] ?? { fields: [] }
-        const opportunityType = OPPORTUNITY_TYPES[project.opportunityType] ?? "Unknown"
+        const opportunityType =
+          OPPORTUNITY_TYPES[project.opportunityType] ?? DEFAULT_OPPORTUNITY_TYPE_LABEL
         const opportunityTypeMeta = OPPORTUNITY_TYPE_META[project.opportunityType] ?? {
           tone: "lavender"
         }
