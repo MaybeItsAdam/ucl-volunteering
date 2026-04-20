@@ -5,6 +5,7 @@ import {
   BackSide,
   DataTexture,
   DoubleSide,
+  MathUtils,
   LinearFilter,
   MeshBasicMaterial,
   NearestFilter,
@@ -44,6 +45,7 @@ const VERTEX_CHUNK = `
 `
 
 const CAMERA_CONFIG = { position: [0.2, 0.1, 4], fov: 45 }
+const POLE_HEIGHT = 4.6
 
 function makeToonGradient(steps) {
   const data = new Uint8Array(steps)
@@ -181,27 +183,27 @@ function Scene({ logoTextureUrl }) {
         scale={[1, 0.0001, 1]}
         visible={false}
       >
-        <mesh position={[0, 1.25, 0]} scale={[1.12, 1.002, 1.12]}>
-          <cylinderGeometry args={[0.04, 0.04, 2.5, 24]} />
+        <mesh position={[0, POLE_HEIGHT / 2, 0]} scale={[1.12, 1.002, 1.12]}>
+          <cylinderGeometry args={[0.04, 0.04, POLE_HEIGHT, 24]} />
           <meshBasicMaterial color="#020a14" side={BackSide} toneMapped={false} />
         </mesh>
-        <mesh position={[0, 1.25, 0]}>
-          <cylinderGeometry args={[0.04, 0.04, 2.5, 24]} />
+        <mesh position={[0, POLE_HEIGHT / 2, 0]}>
+          <cylinderGeometry args={[0.04, 0.04, POLE_HEIGHT, 24]} />
           <meshToonMaterial color="#1a3a66" gradientMap={toonGradient} />
         </mesh>
 
-        <mesh position={[0, 2.55, 0]} scale={1.1}>
+        <mesh position={[0, POLE_HEIGHT + 0.15, 0]} scale={1.1}>
           <sphereGeometry args={[0.09, 20, 20]} />
           <meshBasicMaterial color="#020a14" side={BackSide} toneMapped={false} />
         </mesh>
-        <mesh position={[0, 2.55, 0]}>
+        <mesh position={[0, POLE_HEIGHT + 0.15, 0]}>
           <sphereGeometry args={[0.09, 20, 20]} />
           <meshToonMaterial color="#10c4c0" gradientMap={toonGradient} />
         </mesh>
       </group>
 
       {/* Flag — stays at full size; shader discards beyond uFlagAppear */}
-      <group ref={flagGroupRef} position={[0, 0.25, 0]} visible={false}>
+      <group ref={flagGroupRef} position={[0, MathUtils.clamp(POLE_HEIGHT - 1.8, 0.25, 3), 0]} visible={false}>
         <mesh material={material}>
           <planeGeometry args={[3, 2, 96, 48]} />
         </mesh>
