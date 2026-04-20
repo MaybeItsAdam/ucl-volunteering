@@ -15,6 +15,8 @@ const SUBTYPE_META = {
   external: { label: "External", tone: "tomato" }
 }
 
+const DEFAULT_SUBTYPE_META = { label: "Other", tone: "lavender" }
+
 const PROJECT_TEMPLATES = {
   social: {
     fields: [
@@ -102,17 +104,19 @@ const PROJECTS = [
 const SUBTYPE_KEYS = Object.keys(SUBTYPE_META)
 
 const getSearchText = (project) => {
-  const template = PROJECT_TEMPLATES[project.subtype]
+  const subtypeMeta = SUBTYPE_META[project.subtype] ?? DEFAULT_SUBTYPE_META
+  const template = PROJECT_TEMPLATES[project.subtype] ?? { fields: [] }
+  const opportunityTypeLabel = OPPORTUNITY_TYPES[project.opportunityType] ?? "Unknown"
   const templateValues = template.fields
     .map((field) => project[field.key])
-    .filter(Boolean)
+    .filter((value) => value !== undefined && value !== null)
     .join(" ")
 
   return [
     project.title,
     project.summary,
-    SUBTYPE_META[project.subtype].label,
-    OPPORTUNITY_TYPES[project.opportunityType],
+    subtypeMeta?.label ?? "",
+    opportunityTypeLabel,
     templateValues
   ]
     .join(" ")
@@ -127,6 +131,15 @@ export default function VolunteeringWebsite() {
     if (!normalizedQuery) return PROJECTS
     return PROJECTS.filter((project) => getSearchText(project).includes(normalizedQuery))
   }, [normalizedQuery])
+
+  const filteredProjectsBySubtype = useMemo(
+    () =>
+      SUBTYPE_KEYS.reduce((accumulator, subtype) => {
+        accumulator[subtype] = filteredProjects.filter((project) => project.subtype === subtype)
+        return accumulator
+      }, {}),
+    [filteredProjects]
+  )
 
   return (
     <div className="uvs">
@@ -172,7 +185,7 @@ export default function VolunteeringWebsite() {
         </section>
 
         {SUBTYPE_KEYS.map((subtype) => {
-          const projectsForSubtype = filteredProjects.filter((project) => project.subtype === subtype)
+          const projectsForSubtype = filteredProjectsBySubtype[subtype] ?? []
           return (
             <section className="uvs-section" id={subtype} key={subtype}>
               <div className="uvs-section-head">
@@ -214,20 +227,24 @@ function ProjectGrid({ projects }) {
   return (
     <div className="uvs-cards">
       {projects.map((project) => {
-        const subtypeMeta = SUBTYPE_META[project.subtype]
-        const template = PROJECT_TEMPLATES[project.subtype]
+        const subtypeMeta = SUBTYPE_META[project.subtype] ?? DEFAULT_SUBTYPE_META
+        const template = PROJECT_TEMPLATES[project.subtype] ?? { fields: [] }
+        const opportunityType = OPPORTUNITY_TYPES[project.opportunityType] ?? "Unknown"
+        const populatedFields = template.fields.filter((field) => {
+          const value = project[field.key]
+          return value !== undefined && value !== null
+        })
         return (
           <article key={project.id} className={`uvs-card uvs-card-${subtypeMeta.tone}`}>
             <div className="uvs-card-top">
               <span className="uvs-card-tag">{subtypeMeta.label}</span>
-              <span className="uvs-card-type">{OPPORTUNITY_TYPES[project.opportunityType]}</span>
+              <span className="uvs-card-type">{opportunityType}</span>
             </div>
             <h3>{project.title}</h3>
             <p className="uvs-card-blurb">{project.summary}</p>
             <dl className="uvs-card-meta">
-              {template.fields.map((field) => {
+              {populatedFields.map((field) => {
                 const value = project[field.key]
-                if (!value) return null
                 return (
                   <div key={field.key}>
                     <dt>{field.label}</dt>
