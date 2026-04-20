@@ -3,9 +3,15 @@ import VolSocHand from "./VolSocHand"
 import "./volunteeringWebsite.css"
 
 const OPPORTUNITY_TYPES = {
-  slp: "Student Led",
-  glp: "Group Led",
-  elp: "External Led"
+  slp: "Student Led Projects",
+  glp: "Group Led Projects",
+  elp: "External Volunteering Opportunities"
+}
+
+const OPPORTUNITY_TYPE_META = {
+  slp: { tone: "lavender" },
+  glp: { tone: "gold" },
+  elp: { tone: "brick" }
 }
 
 const SUBTYPE_META = {
@@ -230,12 +236,15 @@ function ProjectGrid({ projects }) {
         const subtypeMeta = SUBTYPE_META[project.subtype] ?? DEFAULT_SUBTYPE_META
         const template = PROJECT_TEMPLATES[project.subtype] ?? { fields: [] }
         const opportunityType = OPPORTUNITY_TYPES[project.opportunityType] ?? "Unknown"
+        const opportunityTypeMeta = OPPORTUNITY_TYPE_META[project.opportunityType] ?? {
+          tone: "lavender"
+        }
         const populatedFields = template.fields.filter((field) => {
           const value = project[field.key]
           return value !== undefined && value !== null
         })
         return (
-          <article key={project.id} className={`uvs-card uvs-card-${subtypeMeta.tone}`}>
+          <article key={project.id} className={`uvs-card uvs-card-${opportunityTypeMeta.tone}`}>
             <div className="uvs-card-top">
               <span className="uvs-card-tag">{subtypeMeta.label}</span>
               <span className="uvs-card-type">{opportunityType}</span>

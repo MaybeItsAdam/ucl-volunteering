@@ -259,6 +259,10 @@ body {
   --tone: var(--lime-moss);
 }
 
+.uvs-card-brick {
+  --tone: var(--brick-red);
+}
+
 .uvs-card-tomato {
   --tone: var(--tomato);
 }
@@ -281,7 +285,8 @@ body {
   color: var(--prussian-blue);
 }
 
-.uvs-card-tomato .uvs-card-tag {
+.uvs-card-tomato .uvs-card-tag,
+.uvs-card-brick .uvs-card-tag {
   color: var(--linen);
 }
 
