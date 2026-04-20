@@ -3,12 +3,14 @@ import VolSocHand from "./VolSocHand"
 import "./volunteeringWebsite.css"
 
 const OPPORTUNITY_TYPES = {
+  svs: "Social Volunteering Sessions",
   slp: "Student Led Projects",
   glp: "Group Led Projects",
   elp: "External Volunteering Opportunities"
 }
 
 const OPPORTUNITY_TYPE_META = {
+  svs: { tone: "pink" },
   slp: { tone: "lavender" },
   glp: { tone: "gold" },
   elp: { tone: "brick" }
@@ -57,7 +59,7 @@ const PROJECTS = [
     id: "pals-night",
     title: "Community Pals Night",
     subtype: "social",
-    opportunityType: "glp",
+    opportunityType: "svs",
     summary: "Friendly weekly socials with local youth clubs.",
     location: "Bloomsbury Community Hall",
     time: "Wednesdays, 18:00–20:00"
@@ -66,7 +68,7 @@ const PROJECTS = [
     id: "care-home-connect",
     title: "Care Home Connect",
     subtype: "social",
-    opportunityType: "slp",
+    opportunityType: "svs",
     summary: "Conversation and games sessions with care-home residents.",
     location: "Camden Wellbeing Centre",
     time: "Fridays, 16:00–17:30"

@@ -255,6 +255,10 @@ body {
   --tone: var(--golden-pollen);
 }
 
+.uvs-card-pink {
+  --tone: var(--baby-pink);
+}
+
 .uvs-card-green {
   --tone: var(--lime-moss);
 }
