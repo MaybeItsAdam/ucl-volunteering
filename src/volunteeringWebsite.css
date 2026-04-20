@@ -35,6 +35,11 @@ body {
   flex-direction: column;
 }
 
+.uvs-home {
+  display: grid;
+  gap: 0.5rem;
+}
+
 .uvs-dashboard {
   display: grid;
   gap: 0.5rem;
@@ -114,8 +119,73 @@ body {
   border-bottom: 2px solid transparent;
 }
 
-.uvs-nav a:hover {
+.uvs-nav button {
+  color: inherit;
+  font: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0.4rem 0.2rem;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.uvs-nav a:hover,
+.uvs-nav button:hover,
+.uvs-nav .is-active {
   border-bottom-color: var(--strong-cyan);
+}
+
+/* ---------- homepage ---------- */
+
+.uvs-home-hero {
+  display: grid;
+  grid-template-columns: minmax(300px, 560px) minmax(0, 1fr);
+  align-items: flex-start;
+  gap: clamp(1.4rem, 4vw, 3.2rem);
+  padding: clamp(1.2rem, 4vw, 3rem) clamp(1rem, 4vw, 3rem);
+}
+
+.uvs-home-copy {
+  display: grid;
+  gap: 1.1rem;
+  max-width: 42rem;
+}
+
+.uvs-home-flag-wrap {
+  position: relative;
+  width: 100%;
+  height: clamp(360px, 50vh, 500px);
+  background: transparent;
+  overflow: hidden;
+}
+
+.uvs-home-flag {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.uvs-cta {
+  justify-self: start;
+  border: 2px solid var(--prussian-blue);
+  border-radius: 999px;
+  background: var(--strong-cyan);
+  color: var(--prussian-blue);
+  font: inherit;
+  font-weight: 700;
+  padding: 0.6rem 1rem;
+  cursor: pointer;
+}
+
+.uvs-cta:hover {
+  background: color-mix(in srgb, var(--strong-cyan) 85%, var(--linen));
+}
+
+.uvs-home-logo {
+  width: clamp(12rem, 32vw, 22rem);
+  height: auto;
+  display: block;
+  color: var(--linen);
 }
 
 /* ---------- hero ---------- */
@@ -392,6 +462,14 @@ body {
 /* ---------- responsive ---------- */
 
 @media (max-width: 860px) {
+  .uvs-home-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .uvs-home-flag-wrap {
+    min-height: 360px;
+  }
+
   .uvs-hero {
     flex-direction: column;
     align-items: flex-start;

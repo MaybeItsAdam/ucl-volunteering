@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react"
+import UclFlag from "./UclFlag"
 import VolSocHand from "./VolSocHand"
 import "./volunteeringWebsite.css"
 
@@ -134,9 +135,15 @@ const getSearchText = (project) => {
     .toLowerCase()
 }
 
-export default function VolunteeringWebsite() {
+export default function VolunteeringWebsite({ activeView = "home", onNavigate }) {
   const [query, setQuery] = useState("")
   const normalizedQuery = query.trim().toLowerCase()
+
+  const handleNavigate = (view) => {
+    if (onNavigate) {
+      onNavigate(view)
+    }
+  }
 
   const filteredProjects = useMemo(() => {
     if (!normalizedQuery) return PROJECTS
@@ -155,59 +162,123 @@ export default function VolunteeringWebsite() {
   return (
     <div className="uvs">
       <header className="uvs-topbar">
-        <a className="uvs-mark" href="#top">
+        <a
+          className="uvs-mark"
+          href="/"
+          onClick={(event) => {
+            event.preventDefault()
+            handleNavigate("home")
+          }}
+        >
           <VolSocHand className="uvs-mark-logo" />
           <span>UCL Volunteering Society</span>
         </a>
         <nav className="uvs-nav" aria-label="Primary">
-          <a href="#dashboard">Dashboard</a>
-          <a href="#social">Social</a>
-          <a href="#external">External</a>
+          <a
+            href="/"
+            className={activeView === "home" ? "is-active" : undefined}
+            onClick={(event) => {
+              event.preventDefault()
+              handleNavigate("home")
+            }}
+          >
+            Home
+          </a>
+          <a
+            href="/dashboard"
+            className={activeView === "dashboard" ? "is-active" : undefined}
+            onClick={(event) => {
+              event.preventDefault()
+              handleNavigate("dashboard")
+            }}
+          >
+            Dashboard
+          </a>
+          {activeView === "dashboard" ? (
+            <>
+              <a href="#social">Social</a>
+              <a href="#external">External</a>
+            </>
+          ) : null}
         </nav>
       </header>
 
-      <main id="dashboard" className="uvs-dashboard">
-        <section className="uvs-hero" id="top">
-          <div className="uvs-hero-copy">
-            <p className="uvs-eyebrow">Volunteering Dashboard</p>
-            <h1>Find your next opportunity</h1>
-            <p className="uvs-lede">
-              Search across all projects, or browse each subtype below.
-            </p>
-          </div>
-          <label className="uvs-search" htmlFor="opportunity-search">
-            <span>Search opportunities</span>
-            <input
-              id="opportunity-search"
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Try location, audience, partner, time..."
-            />
-          </label>
-        </section>
+      {activeView === "home" ? (
+        <main className="uvs-home" id="top">
+          <section className="uvs-home-hero">
+            <div className="uvs-home-flag-wrap" aria-hidden="true">
+              <UclFlag className="uvs-home-flag" />
+            </div>
+            <div className="uvs-home-copy">
+              <p className="uvs-eyebrow">Welcome</p>
+              <VolSocHand className="uvs-home-logo" />
+              <h1>UCL Volunteering Society</h1>
+              <p className="uvs-lede">
+                Join student-led volunteering that makes a local impact. Browse our current
+                projects or jump into the dashboard to find the right opportunity.
+              </p>
+              <button type="button" className="uvs-cta" onClick={() => handleNavigate("dashboard")}>
+                Open Dashboard
+              </button>
+            </div>
+          </section>
 
-        <section className="uvs-section" id="all-opportunities">
-          <div className="uvs-section-head">
-            <p className="uvs-eyebrow">All opportunities</p>
-            <h2>Everything currently available</h2>
-          </div>
-          <ProjectGrid projects={filteredProjects} />
-        </section>
+          <section className="uvs-section">
+            <div className="uvs-section-head">
+              <p className="uvs-eyebrow">At a glance</p>
+              <h2>How you can get involved</h2>
+              <p className="uvs-section-lede">
+                Social sessions, education mentoring, environmental action, and external charity
+                partnerships all run throughout term.
+              </p>
+            </div>
+            <ProjectGrid projects={PROJECTS.slice(0, 3)} />
+          </section>
+        </main>
+      ) : (
+        <main id="dashboard" className="uvs-dashboard">
+          <section className="uvs-hero" id="top">
+            <div className="uvs-hero-copy">
+              <p className="uvs-eyebrow">Volunteering Dashboard</p>
+              <h1>Find your next opportunity</h1>
+              <p className="uvs-lede">
+                Search across all projects, or browse each subtype below.
+              </p>
+            </div>
+            <label className="uvs-search" htmlFor="opportunity-search">
+              <span>Search opportunities</span>
+              <input
+                id="opportunity-search"
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Try location, audience, partner, time..."
+              />
+            </label>
+          </section>
 
-        {SUBTYPE_KEYS.map((subtype) => {
-          const projectsForSubtype = filteredProjectsBySubtype[subtype] ?? []
-          return (
-            <section className="uvs-section" id={subtype} key={subtype}>
-              <div className="uvs-section-head">
-                <p className="uvs-eyebrow">{SUBTYPE_META[subtype].label}</p>
-                <h2>{SUBTYPE_META[subtype].label} opportunities</h2>
-              </div>
-              <ProjectGrid projects={projectsForSubtype} />
-            </section>
-          )
-        })}
-      </main>
+          <section className="uvs-section" id="all-opportunities">
+            <div className="uvs-section-head">
+              <p className="uvs-eyebrow">All opportunities</p>
+              <h2>Everything currently available</h2>
+            </div>
+            <ProjectGrid projects={filteredProjects} />
+          </section>
+
+          {SUBTYPE_KEYS.map((subtype) => {
+            const projectsForSubtype = filteredProjectsBySubtype[subtype] ?? []
+            return (
+              <section className="uvs-section" id={subtype} key={subtype}>
+                <div className="uvs-section-head">
+                  <p className="uvs-eyebrow">{SUBTYPE_META[subtype].label}</p>
+                  <h2>{SUBTYPE_META[subtype].label} opportunities</h2>
+                </div>
+                <ProjectGrid projects={projectsForSubtype} />
+              </section>
+            )
+          })}
+        </main>
+      )}
 
       <footer className="uvs-footer">
         <div className="uvs-footer-brand">
