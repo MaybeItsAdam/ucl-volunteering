@@ -116,17 +116,32 @@ body {
 /* ---------- hero ---------- */
 
 .uvs-hero {
+  position: relative;
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
+  grid-template-columns: minmax(220px, 0.55fr) 1fr;
   align-items: center;
-  gap: clamp(1.5rem, 4vw, 4rem);
+  gap: clamp(1rem, 4vw, 4rem);
   padding: clamp(2rem, 6vw, 5rem) clamp(1rem, 4vw, 3rem);
+  min-height: 90vh;
+  overflow: hidden;
 }
 
 .uvs-hero-copy {
-  max-width: 36rem;
+  position: relative;
+  z-index: 2;
+  max-width: 38rem;
   display: grid;
   gap: 1.2rem;
+  justify-self: center;
+  justify-items: center;
+  text-align: center;
+}
+
+.uvs-hero-logo {
+  width: clamp(5.5rem, 10vw, 9rem);
+  height: auto;
+  color: var(--prussian-blue);
+  margin-bottom: 0.2rem;
 }
 
 .uvs-eyebrow {
@@ -186,15 +201,53 @@ body {
   color: var(--linen);
 }
 
+@property --sky-top {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #3c7ed6;
+}
+
+@property --sky-bot {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a8d0f0;
+}
+
+.uvs-hero {
+  transition: --sky-top 1.2s ease, --sky-bot 1.2s ease;
+}
+
 .uvs-hero-flag {
   position: relative;
+  z-index: 1;
   width: 100%;
-  aspect-ratio: 1 / 1;
-  min-height: 28rem;
-  filter: drop-shadow(0 10px 24px rgba(6, 28, 51, 0.08));
+  max-width: 24rem;
+  aspect-ratio: 3 / 5;
+  min-height: 32rem;
+  justify-self: start;
+}
+
+.uvs-flag-sky {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, var(--sky-top), var(--sky-bot));
+  -webkit-mask-image: radial-gradient(
+    ellipse 60% 55% at 18% 22%,
+    #000 45%,
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    ellipse 60% 55% at 18% 22%,
+    #000 45%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 0;
 }
 
 .uvs-hero-flag canvas {
+  position: relative;
+  z-index: 1;
   width: 100% !important;
   height: 100% !important;
   display: block;
@@ -280,31 +333,21 @@ body {
   background: var(--tone, var(--prussian-blue));
 }
 
-.uvs-card-slp {
-  --tone: var(--lavender-purple);
-}
-
-.uvs-card-glp {
-  --tone: var(--golden-pollen);
-}
-
-.uvs-card-elp {
-  --tone: var(--brick-red);
+.uvs-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
 }
 
 .uvs-card-tag {
   align-self: flex-start;
   font-weight: 800;
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   letter-spacing: 0.18em;
-  padding: 0.35rem 0.6rem;
+  padding: 0.3rem 0.55rem;
   border-radius: 999px;
   background: var(--tone);
   color: var(--prussian-blue);
-}
-
-.uvs-card-elp .uvs-card-tag {
-  color: var(--linen);
 }
 
 .uvs-card-blurb {
@@ -314,6 +357,143 @@ body {
 .uvs-card-detail {
   font-size: 0.92rem;
   color: color-mix(in srgb, var(--prussian-blue) 70%, transparent);
+}
+
+/* ---------- controls (search + filters) ---------- */
+
+.uvs-controls {
+  display: grid;
+  gap: 0.8rem;
+  margin-bottom: clamp(1.2rem, 2.5vw, 2rem);
+}
+
+.uvs-search {
+  display: block;
+}
+
+.uvs-search input {
+  width: 100%;
+  max-width: 28rem;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  border: 2px solid var(--prussian-blue);
+  background: #fff;
+  color: var(--prussian-blue);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.uvs-search input::placeholder {
+  color: color-mix(in srgb, var(--prussian-blue) 45%, transparent);
+}
+
+.uvs-search input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--strong-cyan) 55%, transparent);
+}
+
+.uvs-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+.uvs-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.uvs-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.95rem;
+  border-radius: 999px;
+  border: 2px solid var(--prussian-blue);
+  background: transparent;
+  color: var(--prussian-blue);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.uvs-filter:hover {
+  transform: translateY(-1px);
+}
+
+.uvs-filter.is-active {
+  background: var(--prussian-blue);
+  color: var(--linen);
+}
+
+.uvs-filter-slp.is-active {
+  background: var(--lavender-purple);
+  border-color: var(--lavender-purple);
+  color: var(--prussian-blue);
+}
+
+.uvs-filter-glp.is-active {
+  background: var(--golden-pollen);
+  border-color: var(--golden-pollen);
+  color: var(--prussian-blue);
+}
+
+.uvs-filter-elp.is-active {
+  background: var(--brick-red);
+  border-color: var(--brick-red);
+  color: var(--linen);
+}
+
+.uvs-filter-social.is-active {
+  background: var(--baby-pink);
+  border-color: var(--baby-pink);
+  color: var(--prussian-blue);
+}
+
+.uvs-filter-short {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  opacity: 0.7;
+}
+
+.uvs-empty {
+  padding: 2rem 0;
+  color: color-mix(in srgb, var(--ink) 60%, transparent);
+}
+
+/* ---------- card meta ---------- */
+
+.uvs-card-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.8rem;
+  margin: 0.4rem 0 0;
+}
+
+.uvs-card-meta div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.uvs-card-meta dt {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--prussian-blue) 60%, transparent);
+  font-weight: 700;
+}
+
+.uvs-card-meta dd {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
 }
 
 /* ---------- cadence ---------- */
@@ -400,14 +580,17 @@ body {
 @media (max-width: 860px) {
   .uvs-hero {
     grid-template-columns: 1fr;
-    text-align: left;
+    min-height: auto;
   }
 
   .uvs-hero-flag {
-    order: -1;
-    min-height: 20rem;
-    max-width: 24rem;
-    margin: 0 auto;
+    min-height: 26rem;
+    max-width: 18rem;
+    justify-self: center;
+  }
+
+  .uvs-hero-copy {
+    justify-self: center;
   }
 
   .uvs-nav {
