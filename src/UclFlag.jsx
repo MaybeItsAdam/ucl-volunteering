@@ -1,6 +1,11 @@
 import React, { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
-import { OrbitControls, Stars, useTexture } from "@react-three/drei"
+import {
+  OrbitControls,
+  PerspectiveCamera,
+  Stars,
+  useTexture
+} from "@react-three/drei"
 import {
   BackSide,
   DataTexture,
@@ -11,11 +16,12 @@ import {
   RedFormat,
   SRGBColorSpace
 } from "three"
+import { getEffectiveDate, useTimeOverride } from "./timeOverride"
 
 const VERTEX_CHUNK = `
   vFlagUv = uv;
 
-  float travel = (transformed.x + 1.5) / 3.0;
+  float travel = uv.x;
   float pinned = smoothstep(0.0, 0.06, travel);
 
   // distance behind the unfurl leading edge
@@ -23,14 +29,15 @@ const VERTEX_CHUNK = `
   float settle = smoothstep(0.0, 0.22, edgeDist);
   float bulge = 1.0 - settle;
 
-  // wave amplitude builds up as the fabric settles into place
-  float w1 = sin(travel * 7.0 - uFlagTime * 2.4) * 0.22;
-  float w2 = sin(travel * 14.0 + transformed.y * 1.3 - uFlagTime * 3.1) * 0.09;
-  float w3 = sin(transformed.y * 2.6 + uFlagTime * 1.5) * 0.05;
+  // wave amplitude scales with wind strength
+  float w1 = sin(travel * 7.0 - uFlagTime * 2.4) * 0.22 * uWindStrength;
+  float w2 = sin(travel * 14.0 + transformed.y * 1.3 - uFlagTime * 3.1) * 0.09 * uWindStrength;
+  float w3 = sin(transformed.y * 2.6 + uFlagTime * 1.5) * 0.05 * uWindStrength;
 
   float amp = pinned * travel * settle;
   transformed.z += (w1 + w2 + w3) * amp;
-  transformed.y -= travel * travel * 0.07 * pinned * settle;
+  // flag droops when calm, extends flat when windy
+  transformed.y -= travel * travel * 0.07 * max(0.0, 1.0 - uWindStrength) * pinned * settle;
 
   // leading edge curls — the fabric rolls open rather than popping flat
   float curlPhase = bulge * 3.14159;
@@ -43,7 +50,15 @@ const VERTEX_CHUNK = `
   transformed.z += whipBand * sin(uFlagTime * 18.0) * 0.05 * pinned;
 `
 
-const CAMERA_CONFIG = { position: [0.2, 1.3, 8.0], fov: 48 }
+const CAMERA_POSITION = [0.3, 0.2, 5.5]
+const CAMERA_FOV = 50
+const FLAG_W = 7.2
+const FLAG_H = 4.8
+const FLAG_Y = 0
+const POLE_HEIGHT = 6.5
+const POLE_TOP = FLAG_Y + FLAG_H / 2 + 0.2   // 0.2 exposed above flag top
+const POLE_BASE_Y = POLE_TOP - POLE_HEIGHT    // pole root, below the view
+const POLE_X = -FLAG_W / 2                   // aligns with flag's pinned left edge
 
 function lerp(a, b, t) {
   return a + (b - a) * t
@@ -116,12 +131,39 @@ function computeSunState(date) {
 }
 
 export function useSunState() {
-  const [state, setState] = useState(() => computeSunState(new Date()))
+  const override = useTimeOverride()
+  const [, setTick] = useState(0)
   useEffect(() => {
-    const id = setInterval(() => setState(computeSunState(new Date())), 60_000)
+    if (override != null) return undefined
+    const id = setInterval(() => setTick((x) => x + 1), 60_000)
     return () => clearInterval(id)
-  }, [])
-  return state
+  }, [override])
+  return computeSunState(getEffectiveDate())
+}
+
+function CelestialBody({ sun }) {
+  const dist = 14
+  const az = Math.max(-1, Math.min(1, sun.sunPosition[0] / 100))
+  // y factor kept low so noon sun sits inside the camera frustum
+  const yFactor = 5.5
+  const showSun = sun.elevation > -0.05
+  const showMoon = sun.elevation < 0.05
+  return (
+    <>
+      {showSun && (
+        <mesh position={[az * dist * 0.7, sun.elevation * yFactor, -dist * 0.55]}>
+          <sphereGeometry args={[0.85, 28, 28]} />
+          <meshBasicMaterial color={sun.sunColor} toneMapped={false} />
+        </mesh>
+      )}
+      {showMoon && (
+        <mesh position={[-az * dist * 0.7, -sun.elevation * yFactor * 0.9, -dist * 0.55]}>
+          <sphereGeometry args={[0.62, 28, 28]} />
+          <meshBasicMaterial color="#e8ecf0" toneMapped={false} />
+        </mesh>
+      )}
+    </>
+  )
 }
 
 function CelestialStage({ sun, children }) {
@@ -137,10 +179,12 @@ function CelestialStage({ sun, children }) {
         color={sun.sunColor}
       />
       <directionalLight position={[-2, -1, 2]} intensity={0.2} color="#8fa8d8" />
+      <CelestialBody sun={sun} />
       {children}
     </>
   )
 }
+
 
 function makeToonGradient(steps) {
   const data = new Uint8Array(steps)
@@ -152,8 +196,7 @@ function makeToonGradient(steps) {
   return tex
 }
 
-function Scene({ logoTextureUrl }) {
-  const holeGroupRef = useRef(null)
+function Scene({ logoTextureUrl, flagPosition, flagRotation, flagScale, windStrength, poleScale }) {
   const poleGroupRef = useRef(null)
   const flagGroupRef = useRef(null)
   const shaderRef = useRef(null)
@@ -180,6 +223,7 @@ function Scene({ logoTextureUrl }) {
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uFlagTime = { value: 0 }
       shader.uniforms.uFlagAppear = { value: 0 }
+      shader.uniforms.uWindStrength = { value: 1 }
 
       shader.vertexShader = shader.vertexShader
         .replace(
@@ -187,6 +231,7 @@ function Scene({ logoTextureUrl }) {
           `#include <common>
            uniform float uFlagTime;
            uniform float uFlagAppear;
+           uniform float uWindStrength;
            varying vec2 vFlagUv;`
         )
         .replace(
@@ -217,28 +262,17 @@ function Scene({ logoTextureUrl }) {
   useFrame((state) => {
     const t = state.clock.elapsedTime
 
-    // Hole opens: 0 → 0.5s, easeOutCubic
-    const holeT = Math.min(Math.max(t / 0.5, 0), 1)
-    const holeEase = 1 - Math.pow(1 - holeT, 3)
-    if (holeGroupRef.current) {
-      holeGroupRef.current.scale.x = Math.max(holeEase, 0.0001)
-      holeGroupRef.current.scale.y = Math.max(holeEase * 0.32, 0.0001)
-    }
-
-    // Pole pushes up out of the hole: 0.5s → 1.4s, easeOutCubic
-    const poleStart = 0.5
-    const poleT = Math.min(Math.max((t - poleStart) / 0.9, 0), 1)
+    // Pole rises: 0 → 0.9s, easeOutCubic
+    const poleT = Math.min(Math.max(t / 0.9, 0), 1)
     const poleEase = 1 - Math.pow(1 - poleT, 3)
     if (poleGroupRef.current) {
-      poleGroupRef.current.visible = t >= poleStart
       poleGroupRef.current.scale.y = Math.max(poleEase, 0.0001)
     }
 
-    // Flag unfurls: 1.5s → 2.9s — slower for a more deliberate roll-out
-    const flagStart = 1.5
+    // Flag unfurls: 0.2s → 1.6s
+    const flagStart = 0.2
     const flagDuration = 1.4
     const flagT = Math.min(Math.max((t - flagStart) / flagDuration, 0), 1)
-    // ease that starts slow, speeds up mid-roll, then eases out at the tip
     const flagEase =
       flagT < 0.5
         ? 2.0 * flagT * flagT
@@ -248,59 +282,44 @@ function Scene({ logoTextureUrl }) {
     }
     if (shaderRef.current) {
       shaderRef.current.uniforms.uFlagTime.value = t
-      // overshoot past 1 so the tip clears the 0.22-wide curl zone and settles flat
       shaderRef.current.uniforms.uFlagAppear.value = flagEase * 1.28
+      shaderRef.current.uniforms.uWindStrength.value = windStrength
     }
   })
 
   return (
-    <group position={[0.2, 0, 0]}>
-      {/* Hole in the ground — grows open, then the pole emerges from it */}
-      <group
-        ref={holeGroupRef}
-        position={[-1.5, -1.25, 0.05]}
-        scale={[0.0001, 0.0001, 1]}
-      >
-        <mesh position={[0, 0, 0.01]} renderOrder={1}>
-          <circleGeometry args={[0.16, 48]} />
-          <meshBasicMaterial color="#020a14" toneMapped={false} />
-        </mesh>
-        <mesh>
-          <ringGeometry args={[0.16, 0.19, 48]} />
-          <meshBasicMaterial color="#061c33" toneMapped={false} />
-        </mesh>
-      </group>
-
-      {/* Pole + finial — cel-shaded, emerges from the hole */}
+    <group position={flagPosition} rotation={flagRotation} scale={flagScale}>
+      {/* Pole + finial — outer group drives rise animation (scale.y only) */}
       <group
         ref={poleGroupRef}
-        position={[-1.5, -1.25, 0]}
+        position={[POLE_X, POLE_BASE_Y, 0]}
         scale={[1, 0.0001, 1]}
-        visible={false}
       >
-        <mesh position={[0, 2.1, 0]} scale={[1.12, 1.002, 1.12]}>
-          <cylinderGeometry args={[0.04, 0.04, 4.2, 24]} />
-          <meshBasicMaterial color="#020a14" side={BackSide} toneMapped={false} />
-        </mesh>
-        <mesh position={[0, 2.1, 0]}>
-          <cylinderGeometry args={[0.04, 0.04, 4.2, 24]} />
-          <meshToonMaterial color="#1a3a66" gradientMap={toonGradient} />
-        </mesh>
-
-        <mesh position={[0, 4.3, 0]} scale={1.1}>
-          <sphereGeometry args={[0.14, 24, 24]} />
-          <meshBasicMaterial color="#020a14" side={BackSide} toneMapped={false} />
-        </mesh>
-        <mesh position={[0, 4.3, 0]}>
-          <sphereGeometry args={[0.14, 24, 24]} />
-          <meshToonMaterial color="#10c4c0" gradientMap={toonGradient} />
-        </mesh>
+        {/* inner group scales XZ (radius/thickness) without interfering with animation */}
+        <group scale={[poleScale, 1, poleScale]}>
+          <mesh position={[0, POLE_HEIGHT / 2, 0]} scale={[1.12, 1.002, 1.12]}>
+            <cylinderGeometry args={[0.035, 0.035, POLE_HEIGHT, 24]} />
+            <meshBasicMaterial color="#020a14" side={BackSide} toneMapped={false} />
+          </mesh>
+          <mesh position={[0, POLE_HEIGHT / 2, 0]}>
+            <cylinderGeometry args={[0.035, 0.035, POLE_HEIGHT, 24]} />
+            <meshToonMaterial color="#1a3a66" gradientMap={toonGradient} />
+          </mesh>
+          <mesh position={[0, POLE_HEIGHT + 0.1, 0]} scale={poleScale * 1.1}>
+            <sphereGeometry args={[0.12, 24, 24]} />
+            <meshBasicMaterial color="#020a14" side={BackSide} toneMapped={false} />
+          </mesh>
+          <mesh position={[0, POLE_HEIGHT + 0.1, 0]} scale={poleScale}>
+            <sphereGeometry args={[0.12, 24, 24]} />
+            <meshToonMaterial color="#10c4c0" gradientMap={toonGradient} />
+          </mesh>
+        </group>
       </group>
 
-      {/* Flag — pinned just below finial; shader discards beyond uFlagAppear */}
-      <group ref={flagGroupRef} position={[0, 1.85, 0]} visible={false}>
+      {/* Flag — pinned to pole's right edge */}
+      <group ref={flagGroupRef} position={[0, FLAG_Y, 0]} visible={false}>
         <mesh material={material}>
-          <planeGeometry args={[3, 2, 96, 48]} />
+          <planeGeometry args={[FLAG_W, FLAG_H, 192, 128]} />
         </mesh>
       </group>
     </group>
@@ -311,21 +330,33 @@ export default function UclFlag({
   logoTextureUrl = "/volsoc-flag.svg",
   className,
   style,
-  interactive = false
+  interactive = false,
+  flagPosition = [0, 0, 0],
+  flagRotation = [0.08, 0.48, 0],
+  flagScale = 1,
+  windStrength = 1,
+  poleScale = 1,
 }) {
   const sun = useSunState()
 
   return (
     <Canvas
-      camera={CAMERA_CONFIG}
       className={className}
       style={{ ...style, background: "transparent" }}
       dpr={[1, 2]}
       gl={{ alpha: true }}
     >
+      <PerspectiveCamera makeDefault position={CAMERA_POSITION} fov={CAMERA_FOV} />
       <Suspense fallback={null}>
         <CelestialStage sun={sun}>
-          <Scene logoTextureUrl={logoTextureUrl} />
+          <Scene
+            logoTextureUrl={logoTextureUrl}
+            flagPosition={flagPosition}
+            flagRotation={flagRotation}
+            flagScale={flagScale}
+            windStrength={windStrength}
+            poleScale={poleScale}
+          />
         </CelestialStage>
       </Suspense>
       {interactive ? <OrbitControls enablePan={false} /> : null}

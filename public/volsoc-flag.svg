@@ -11,7 +11,4 @@
   <!-- Right quarter, split into halves -->
   <rect x="1125" y="0"   width="375" height="500" fill="#FFD23F"/>
   <rect x="1125" y="500" width="375" height="500" fill="#FF99C8"/>
-
-  <!-- Linen strip straddling the lavender / cyan seam (1/18 of flag width) -->
-  <rect x="333.333" y="0" width="83.333" height="1000" fill="#FEEFE5"/>
 </svg>
