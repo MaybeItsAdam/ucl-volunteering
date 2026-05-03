@@ -155,18 +155,6 @@ export default function Dashboard() {
 
   return (
     <div className="uvs">
-      <header className="uvs-topbar">
-        <a className="uvs-mark" href="#/">
-          <VolSocHand className="uvs-mark-logo" />
-          <span>UCL Volunteering Society</span>
-        </a>
-        <nav className="uvs-nav" aria-label="Primary">
-          <a href="#/">Home</a>
-          <a href="#/dashboard" aria-current="page">Opportunities</a>
-          <a href="#/#connect">Connect</a>
-        </nav>
-      </header>
-
       <section className="uvs-section">
         <div className="uvs-section-head">
           <p className="uvs-eyebrow">Opportunities</p>
