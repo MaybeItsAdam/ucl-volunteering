@@ -117,6 +117,7 @@ export default function VolunteeringWebsite({ onNavigate }) {
             windRef={windRef}
             poleScale={poleScale}
             ballScale={ballScale}
+            isDark={themeMix === 1}
           />
         </div>
         <div className="uvs-hero-copy">
@@ -134,6 +135,18 @@ export default function VolunteeringWebsite({ onNavigate }) {
               }}
             >
               Browse opportunities →
+            </a>
+            <a
+              className="uvs-cta uvs-cta-secondary"
+              href="#/leaderboard"
+              onClick={(e) => {
+                if (onNavigate) {
+                  e.preventDefault()
+                  onNavigate("#/leaderboard")
+                }
+              }}
+            >
+              Leaderboard
             </a>
           </div>
         </div>

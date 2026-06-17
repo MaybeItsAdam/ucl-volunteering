@@ -1,15 +1,31 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import VolunteeringWebsite from "./VolunteeringWebsite"
 import Dashboard from "./Dashboard"
+import { setToken } from "./auth"
 
 function readRoute() {
-  return window.location.hash.startsWith("#/dashboard") ? "dashboard" : "home"
+  const hash = window.location.hash
+  if (hash.startsWith("#token=")) {
+    // OAuth callback — consume token before routing
+    setToken(hash.slice("#token=".length))
+    window.history.replaceState(null, "", window.location.pathname + window.location.search + "#/dashboard")
+    return "dashboard"
+  }
+  if (hash.startsWith("#/dashboard")) return "dashboard"
+  if (hash.startsWith("#/leaderboard")) return "leaderboard"
+  if (hash.startsWith("#/my-volunteering")) return "my-volunteering"
+  if (hash.startsWith("#/committee")) return "committee"
+  return "home"
+}
+
+const ROUTE_TO_TAB = {
+  dashboard: "opportunities",
+  leaderboard: "leaderboard",
+  "my-volunteering": "my-volunteering",
+  committee: "committee",
 }
 
 // Page-wipe choreography
-//   idle      → linen sheet parked off-screen below
-//   rising    → sheet slides up to fully cover the viewport (route swaps at the top)
-//   revealing → sheet continues sliding off the top, exposing the new page
 const RISE_MS = 520
 const REVEAL_MS = 560
 
@@ -31,6 +47,19 @@ function App() {
 
   const navigateTo = useCallback((target) => {
     if (phase !== "idle") return
+    const targetRoute = (() => {
+      if (target.startsWith("#/dashboard")) return "dashboard"
+      if (target.startsWith("#/leaderboard")) return "leaderboard"
+      if (target.startsWith("#/my-volunteering")) return "my-volunteering"
+      if (target.startsWith("#/committee")) return "committee"
+      return "home"
+    })()
+    const animated = targetRoute === "home" || route === "home"
+    if (!animated) {
+      window.location.hash = target
+      setRoute(readRoute())
+      return
+    }
     setPhase("rising")
     timers.current.push(
       setTimeout(() => {
@@ -42,13 +71,20 @@ function App() {
         )
       }, RISE_MS)
     )
-  }, [phase])
+  }, [phase, route])
+
+  const isDashboardRoute = route !== "home"
 
   return (
     <>
-      {route === "dashboard"
-        ? <Dashboard onNavigate={navigateTo} />
-        : <VolunteeringWebsite onNavigate={navigateTo} />}
+      {route === "home" && <VolunteeringWebsite onNavigate={navigateTo} />}
+      {isDashboardRoute && (
+        <Dashboard
+          tab={ROUTE_TO_TAB[route]}
+          onNavigate={navigateTo}
+        />
+      )}
+
       <div
         className={`uvs-page-wipe uvs-page-wipe--${phase}`}
         aria-hidden="true"

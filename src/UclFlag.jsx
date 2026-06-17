@@ -16,7 +16,20 @@ import {
   RedFormat,
   SRGBColorSpace
 } from "three"
+import SunCalc from "suncalc"
 import { getEffectiveDate, useTimeOverride } from "./timeOverride"
+
+// London (UCL): real lat/lon used for live sun position via SunCalc.
+const LONDON_LAT = 51.5074
+const LONDON_LON = -0.1278
+
+// "Elevation" thresholds, expressed as sin(sun-altitude in radians):
+// >= SKY_DAY_ELEV  → full day sky.  6° above horizon.
+// 0..SKY_DAY_ELEV  → blend dusk → day.  Sun at horizon up to ~6°.
+// SKY_NIGHT_ELEV..0 → blend night → dusk. Civil/nautical twilight, 0° to -12°.
+// <= SKY_NIGHT_ELEV → full night sky. Sun more than 12° below horizon.
+const SKY_DAY_ELEV = Math.sin(6 * Math.PI / 180)    // ≈ 0.105
+const SKY_NIGHT_ELEV = Math.sin(-12 * Math.PI / 180) // ≈ -0.208
 
 const FLAG_SEGMENTS_X = 120
 const FLAG_SEGMENTS_Y = 80
@@ -181,15 +194,15 @@ const SKY_DAY_BOT = [168, 208, 240]
 
 export function skyColors(elevation) {
   let top, bot
-  if (elevation >= 0.35) {
+  if (elevation >= SKY_DAY_ELEV) {
     top = SKY_DAY_TOP
     bot = SKY_DAY_BOT
   } else if (elevation >= 0) {
-    const t = elevation / 0.35
+    const t = elevation / SKY_DAY_ELEV
     top = lerpColor(SKY_DUSK_TOP, SKY_DAY_TOP, t)
     bot = lerpColor(SKY_DUSK_BOT, SKY_DAY_BOT, t)
-  } else if (elevation >= -0.25) {
-    const t = (elevation + 0.25) / 0.25
+  } else if (elevation >= SKY_NIGHT_ELEV) {
+    const t = (elevation - SKY_NIGHT_ELEV) / -SKY_NIGHT_ELEV
     top = lerpColor(SKY_NIGHT_TOP, SKY_DUSK_TOP, t)
     bot = lerpColor(SKY_NIGHT_BOT, SKY_DUSK_BOT, t)
   } else {
@@ -200,16 +213,27 @@ export function skyColors(elevation) {
 }
 
 function computeSunState(date) {
-  const hour = date.getHours() + date.getMinutes() / 60
-  const t = (hour / 24) * Math.PI * 2
-  const elevation = -Math.cos(t)
-  const azimuth = Math.sin(t)
+  // Real solar position for London at the given moment. SunCalc returns
+  // altitude (radians above horizon) and azimuth (radians clockwise from south).
+  const pos = SunCalc.getPosition(date, LONDON_LAT, LONDON_LON)
+  const altitude = pos.altitude
+  const azimuth = pos.azimuth
+
+  // Normalised sun height: sin(altitude) maps the [-π/2, π/2] altitude range to
+  // [-1, 1], matching the existing scene's expected scale for sun.elevation.
+  const elevation = Math.sin(altitude)
+
+  // Horizontal sun position. SunCalc's azimuth is measured clockwise from
+  // south, so −sin(azimuth) gives east = +1 / west = −1, which is what the
+  // celestial-body placement and theme code already assume.
+  const horizontal = -Math.sin(azimuth)
   const distance = 100
-  const sunPosition = [azimuth * distance, elevation * distance, 30]
+  const sunPosition = [horizontal * distance, elevation * distance, 30]
 
   const daylight = Math.max(0, elevation)
   const belowHorizon = elevation < 0
-  const isGolden = !belowHorizon && elevation < 0.25
+  // "Golden hour" — sun above horizon but within ~14° of it.
+  const isGolden = !belowHorizon && altitude < (14 * Math.PI / 180)
 
   let sunColor = "#fff4d6"
   if (belowHorizon) sunColor = "#5873a8"
@@ -218,13 +242,21 @@ function computeSunState(date) {
   const ambientIntensity = 0.38 + 0.4 * daylight
   const directIntensity = belowHorizon ? 0.25 : 0.4 + daylight * 0.9
 
+  // Ramps from 0 in daylight to 1 at deep night (sun ≥ 12° below horizon),
+  // used to drive a warm flag-floodlight effect so the flag stays readable
+  // after sunset rather than fading into the dark sky.
+  const nightFactor = Math.max(0, Math.min(1, -elevation / -SKY_NIGHT_ELEV))
+
   return {
     elevation,
+    altitude,
+    azimuth,
     sunPosition,
     sunColor,
     ambientIntensity,
     directIntensity,
-    showStars: elevation < 0.05
+    nightFactor,
+    showStars: elevation < 0.05,
   }
 }
 
@@ -264,7 +296,7 @@ function CelestialBody({ sun }) {
   )
 }
 
-function CelestialStage({ sun, children }) {
+function CelestialStage({ sun, isDark, children }) {
   return (
     <>
       {sun.showStars && (
@@ -279,6 +311,29 @@ function CelestialStage({ sun, children }) {
       <directionalLight position={[-2, -1, 2]} intensity={0.2} color="#8fa8d8" />
       {/* Front fill — keeps the flag's camera-facing side bright when the sun is overhead. */}
       <directionalLight position={[0.3, 0.6, 5]} intensity={0.85} color="#fff4d8" />
+      {/* Night flagpole floodlight — warm uplight that ramps in below horizon
+          so the flag stays lit after sunset, like real flagpole lighting. Suppressed
+          in dark mode where the warm uplights create an unwanted neon glow effect. */}
+      {sun.nightFactor > 0 && !isDark && (
+        <>
+          <directionalLight
+            position={[0, -2, 4]}
+            intensity={2.6 * sun.nightFactor}
+            color="#ffd9a3"
+          />
+          <directionalLight
+            position={[4, -1.5, 3]}
+            intensity={1.6 * sun.nightFactor}
+            color="#ffe1b4"
+          />
+          <directionalLight
+            position={[-3, -1, 3]}
+            intensity={1.2 * sun.nightFactor}
+            color="#ffe6c4"
+          />
+          <ambientLight intensity={0.7 * sun.nightFactor} color="#fff0d0" />
+        </>
+      )}
       <CelestialBody sun={sun} />
       {children}
     </>
@@ -454,6 +509,7 @@ export default function UclFlag({
   className,
   style,
   interactive = false,
+  isDark = false,
   flagPosition = [0, 0, 0],
   flagRotation = [0.08, 0.48, 0],
   flagScale = 1,
@@ -472,7 +528,7 @@ export default function UclFlag({
     >
       <ResponsiveCamera flagPosition={flagPosition} flagScale={flagScale} />
       <Suspense fallback={null}>
-        <CelestialStage sun={sun}>
+        <CelestialStage sun={sun} isDark={isDark}>
           <Scene
             logoTextureUrl={logoTextureUrl}
             flagPosition={flagPosition}
