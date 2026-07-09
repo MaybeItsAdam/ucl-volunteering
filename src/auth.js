@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
+import { API_BASE } from './config'
 
 const TOKEN_KEY = 'vol_auth_token'
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY)
@@ -17,7 +17,7 @@ export function clearToken() {
 
 export function signIn() {
   const returnTo = window.location.origin
-  window.location.href = `${API_BASE}/api/auth/ucl?return_to=${encodeURIComponent(returnTo)}`
+  window.location.href = `${API_BASE}/api/auth/entra?return_to=${encodeURIComponent(returnTo)}`
 }
 
 export function signOut() {

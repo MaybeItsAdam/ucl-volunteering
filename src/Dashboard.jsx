@@ -8,8 +8,6 @@ import CommitteeDashboard from "./CommitteeDashboard"
 import MyVolunteering from "./MyVolunteering"
 import "./volunteeringWebsite.css"
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'
-
 const CADENCES = [
   { id: "all", label: "Any time" },
   { id: "weekly", label: "Weekly" },
@@ -44,10 +42,8 @@ function useCommitteeStatus(user) {
     if (!token) { setStatus(false); return }
     setStatus(null)
     let cancelled = false
-    fetch(`${API_BASE}/api/volunteering-lb/ribbons`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((r) => { if (!cancelled) setStatus(r.ok) })
+    api.getRibbons()
+      .then(() => { if (!cancelled) setStatus(true) })
       .catch(() => { if (!cancelled) setStatus(false) })
     return () => { cancelled = true }
   }, [user])
