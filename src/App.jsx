@@ -12,6 +12,7 @@ function readRoute() {
     return "dashboard"
   }
   if (hash.startsWith("#/dashboard")) return "dashboard"
+  if (hash.startsWith("#/opportunities")) return "opportunities"
   if (hash.startsWith("#/leaderboard")) return "leaderboard"
   if (hash.startsWith("#/my-volunteering")) return "my-volunteering"
   if (hash.startsWith("#/committee")) return "committee"
@@ -19,7 +20,8 @@ function readRoute() {
 }
 
 const ROUTE_TO_TAB = {
-  dashboard: "opportunities",
+  dashboard: "dashboard",
+  opportunities: "opportunities",
   leaderboard: "leaderboard",
   "my-volunteering": "my-volunteering",
   committee: "committee",
@@ -49,6 +51,7 @@ function App() {
     if (phase !== "idle") return
     const targetRoute = (() => {
       if (target.startsWith("#/dashboard")) return "dashboard"
+      if (target.startsWith("#/opportunities")) return "opportunities"
       if (target.startsWith("#/leaderboard")) return "leaderboard"
       if (target.startsWith("#/my-volunteering")) return "my-volunteering"
       if (target.startsWith("#/committee")) return "committee"

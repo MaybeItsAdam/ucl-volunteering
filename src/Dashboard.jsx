@@ -6,6 +6,7 @@ import { useAuth, signIn, signOut, getToken } from "./auth"
 import Leaderboard from "./Leaderboard"
 import CommitteeDashboard from "./CommitteeDashboard"
 import MyVolunteering from "./MyVolunteering"
+import MainDashboard from "./MainDashboard"
 import "./volunteeringWebsite.css"
 
 const CADENCES = [
@@ -22,12 +23,14 @@ const CATEGORY_FILTER_TONES = {
 }
 
 const TAB_HASHES = {
-  opportunities: "#/dashboard",
+  dashboard: "#/dashboard",
+  opportunities: "#/opportunities",
   leaderboard: "#/leaderboard",
   "my-volunteering": "#/my-volunteering",
 }
 
 const LEDES = {
+  dashboard: "Opportunities on the map, upcoming deadlines, and the organisation directory.",
   opportunities: "Filter by cadence and volunteering type, search by name or organisation.",
   leaderboard: "Sessions leaderboard — see who's volunteered the most.",
   "my-volunteering": "Your sessions, ribbon collection, and awards.",
@@ -897,16 +900,17 @@ function OpportunitiesPanel({ isCommittee }) {
   )
 }
 
-export default function Dashboard({ tab = "opportunities", onNavigate }) {
+export default function Dashboard({ tab = "dashboard", onNavigate }) {
   const { user, loading: authLoading } = useAuth()
   const committeeStatus = useCommitteeStatus(user)
   const isCommittee = committeeStatus === true
 
   const tabs = useMemo(() => {
     return [
+      { id: "dashboard", label: "Dashboard" },
       { id: "opportunities", label: "Opportunities" },
       { id: "leaderboard", label: "Leaderboard" },
-      { id: "my-volunteering", label: "Dashboard" },
+      { id: "my-volunteering", label: "My Volunteering" },
     ]
   }, [])
 
@@ -924,7 +928,7 @@ export default function Dashboard({ tab = "opportunities", onNavigate }) {
 
   useEffect(() => {
     if (authLoading) return
-    if (tab === "committee" && user === null) selectTab("opportunities")
+    if (tab === "committee" && user === null) selectTab("dashboard")
   }, [tab, authLoading, user, selectTab])
 
   const activeTab =
@@ -999,6 +1003,9 @@ export default function Dashboard({ tab = "opportunities", onNavigate }) {
           <p className="uvs-section-lede">{LEDES[activeTab]}</p>
         </div>
 
+        {activeTab === "dashboard" && (
+          <MainDashboard onBrowseOpportunities={() => selectTab("opportunities")} />
+        )}
         {activeTab === "opportunities" && <OpportunitiesPanel isCommittee={isCommittee} />}
         {activeTab === "leaderboard" && <Leaderboard />}
         {activeTab === "my-volunteering" && (
