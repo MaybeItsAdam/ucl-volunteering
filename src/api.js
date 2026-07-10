@@ -33,42 +33,10 @@ export const api = {
   unstarOpportunity: (id) =>
     apiFetch(`/api/volunteering/${id}/star`, { method: 'DELETE' }),
 
-  // Leaderboard
-  getLeaderboard: () => apiFetch('/api/volunteering-lb/leaderboard'),
-  getMe: () => apiFetch('/api/volunteering-lb/me'),
-
-  // Committee
+  // Committee — getRibbons doubles as the "is this user committee?" probe
   getRibbons: () => apiFetch('/api/volunteering-lb/ribbons'),
-  awardRibbon: (userId, opportunityId, notes) =>
-    apiFetch('/api/volunteering-lb/ribbons', {
-      method: 'POST',
-      body: JSON.stringify({ userId, opportunityId, notes }),
-    }),
-  deleteRibbon: (id) =>
-    apiFetch(`/api/volunteering-lb/ribbons/${id}`, { method: 'DELETE' }),
   createOpportunity: (data) =>
     apiFetch('/api/volunteering', { method: 'POST', body: JSON.stringify(data) }),
   updateOpportunity: (id, data) =>
     apiFetch(`/api/volunteering/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
-
-  getColours: () => apiFetch('/api/volunteering-lb/colours'),
-  awardColour: (userId, colourName, notes) =>
-    apiFetch('/api/volunteering-lb/colours', {
-      method: 'POST',
-      body: JSON.stringify({ userId, colourName, notes }),
-    }),
-  deleteColour: (id) =>
-    apiFetch(`/api/volunteering-lb/colours/${id}`, { method: 'DELETE' }),
-
-  searchUsers: (q) => apiFetch(`/api/users/search?q=${encodeURIComponent(q)}`),
-
-  // Sessions
-  getSessions: () => apiFetch('/api/volunteering-lb/sessions'),
-  recordSession: (userId, opportunityId, notes) =>
-    apiFetch('/api/volunteering-lb/sessions', {
-      method: 'POST',
-      body: JSON.stringify({ userId, opportunityId, notes }),
-    }),
-  deleteSession: (id) =>
-    apiFetch(`/api/volunteering-lb/sessions/${id}`, { method: 'DELETE' }),
 }

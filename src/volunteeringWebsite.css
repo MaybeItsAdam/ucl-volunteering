@@ -2113,3 +2113,89 @@ button.uvs-cta-secondary {
   object-fit: cover;
   border-radius: var(--radius-sm);
 }
+
+/* Main dashboard — Map / Upcoming / Directory */
+.uvs-dash-panel {
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: var(--radius-md);
+  padding: 1.25rem 1.5rem 1.5rem;
+  min-width: 0;
+}
+
+.uvs-map-canvas {
+  height: min(62vh, 560px);
+  border-radius: var(--radius-sm);
+  border: 1.5px solid #e2e8f0;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.uvs-map-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--prussian-blue) 55%, transparent);
+}
+
+.uvs-map-pin-anchor { background: none; border: none; }
+
+.uvs-map-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50% 50% 50% 6px;
+  background: var(--strong-cyan);
+  color: var(--prussian-blue);
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: 2px solid var(--linen);
+  box-shadow: 0 2px 6px rgba(6, 28, 51, 0.35);
+}
+
+.uvs-map-popup strong { color: var(--prussian-blue); }
+.uvs-map-popup ul { margin: 0.4rem 0; padding-left: 1.1rem; }
+.uvs-map-popup li { margin: 0.15rem 0; }
+.uvs-map-popup a { color: var(--strong-cyan); font-weight: 600; }
+
+.uvs-upcoming-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.uvs-upcoming-group { min-width: 0; }
+
+.uvs-upcoming-group-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--prussian-blue) 60%, transparent);
+}
+
+.uvs-upcoming-row {
+  width: 100%;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.uvs-deadline-chip {
+  flex-shrink: 0;
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--strong-cyan) 18%, #fff);
+  color: var(--prussian-blue);
+}
+
+.uvs-deadline-chip--urgent {
+  background: color-mix(in srgb, var(--tomato) 20%, #fff);
+  color: var(--brick-red);
+}

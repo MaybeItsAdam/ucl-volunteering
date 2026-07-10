@@ -3,9 +3,8 @@ import { createPortal } from "react-dom"
 import { motion as Motion, AnimatePresence } from "motion/react"
 import { api } from "./api"
 import { useAuth, signIn, signOut, getToken } from "./auth"
-import Leaderboard from "./Leaderboard"
-import CommitteeDashboard from "./CommitteeDashboard"
-import MyVolunteering from "./MyVolunteering"
+import { MapPanel, UpcomingPanel } from "./MainDashboard"
+import { useAllOpportunities } from "./useAllOpportunities"
 import "./volunteeringWebsite.css"
 
 const CADENCES = [
@@ -22,15 +21,15 @@ const CATEGORY_FILTER_TONES = {
 }
 
 const TAB_HASHES = {
-  opportunities: "#/dashboard",
-  leaderboard: "#/leaderboard",
-  "my-volunteering": "#/my-volunteering",
+  map: "#/map",
+  upcoming: "#/upcoming",
+  directory: "#/directory",
 }
 
 const LEDES = {
-  opportunities: "Filter by cadence and volunteering type, search by name or organisation.",
-  leaderboard: "Sessions leaderboard — see who's volunteered the most.",
-  "my-volunteering": "Your sessions, ribbon collection, and awards.",
+  map: "See where opportunities are across London — tap a pin to see what's there.",
+  upcoming: "Deadlines closing soon and the latest opportunities.",
+  directory: "Filter by cadence and volunteering type, search by name or organisation.",
 }
 
 function useCommitteeStatus(user) {
@@ -897,16 +896,17 @@ function OpportunitiesPanel({ isCommittee }) {
   )
 }
 
-export default function Dashboard({ tab = "opportunities", onNavigate }) {
+export default function Dashboard({ tab = "map", onNavigate }) {
   const { user, loading: authLoading } = useAuth()
   const committeeStatus = useCommitteeStatus(user)
   const isCommittee = committeeStatus === true
+  const { opportunities, loading: oppsLoading, error: oppsError } = useAllOpportunities()
 
   const tabs = useMemo(() => {
     return [
-      { id: "opportunities", label: "Opportunities" },
-      { id: "leaderboard", label: "Leaderboard" },
-      { id: "my-volunteering", label: "Dashboard" },
+      { id: "map", label: "Map" },
+      { id: "upcoming", label: "Upcoming" },
+      { id: "directory", label: "Directory" },
     ]
   }, [])
 
@@ -922,15 +922,7 @@ export default function Dashboard({ tab = "opportunities", onNavigate }) {
     else window.location.hash = "#/"
   }
 
-  useEffect(() => {
-    if (authLoading) return
-    if (tab === "committee" && user === null) selectTab("opportunities")
-  }, [tab, authLoading, user, selectTab])
-
-  const activeTab =
-    tab === "committee"
-      ? "my-volunteering"
-      : tab
+  const activeTab = TAB_HASHES[tab] ? tab : "map"
 
   return (
     <div className="uvs">
@@ -999,19 +991,22 @@ export default function Dashboard({ tab = "opportunities", onNavigate }) {
           <p className="uvs-section-lede">{LEDES[activeTab]}</p>
         </div>
 
-        {activeTab === "opportunities" && <OpportunitiesPanel isCommittee={isCommittee} />}
-        {activeTab === "leaderboard" && <Leaderboard />}
-        {activeTab === "my-volunteering" && (
-          <>
-            <MyVolunteering user={user} />
-            {user && isCommittee && (
-              <div className="uvs-committee-section">
-                <p className="uvs-committee-section-label">Committee</p>
-                <CommitteeDashboard />
-              </div>
-            )}
-          </>
+        {activeTab === "map" && (
+          <MapPanel
+            opportunities={opportunities}
+            loading={oppsLoading}
+            error={oppsError}
+          />
         )}
+        {activeTab === "upcoming" && (
+          <UpcomingPanel
+            opportunities={opportunities}
+            loading={oppsLoading}
+            error={oppsError}
+            onBrowse={() => selectTab("directory")}
+          />
+        )}
+        {activeTab === "directory" && <OpportunitiesPanel isCommittee={isCommittee} />}
       </section>
     </div>
   )
