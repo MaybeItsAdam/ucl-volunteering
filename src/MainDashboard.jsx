@@ -1,11 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from "react"
+import React, { useEffect, useMemo, useRef } from "react"
 import { motion as Motion } from "motion/react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
-import { api } from "./api"
 
 const UCL_CENTRE = [51.5246, -0.134]
-const MAX_PAGES = 5
 
 // Rough coordinates for locations that commonly appear as free-text on
 // opportunities, so they can be plotted without a geocoding service.
@@ -103,20 +101,15 @@ function locateOpportunity(opp) {
   return null
 }
 
-async function fetchAllOpportunities() {
-  const first = await api.getOpportunities()
-  let opps = first.opportunities || []
-  const totalPages = Math.min(first.totalPages || 1, MAX_PAGES)
-  for (let page = 2; page <= totalPages; page++) {
-    const d = await api.getOpportunities({ page })
-    opps = opps.concat(d.opportunities || [])
-  }
-  const seen = new Set()
-  return opps.filter((o) => {
-    if (seen.has(o.id)) return false
-    seen.add(o.id)
-    return true
-  })
+function LoadingStripes({ label }) {
+  return (
+    <div className="uvs-opp-loading" role="status" aria-label={label}>
+      <span className="uvs-opp-loading-stripe" aria-hidden="true" />
+      <span className="uvs-opp-loading-stripe" aria-hidden="true" />
+      <span className="uvs-opp-loading-stripe" aria-hidden="true" />
+      <span className="uvs-opp-loading-stripe" aria-hidden="true" />
+    </div>
+  )
 }
 
 function popupHtml(group) {
@@ -134,7 +127,7 @@ function popupHtml(group) {
     `<div class="uvs-map-popup">` +
     `<strong>${escapeHtml(group.label)}</strong>` +
     `<ul>${items}${more}</ul>` +
-    `<a href="#/opportunities">Browse opportunities →</a>` +
+    `<a href="#/directory">Open the directory →</a>` +
     `</div>`
   )
 }
@@ -198,224 +191,7 @@ function OpportunityMap({ groups, remoteCount, unplacedCount }) {
   )
 }
 
-function daysUntil(value) {
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return null
-  d.setHours(23, 59, 59, 999)
-  return Math.ceil((d.getTime() - Date.now()) / 86400000)
-}
-
-function deadlineLabel(days) {
-  if (days <= 0) return "Closes today"
-  if (days === 1) return "1 day left"
-  return `${days} days left`
-}
-
-function UpcomingPanel({ opportunities, onBrowse }) {
-  const closingSoon = useMemo(() => {
-    return opportunities
-      .map((opp) => ({ opp, days: opp.expiryDate ? daysUntil(opp.expiryDate) : null }))
-      .filter((x) => x.days !== null && x.days >= 0)
-      .sort((a, b) => a.days - b.days)
-      .slice(0, 6)
-  }, [opportunities])
-
-  const recentlyAdded = useMemo(() => {
-    const closingIds = new Set(closingSoon.map((x) => x.opp.id))
-    return opportunities
-      .filter((opp) => opp.setDate && !closingIds.has(opp.id))
-      .sort((a, b) => new Date(b.setDate) - new Date(a.setDate))
-      .slice(0, 4)
-  }, [opportunities, closingSoon])
-
-  return (
-    <>
-      {closingSoon.length === 0 && recentlyAdded.length === 0 && (
-        <p className="uvs-empty uvs-empty--compact">Nothing on the horizon yet — check back soon</p>
-      )}
-
-      {closingSoon.length > 0 && (
-        <div className="uvs-upcoming-group">
-          <p className="uvs-upcoming-group-label">Closing soon</p>
-          <div className="uvs-my-vol-list">
-            {closingSoon.map(({ opp, days }, i) => (
-              <Motion.button
-                type="button"
-                key={opp.id}
-                className="uvs-my-vol-row uvs-upcoming-row"
-                onClick={onBrowse}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.02 * i, duration: 0.28 }}
-              >
-                <div className="uvs-my-vol-row-info">
-                  <span className="uvs-my-vol-row-name">{opp.title}</span>
-                  {(opp.organisation || opp.location) && (
-                    <span className="uvs-my-vol-row-notes">
-                      {[opp.organisation, opp.location].filter(Boolean).join(" • ")}
-                    </span>
-                  )}
-                </div>
-                <span className={`uvs-deadline-chip${days <= 3 ? " uvs-deadline-chip--urgent" : ""}`}>
-                  {deadlineLabel(days)}
-                </span>
-              </Motion.button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {recentlyAdded.length > 0 && (
-        <div className="uvs-upcoming-group">
-          <p className="uvs-upcoming-group-label">Recently added</p>
-          <div className="uvs-my-vol-list">
-            {recentlyAdded.map((opp, i) => (
-              <Motion.button
-                type="button"
-                key={opp.id}
-                className="uvs-my-vol-row uvs-upcoming-row"
-                onClick={onBrowse}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.02 * i, duration: 0.28 }}
-              >
-                <div className="uvs-my-vol-row-info">
-                  <span className="uvs-my-vol-row-name">{opp.title}</span>
-                  {(opp.organisation || opp.location) && (
-                    <span className="uvs-my-vol-row-notes">
-                      {[opp.organisation, opp.location].filter(Boolean).join(" • ")}
-                    </span>
-                  )}
-                </div>
-                <span className="uvs-my-vol-row-date">
-                  {new Date(opp.setDate).toLocaleDateString()}
-                </span>
-              </Motion.button>
-            ))}
-          </div>
-        </div>
-      )}
-    </>
-  )
-}
-
-function externalUrl(opps) {
-  const opp = opps.find((o) => o.sourceUrl && !o.sourceUrl.startsWith("internal://"))
-  return opp?.sourceUrl
-}
-
-function DirectoryPanel({ opportunities }) {
-  const [query, setQuery] = useState("")
-
-  const organisations = useMemo(() => {
-    const byOrg = new Map()
-    for (const opp of opportunities) {
-      const name = (opp.organisation || "").trim() || "Independent opportunities"
-      if (!byOrg.has(name)) byOrg.set(name, [])
-      byOrg.get(name).push(opp)
-    }
-    return [...byOrg.entries()]
-      .map(([name, opps]) => ({
-        name,
-        opps,
-        causes: [...new Set(opps.flatMap((o) => o.causes || []))],
-        url: externalUrl(opps),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [opportunities])
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    if (!q) return organisations
-    return organisations.filter(
-      (org) =>
-        org.name.toLowerCase().includes(q) ||
-        org.causes.some((c) => c.replace(/_/g, " ").includes(q))
-    )
-  }, [organisations, query])
-
-  return (
-    <>
-      <label className="uvs-search uvs-dir-search">
-        <span className="uvs-sr">Search the directory</span>
-        <input
-          type="search"
-          placeholder="Search organisations…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </label>
-
-      {filtered.length === 0 && (
-        <p className="uvs-empty uvs-empty--compact">
-          {organisations.length === 0
-            ? "No organisations listed yet"
-            : "No organisations match your search"}
-        </p>
-      )}
-
-      <div className="uvs-dir-grid">
-        {filtered.map((org, i) => (
-          <Motion.article
-            key={org.name}
-            className="uvs-dir-card"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: Math.min(0.02 * i, 0.3), duration: 0.28 }}
-          >
-            <h4 className="uvs-dir-card-name">{org.name}</h4>
-            <p className="uvs-dir-card-count">
-              {org.opps.length} opportunit{org.opps.length === 1 ? "y" : "ies"}
-            </p>
-            {org.causes.length > 0 && (
-              <div className="uvs-dir-card-causes">
-                {org.causes.slice(0, 4).map((cause) => (
-                  <span key={cause} className="uvs-dir-cause">{cause.replace(/_/g, " ")}</span>
-                ))}
-                {org.causes.length > 4 && (
-                  <span className="uvs-dir-cause">+{org.causes.length - 4}</span>
-                )}
-              </div>
-            )}
-            {org.url && (
-              <a
-                className="uvs-dir-card-link"
-                href={org.url}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Visit website →
-              </a>
-            )}
-          </Motion.article>
-        ))}
-      </div>
-    </>
-  )
-}
-
-export default function MainDashboard({ onBrowseOpportunities }) {
-  const [opportunities, setOpportunities] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    let cancelled = false
-    fetchAllOpportunities()
-      .then((opps) => {
-        if (cancelled) return
-        setOpportunities(opps)
-        setError(null)
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e.message)
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => { cancelled = true }
-  }, [])
-
+export function MapPanel({ opportunities, loading, error }) {
   const { groups, remoteCount, unplacedCount } = useMemo(() => {
     const byPlace = new Map()
     let remote = 0
@@ -430,39 +206,126 @@ export default function MainDashboard({ onBrowseOpportunities }) {
     return { groups: [...byPlace.values()], remoteCount: remote, unplacedCount: unplaced }
   }, [opportunities])
 
-  if (loading) {
-    return (
-      <div className="uvs-opp-loading" role="status" aria-label="Loading dashboard">
-        <span className="uvs-opp-loading-stripe" aria-hidden="true" />
-        <span className="uvs-opp-loading-stripe" aria-hidden="true" />
-        <span className="uvs-opp-loading-stripe" aria-hidden="true" />
-        <span className="uvs-opp-loading-stripe" aria-hidden="true" />
-      </div>
-    )
-  }
+  if (loading) return <LoadingStripes label="Loading map" />
 
   return (
-    <div className="uvs-dashgrid">
-      {error && <p className="uvs-lb-error uvs-dashgrid-error">{error}</p>}
+    <section className="uvs-dash-panel uvs-dash-panel--map">
+      {error && <p className="uvs-lb-error">{error}</p>}
+      <OpportunityMap
+        groups={groups}
+        remoteCount={remoteCount}
+        unplacedCount={unplacedCount}
+      />
+    </section>
+  )
+}
 
-      <section className="uvs-dash-panel uvs-dash-panel--map">
-        <p className="uvs-committee-section-label">Map</p>
-        <OpportunityMap
-          groups={groups}
-          remoteCount={remoteCount}
-          unplacedCount={unplacedCount}
-        />
-      </section>
+function daysUntil(value) {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return null
+  d.setHours(23, 59, 59, 999)
+  return Math.ceil((d.getTime() - Date.now()) / 86400000)
+}
 
-      <section className="uvs-dash-panel uvs-dash-panel--upcoming">
-        <p className="uvs-committee-section-label">Upcoming</p>
-        <UpcomingPanel opportunities={opportunities} onBrowse={onBrowseOpportunities} />
-      </section>
+function deadlineLabel(days) {
+  if (days <= 0) return "Closes today"
+  if (days === 1) return "1 day left"
+  return `${days} days left`
+}
 
-      <section className="uvs-dash-panel uvs-dash-panel--directory">
-        <p className="uvs-committee-section-label">Directory</p>
-        <DirectoryPanel opportunities={opportunities} />
-      </section>
-    </div>
+function UpcomingRow({ opp, right, index, onClick }) {
+  return (
+    <Motion.button
+      type="button"
+      className="uvs-my-vol-row uvs-upcoming-row"
+      onClick={onClick}
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: 0.02 * index, duration: 0.28 }}
+    >
+      <div className="uvs-my-vol-row-info">
+        <span className="uvs-my-vol-row-name">{opp.title}</span>
+        {(opp.organisation || opp.location) && (
+          <span className="uvs-my-vol-row-notes">
+            {[opp.organisation, opp.location].filter(Boolean).join(" • ")}
+          </span>
+        )}
+      </div>
+      {right}
+    </Motion.button>
+  )
+}
+
+export function UpcomingPanel({ opportunities, loading, error, onBrowse }) {
+  const closingSoon = useMemo(() => {
+    return opportunities
+      .map((opp) => ({ opp, days: opp.expiryDate ? daysUntil(opp.expiryDate) : null }))
+      .filter((x) => x.days !== null && x.days >= 0)
+      .sort((a, b) => a.days - b.days)
+      .slice(0, 8)
+  }, [opportunities])
+
+  const recentlyAdded = useMemo(() => {
+    const closingIds = new Set(closingSoon.map((x) => x.opp.id))
+    return opportunities
+      .filter((opp) => opp.setDate && !closingIds.has(opp.id))
+      .sort((a, b) => new Date(b.setDate) - new Date(a.setDate))
+      .slice(0, 8)
+  }, [opportunities, closingSoon])
+
+  if (loading) return <LoadingStripes label="Loading upcoming opportunities" />
+
+  return (
+    <section className="uvs-dash-panel uvs-dash-panel--upcoming">
+      {error && <p className="uvs-lb-error">{error}</p>}
+
+      {closingSoon.length === 0 && recentlyAdded.length === 0 && !error && (
+        <p className="uvs-empty uvs-empty--compact">Nothing on the horizon yet — check back soon</p>
+      )}
+
+      <div className="uvs-upcoming-columns">
+        {closingSoon.length > 0 && (
+          <div className="uvs-upcoming-group">
+            <p className="uvs-upcoming-group-label">Closing soon</p>
+            <div className="uvs-my-vol-list">
+              {closingSoon.map(({ opp, days }, i) => (
+                <UpcomingRow
+                  key={opp.id}
+                  opp={opp}
+                  index={i}
+                  onClick={onBrowse}
+                  right={
+                    <span className={`uvs-deadline-chip${days <= 3 ? " uvs-deadline-chip--urgent" : ""}`}>
+                      {deadlineLabel(days)}
+                    </span>
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {recentlyAdded.length > 0 && (
+          <div className="uvs-upcoming-group">
+            <p className="uvs-upcoming-group-label">Recently added</p>
+            <div className="uvs-my-vol-list">
+              {recentlyAdded.map((opp, i) => (
+                <UpcomingRow
+                  key={opp.id}
+                  opp={opp}
+                  index={i}
+                  onClick={onBrowse}
+                  right={
+                    <span className="uvs-my-vol-row-date">
+                      {new Date(opp.setDate).toLocaleDateString()}
+                    </span>
+                  }
+                />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
   )
 }

@@ -8,23 +8,19 @@ function readRoute() {
   if (hash.startsWith("#token=")) {
     // OAuth callback — consume token before routing
     setToken(hash.slice("#token=".length))
-    window.history.replaceState(null, "", window.location.pathname + window.location.search + "#/dashboard")
-    return "dashboard"
+    window.history.replaceState(null, "", window.location.pathname + window.location.search + "#/map")
+    return "map"
   }
-  if (hash.startsWith("#/dashboard")) return "dashboard"
-  if (hash.startsWith("#/opportunities")) return "opportunities"
-  if (hash.startsWith("#/leaderboard")) return "leaderboard"
-  if (hash.startsWith("#/my-volunteering")) return "my-volunteering"
-  if (hash.startsWith("#/committee")) return "committee"
+  if (hash.startsWith("#/map") || hash.startsWith("#/dashboard")) return "map"
+  if (hash.startsWith("#/upcoming")) return "upcoming"
+  if (hash.startsWith("#/directory") || hash.startsWith("#/opportunities")) return "directory"
   return "home"
 }
 
 const ROUTE_TO_TAB = {
-  dashboard: "dashboard",
-  opportunities: "opportunities",
-  leaderboard: "leaderboard",
-  "my-volunteering": "my-volunteering",
-  committee: "committee",
+  map: "map",
+  upcoming: "upcoming",
+  directory: "directory",
 }
 
 // Page-wipe choreography
@@ -50,11 +46,9 @@ function App() {
   const navigateTo = useCallback((target) => {
     if (phase !== "idle") return
     const targetRoute = (() => {
-      if (target.startsWith("#/dashboard")) return "dashboard"
-      if (target.startsWith("#/opportunities")) return "opportunities"
-      if (target.startsWith("#/leaderboard")) return "leaderboard"
-      if (target.startsWith("#/my-volunteering")) return "my-volunteering"
-      if (target.startsWith("#/committee")) return "committee"
+      if (target.startsWith("#/map") || target.startsWith("#/dashboard")) return "map"
+      if (target.startsWith("#/upcoming")) return "upcoming"
+      if (target.startsWith("#/directory") || target.startsWith("#/opportunities")) return "directory"
       return "home"
     })()
     const animated = targetRoute === "home" || route === "home"

@@ -2115,22 +2115,6 @@ button.uvs-cta-secondary {
 }
 
 /* Main dashboard — Map / Upcoming / Directory */
-.uvs-dashgrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-  gap: 1.25rem;
-  align-items: start;
-}
-
-.uvs-dashgrid-error,
-.uvs-dash-panel--directory {
-  grid-column: 1 / -1;
-}
-
-@media (max-width: 860px) {
-  .uvs-dashgrid { grid-template-columns: minmax(0, 1fr); }
-}
-
 .uvs-dash-panel {
   background: #fff;
   border: 1.5px solid #e2e8f0;
@@ -2140,7 +2124,7 @@ button.uvs-cta-secondary {
 }
 
 .uvs-map-canvas {
-  height: 380px;
+  height: min(62vh, 560px);
   border-radius: var(--radius-sm);
   border: 1.5px solid #e2e8f0;
   overflow: hidden;
@@ -2175,8 +2159,14 @@ button.uvs-cta-secondary {
 .uvs-map-popup li { margin: 0.15rem 0; }
 .uvs-map-popup a { color: var(--strong-cyan); font-weight: 600; }
 
-.uvs-upcoming-group { margin-bottom: 1.25rem; }
-.uvs-upcoming-group:last-child { margin-bottom: 0; }
+.uvs-upcoming-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.uvs-upcoming-group { min-width: 0; }
 
 .uvs-upcoming-group-label {
   margin: 0 0 0.5rem;
@@ -2209,65 +2199,3 @@ button.uvs-cta-secondary {
   background: color-mix(in srgb, var(--tomato) 20%, #fff);
   color: var(--brick-red);
 }
-
-.uvs-dir-search { margin-bottom: 1rem; max-width: 360px; }
-
-.uvs-dir-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.85rem;
-}
-
-.uvs-dir-card {
-  border: 1.5px solid #e2e8f0;
-  border-radius: var(--radius-sm);
-  padding: 0.9rem 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.uvs-dir-card:hover {
-  border-color: var(--strong-cyan);
-  box-shadow: 0 3px 12px rgba(6, 28, 51, 0.08);
-}
-
-.uvs-dir-card-name {
-  margin: 0;
-  font-size: 0.98rem;
-  font-weight: 700;
-  color: var(--prussian-blue);
-}
-
-.uvs-dir-card-count {
-  margin: 0;
-  font-size: 0.8rem;
-  color: color-mix(in srgb, var(--prussian-blue) 55%, transparent);
-}
-
-.uvs-dir-card-causes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
-}
-
-.uvs-dir-cause {
-  padding: 0.15rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  background: color-mix(in srgb, var(--lavender-purple) 14%, #fff);
-  color: var(--prussian-blue);
-  text-transform: capitalize;
-}
-
-.uvs-dir-card-link {
-  margin-top: auto;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--strong-cyan);
-  text-decoration: none;
-}
-
-.uvs-dir-card-link:hover { text-decoration: underline; }

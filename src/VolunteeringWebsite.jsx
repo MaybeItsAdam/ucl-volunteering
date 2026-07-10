@@ -126,11 +126,11 @@ export default function VolunteeringWebsite({ onNavigate }) {
           <div className="uvs-cta-row">
             <a
               className="uvs-cta uvs-cta-primary"
-              href="#/dashboard"
+              href="#/map"
               onClick={(e) => {
                 if (onNavigate) {
                   e.preventDefault()
-                  onNavigate("#/dashboard")
+                  onNavigate("#/map")
                 }
               }}
             >
@@ -138,15 +138,15 @@ export default function VolunteeringWebsite({ onNavigate }) {
             </a>
             <a
               className="uvs-cta uvs-cta-secondary"
-              href="#/leaderboard"
+              href="#/upcoming"
               onClick={(e) => {
                 if (onNavigate) {
                   e.preventDefault()
-                  onNavigate("#/leaderboard")
+                  onNavigate("#/upcoming")
                 }
               }}
             >
-              Leaderboard
+              What's coming up
             </a>
           </div>
         </div>
