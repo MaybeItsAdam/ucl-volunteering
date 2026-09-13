@@ -514,18 +514,44 @@ function handleEdit(e) {
   }
 }
 
+const VOLSOC_CALENDAR_SUMMARY = 'VolSoc events, managed from the Volsoc Master Plan sheet.';
+
+// There is exactly one VolSoc calendar. It's looked up by stored ID, then by
+// name, and only created if neither finds it — a calendar made seconds ago
+// isn't always found by ID yet, which is how earlier runs made several. The
+// script lock stops two runs (an edit and the hourly sync) racing to create
+// it. Extra calendars this script made are deleted; their events are
+// recreated in the real one by the next sync, since rows whose event can't be
+// found get a new one.
 function volsocCalendar_() {
-  const props = PropertiesService.getScriptProperties();
-  const id = props.getProperty('VOLSOC_CALENDAR_ID');
-  let calendar = id ? CalendarApp.getCalendarById(id) : null;
-  if (!calendar) {
-    calendar = CalendarApp.createCalendar(CONFIG.VOLSOC_CALENDAR_NAME, {
-      summary: 'VolSoc events, managed from the Volsoc Master Plan sheet.',
-      timeZone: spreadsheet_().getSpreadsheetTimeZone(),
-    });
-    props.setProperty('VOLSOC_CALENDAR_ID', calendar.getId());
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30 * 1000);
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const storedId = props.getProperty('VOLSOC_CALENDAR_ID');
+    const named = CalendarApp.getOwnedCalendarsByName(CONFIG.VOLSOC_CALENDAR_NAME);
+
+    let calendar =
+      named.find((c) => c.getId() === storedId) ||
+      (storedId && CalendarApp.getCalendarById(storedId)) ||
+      named[0] ||
+      null;
+    if (!calendar) {
+      calendar = CalendarApp.createCalendar(CONFIG.VOLSOC_CALENDAR_NAME, {
+        summary: VOLSOC_CALENDAR_SUMMARY,
+        timeZone: spreadsheet_().getSpreadsheetTimeZone(),
+      });
+    }
+    if (calendar.getId() !== storedId) props.setProperty('VOLSOC_CALENDAR_ID', calendar.getId());
+
+    named
+      .filter((c) => c.getId() !== calendar.getId() && c.getDescription() === VOLSOC_CALENDAR_SUMMARY)
+      .forEach((c) => c.deleteCalendar());
+
+    return calendar;
+  } finally {
+    lock.releaseLock();
   }
-  return calendar;
 }
 
 // Makes the calendar match the VolSoc Calendar column for the given rows: an
