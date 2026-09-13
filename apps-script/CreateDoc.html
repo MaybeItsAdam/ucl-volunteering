@@ -49,24 +49,50 @@
       <p class="eyebrow">VolSoc Master Plan</p>
 
       <div id="working">
-        <h1>Creating doc…</h1>
+        <h1 id="working-title"></h1>
         <p>Filling it in from the sheet. This takes a few seconds.</p>
       </div>
 
       <div id="done" hidden>
-        <h1 id="done-title">Doc created</h1>
-        <p>It's linked in the Doc Detail cell for this row.</p>
-        <a id="open" class="button" href="#">Open doc</a>
+        <h1 id="done-title"></h1>
+        <p id="done-text"></p>
+        <a id="open" class="button" href="#"></a>
       </div>
 
       <div id="failed" hidden>
-        <h1>Couldn't create the doc</h1>
+        <h1 id="failed-title"></h1>
         <p id="message" class="error"></p>
       </div>
     </main>
 
     <script>
       const rowId = <?= rowId ?>;
+      const action = <?= action ?>;
+
+      const copy = {
+        doc: {
+          working: 'Creating doc…',
+          done: 'Doc created',
+          existed: 'This row already has a doc',
+          text: "It's linked in the Doc Detail cell for this row.",
+          open: 'Open doc',
+          failed: "Couldn't create the doc",
+        },
+        calendar: {
+          working: 'Adding to calendar…',
+          done: 'Added as provisional',
+          existed: 'Already in the calendar',
+          text: 'It\'s in the VolSoc calendar as "[Provisional] …" and follows the sheet. Clear the cell in the sheet to take it out.',
+          open: 'Open event',
+          failed: "Couldn't add it to the calendar",
+        },
+      }[action];
+
+      const setText = (id, text) => (document.getElementById(id).textContent = text);
+      setText('working-title', copy.working);
+      setText('done-text', copy.text);
+      setText('open', copy.open);
+      setText('failed-title', copy.failed);
 
       function show(id) {
         ['working', 'done', 'failed'].forEach((section) => {
@@ -76,7 +102,7 @@
 
       google.script.run
         .withSuccessHandler((result) => {
-          document.getElementById('done-title').textContent = result.existed ? 'This row already has a doc' : 'Doc created';
+          setText('done-title', result.existed ? copy.existed : copy.done);
           document.getElementById('open').href = result.url;
           show('done');
           // Works where the sandbox allows it; the button is there if not.
@@ -86,7 +112,7 @@
           document.getElementById('message').textContent = err.message || String(err);
           show('failed');
         })
-        .createDocFromWebApp(rowId);
+        .runRowAction(action, rowId);
     </script>
   </body>
 </html>
