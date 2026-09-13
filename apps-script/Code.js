@@ -3,8 +3,8 @@
  *
  * - syncFromGoogleCalendar: pulls every event run by the UCL Student Social
  *   Impact organiser from Adam's Campus Toolbox's iCal feed into Sheet1, updating rows it already knows and adding new ones,
- *   then keeps the sheet in date order. VolSoc-only rows (no Union Event) are
- *   never touched.
+ *   then keeps the sheet in date order. Standalone VolSoc rows (a Volsoc Event
+ *   with no Union Event) are never changed or struck through, only sorted.
  * - Doc Detail "＋ Create doc" button: a link to this script's web app, which
  *   drafts a planning doc from that row and puts the doc's link in the cell.
  * - VolSoc Calendar "Add to calendar" button: puts the row's VolSoc event in
@@ -264,7 +264,10 @@ function sync_() {
     sheet.getRange(start, COL.UNION_EVENT, newRows.length, 1).setFontLine('none');
   }
 
-  if (newRows.length || datesChanged) sortByDate_(sheet);
+  // Also catches rows added by hand, e.g. a standalone VolSoc event typed in
+  // at the bottom. Sorting waits for the sync rather than happening on edit so
+  // a row doesn't jump away while someone is still filling it in.
+  if (newRows.length || datesChanged || !isInDateOrder_(sheet, tz)) sortByDate_(sheet);
 
   if (COL.CALENDAR) {
     const all = sheet.getLastRow() - 1;
@@ -392,6 +395,14 @@ function timeKey_(text) {
   return String(hours).padStart(2, '0') + ':' + m[2];
 }
 
+// Rows without a date count as last, where the sort puts them.
+function isInDateOrder_(sheet, tz) {
+  const rows = sheet.getLastRow() - 1;
+  if (rows < 2) return true;
+  const dates = sheet.getRange(2, COL.DATE, rows, 1).getValues().map((r) => (r[0] === '' ? '\uffff' : dateKey_(r[0], tz)));
+  return dates.every((date, i) => i === 0 || dates[i - 1] <= date);
+}
+
 function sortByDate_(sheet) {
   const rows = sheet.getLastRow() - 1;
   if (rows < 2) return;
@@ -506,6 +517,13 @@ function handleEdit(e) {
       cols.some((col) => col && range.getColumn() <= col && range.getLastColumn() >= col);
 
     if (touches(COL.DATE)) refreshDayDividers_(sheet);
+
+    // A row typed in by hand, such as a standalone VolSoc event with no Union
+    // Event, gets its Create doc and Add to calendar buttons straight away.
+    if (touches(COL.DATE, COL.UNION_EVENT, COL.VOLSOC_EVENT)) {
+      refreshDocButtons_(sheet);
+      if (COL.CALENDAR) refreshCalendarButtons_(sheet);
+    }
 
     if (COL.CALENDAR && touches(COL.CALENDAR, COL.DATE, COL.VOLSOC_EVENT, COL.VOLSOC_START, COL.VOLSOC_END)) {
       const first = Math.max(range.getRow(), 2);
