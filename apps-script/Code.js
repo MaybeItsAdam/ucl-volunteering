@@ -27,37 +27,41 @@ const CONFIG = {
   DOC_FOLDER_ID: '',
 };
 
-// 1-based column numbers. checkHeaders_ stops the script if these move, so a
-// column inserted by hand can't make the sync write into the wrong place.
-const COL = {
-  DATE: 1,
-  UNION_EVENT: 2,
-  UNION_START: 3,
-  UNION_END: 4,
-  LOCATION: 5,
-  LINK: 6,
-  VOLSOC_EVENT: 7,
-  VOLSOC_START: 8,
-  VOLSOC_END: 9,
-  DOC: 10,
-  WHATSON: 11,
-  INSTAGRAM: 12,
-  PUBLISHED: 13,
-  LEAD: 14,
-  EVENT_KEY: 15,
-  ROW_ID: 16,
+// Columns are found by header text each run, so inserting, moving or adding
+// columns in the sheet doesn't break the script. Only renaming one of the
+// required headers does, and that stops the script with a message naming it.
+// "Start Time" and "End Time" appear twice; each pair is the first one after
+// its event column.
+const REQUIRED_HEADERS = {
+  DATE: 'Date',
+  UNION_EVENT: 'Union Event',
+  UNION_START: ['Start Time', 'UNION_EVENT'],
+  UNION_END: ['End Time', 'UNION_EVENT'],
+  LOCATION: 'Location',
+  LINK: 'Link',
+  VOLSOC_EVENT: 'Volsoc Event',
+  VOLSOC_START: ['Start Time', 'VOLSOC_EVENT'],
+  VOLSOC_END: ['End Time', 'VOLSOC_EVENT'],
+  DOC: 'Doc Detail',
 };
+// Used in the planning doc when present; the first matching name wins.
+const OPTIONAL_HEADERS = {
+  WHATSON: ['Created Whats on Event Link'],
+  SOCIAL_POST: ['Canva Post', 'Instagram Post'],
+  COMMITTEE: ['Committee Present'],
+  LEAD: ['Activity Lead?', 'Activity Lead'],
+};
+// Script-owned columns, created hidden at the end of the sheet if missing.
+const HIDDEN_HEADERS = {
+  EVENT_KEY: 'Calendar Event Key',
+  ROW_ID: 'Row ID',
+};
+// The fields the feed owns, in eventFields_ order.
+const FEED_COLUMNS = ['DATE', 'UNION_EVENT', 'UNION_START', 'UNION_END', 'LOCATION', 'LINK'];
 
-const HEADERS = {
-  [COL.DATE]: 'Date',
-  [COL.UNION_EVENT]: 'Union Event',
-  [COL.LINK]: 'Link',
-  [COL.VOLSOC_EVENT]: 'Volsoc Event',
-  [COL.DOC]: 'Doc Detail',
-  [COL.LEAD]: 'Activity Lead?',
-  [COL.EVENT_KEY]: 'Calendar Event Key',
-  [COL.ROW_ID]: 'Row ID',
-};
+// 1-based column numbers for this run, filled in by getSheet_. Optional
+// columns that aren't in the sheet are 0. WIDTH covers every known column.
+let COL = null;
 
 // Doc Detail cells are styled as chips: tinted fill, bold text, no underline.
 const DOC_CHIPS = {
@@ -67,7 +71,6 @@ const DOC_CHIPS = {
 // Labels from earlier versions, recognised so they get restyled.
 const LEGACY_CREATE_LABELS = ['＋ Create doc'];
 
-const MISSING_VOLSOC_FORMULA = '=AND($G2="",OR($A2<>"",$B2<>""))';
 const MISSING_VOLSOC_COLOUR = '#f4c7c3';
 
 // ── Menu and one-off setup ────────────────────────────────────────────────
@@ -84,8 +87,6 @@ function onOpen() {
 
 function setup() {
   const sheet = getSheet_();
-  ensureHiddenColumns_(sheet);
-  checkHeaders_(sheet);
   addMissingVolsocRule_(sheet);
   refreshDocButtons_(sheet);
   installTriggers_();
@@ -103,16 +104,18 @@ function installTriggers_() {
 }
 
 function addMissingVolsocRule_(sheet) {
+  const [g, a, b] = [COL.VOLSOC_EVENT, COL.DATE, COL.UNION_EVENT].map(columnLetter_);
+  const formula = `=AND($${g}2="",OR($${a}2<>"",$${b}2<>""))`;
   const rules = sheet.getConditionalFormatRules();
   const exists = rules.some((rule) => {
     const condition = rule.getBooleanCondition();
-    return condition && condition.getCriteriaValues()[0] === MISSING_VOLSOC_FORMULA;
+    return condition && condition.getCriteriaValues()[0] === formula;
   });
   if (exists) return;
 
   rules.push(
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied(MISSING_VOLSOC_FORMULA)
+      .whenFormulaSatisfied(formula)
       .setBackground(MISSING_VOLSOC_COLOUR)
       .setRanges([sheet.getRange(2, COL.VOLSOC_EVENT, sheet.getMaxRows() - 1, 1)])
       .build()
@@ -139,8 +142,6 @@ function syncFromGoogleCalendar() {
 function sync_() {
   const tz = spreadsheet_().getSpreadsheetTimeZone();
   const sheet = getSheet_();
-  ensureHiddenColumns_(sheet);
-  checkHeaders_(sheet);
 
   const windowStart = new Date();
   windowStart.setHours(0, 0, 0, 0);
@@ -150,8 +151,8 @@ function sync_() {
 
   const lastRow = sheet.getLastRow();
   const rowCount = Math.max(lastRow - 1, 0);
-  const values = rowCount ? sheet.getRange(2, 1, rowCount, COL.EVENT_KEY).getValues() : [];
-  const display = rowCount ? sheet.getRange(2, 1, rowCount, COL.EVENT_KEY).getDisplayValues() : [];
+  const values = rowCount ? sheet.getRange(2, 1, rowCount, COL.WIDTH).getValues() : [];
+  const display = rowCount ? sheet.getRange(2, 1, rowCount, COL.WIDTH).getDisplayValues() : [];
   const struck = rowCount
     ? sheet.getRange(2, COL.UNION_EVENT, rowCount, 1).getFontLines().map((r) => r[0] === 'line-through')
     : [];
@@ -184,8 +185,8 @@ function sync_() {
     }
 
     if (i === undefined) {
-      const row = new Array(COL.EVENT_KEY).fill('');
-      fields.forEach((value, c) => (row[c] = value));
+      const row = new Array(COL.WIDTH).fill('');
+      fields.forEach((value, f) => (row[COL[FEED_COLUMNS[f]] - 1] = value));
       row[COL.EVENT_KEY - 1] = key;
       newRows.push(row);
       return;
@@ -197,7 +198,9 @@ function sync_() {
     const sheetRow = i + 2;
     if (changed) {
       if (fields[0] !== current[0]) datesChanged = true;
-      sheet.getRange(sheetRow, 1, 1, fields.length).setValues([fields]);
+      fields.forEach((value, f) => {
+        if (value !== current[f]) sheet.getRange(sheetRow, COL[FEED_COLUMNS[f]]).setValue(value);
+      });
     }
     if (String(values[i][COL.EVENT_KEY - 1]) !== key) {
       sheet.getRange(sheetRow, COL.EVENT_KEY).setValue(key);
@@ -229,9 +232,9 @@ function sync_() {
     const end = start + newRows.length - 1;
     if (end > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(), end - sheet.getMaxRows());
     if (start > 2) {
-      sheet.getRange(2, 1, 1, COL.EVENT_KEY).copyFormatToRange(sheet, 1, COL.EVENT_KEY, start, end);
+      sheet.getRange(2, 1, 1, COL.WIDTH).copyFormatToRange(sheet, 1, COL.WIDTH, start, end);
     }
-    sheet.getRange(start, 1, newRows.length, COL.EVENT_KEY).setValues(newRows);
+    sheet.getRange(start, 1, newRows.length, COL.WIDTH).setValues(newRows);
     sheet.getRange(start, COL.UNION_EVENT, newRows.length, 1).setFontLine('none');
   }
 
@@ -375,7 +378,7 @@ function sortByDate_(sheet) {
 function refreshDocButtons_(sheet) {
   const rows = sheet.getLastRow() - 1;
   if (rows < 1) return;
-  const values = sheet.getRange(2, 1, rows, COL.ROW_ID).getValues();
+  const values = sheet.getRange(2, 1, rows, COL.WIDTH).getValues();
   const docRange = sheet.getRange(2, COL.DOC, rows, 1);
   const docs = docRange.getRichTextValues();
   const fills = docRange.getBackgrounds();
@@ -482,8 +485,9 @@ function createDocForRow_(row) {
     if (existingUrl) return { url: existingUrl, existed: true };
 
     const tz = ss.getSpreadsheetTimeZone();
-    const values = sheet.getRange(row, 1, 1, COL.LEAD).getValues()[0];
-    const text = sheet.getRange(row, 1, 1, COL.LEAD).getDisplayValues()[0];
+    const values = sheet.getRange(row, 1, 1, COL.WIDTH).getValues()[0];
+    const text = sheet.getRange(row, 1, 1, COL.WIDTH).getDisplayValues()[0];
+    const optional = (col) => (col ? text[col - 1] : '');
     const info = {
       date: dateKey_(values[COL.DATE - 1], tz),
       unionEvent: text[COL.UNION_EVENT - 1],
@@ -492,9 +496,10 @@ function createDocForRow_(row) {
       link: text[COL.LINK - 1],
       volsocEvent: text[COL.VOLSOC_EVENT - 1],
       volsocTime: timeRange_(text[COL.VOLSOC_START - 1], text[COL.VOLSOC_END - 1]),
-      whatsOn: text[COL.WHATSON - 1],
-      instagram: text[COL.INSTAGRAM - 1],
-      lead: text[COL.LEAD - 1],
+      whatsOn: optional(COL.WHATSON),
+      socialPost: optional(COL.SOCIAL_POST),
+      committee: optional(COL.COMMITTEE),
+      lead: optional(COL.LEAD),
     };
     if (!info.date && !info.unionEvent && !info.volsocEvent) {
       throw new Error('This row is empty — nothing to make a doc from.');
@@ -536,9 +541,10 @@ function writePlanningDoc_(doc, info) {
     ['Date', formatDay_(info.date) || tbc],
     ['Time', info.volsocTime || tbc],
     ['Activity lead', info.lead || tbc],
+    ['Committee present', info.committee || tbc],
     ['Meeting point', info.unionEvent ? `After the Social Impact event — ${info.location || 'location TBC'}` : tbc],
     ["What's On listing", info.whatsOn || 'Not created yet'],
-    ['Instagram post', info.instagram || 'Not posted yet'],
+    ['Canva post', info.socialPost || 'Not made yet'],
   ]);
 
   if (info.unionEvent) {
@@ -612,31 +618,48 @@ function spreadsheet_() {
 function getSheet_() {
   const sheet = spreadsheet_().getSheetByName(CONFIG.SHEET_NAME);
   if (!sheet) throw new Error(`No sheet called "${CONFIG.SHEET_NAME}".`);
+  COL = resolveColumns_(sheet);
   return sheet;
 }
 
-// The event key keeps a row tied to its feed event when the title, time or date
-// changes; the row ID lets a Create doc link find its row after a sort. Both
-// live in hidden columns.
-function ensureHiddenColumns_(sheet) {
-  if (sheet.getMaxColumns() < COL.ROW_ID) {
-    sheet.insertColumnsAfter(sheet.getMaxColumns(), COL.ROW_ID - sheet.getMaxColumns());
-  }
-  [COL.EVENT_KEY, COL.ROW_ID].forEach((col) => {
-    const header = sheet.getRange(1, col);
-    if (header.getValue() === '') {
-      header.setValue(HEADERS[col]);
-      sheet.hideColumns(col);
-    }
+function resolveColumns_(sheet) {
+  let headers = sheet.getRange(1, 1, 1, sheet.getMaxColumns()).getValues()[0].map((h) => String(h).trim());
+  const find = (name, from = 0) => headers.indexOf(name, from) + 1;
+
+  // The event key keeps a row tied to its feed event when the title, time or
+  // date changes; the row ID lets a Create doc link find its row after a sort.
+  Object.values(HIDDEN_HEADERS).forEach((name) => {
+    if (find(name)) return;
+    const col = Math.max(sheet.getLastColumn(), 1) + 1;
+    if (col > sheet.getMaxColumns()) sheet.insertColumnsAfter(sheet.getMaxColumns(), 1);
+    sheet.getRange(1, col).setValue(name);
+    sheet.hideColumns(col);
+    headers[col - 1] = name;
   });
+
+  const col = {};
+  const missing = [];
+  Object.entries(REQUIRED_HEADERS).forEach(([key, spec]) => {
+    const [name, after] = Array.isArray(spec) ? spec : [spec];
+    col[key] = find(name, after ? col[after] : 0);
+    if (!col[key]) missing.push(after ? `"${name}" after "${REQUIRED_HEADERS[after]}"` : `"${name}"`);
+  });
+  if (missing.length) {
+    throw new Error(`Can't find these column headers in ${CONFIG.SHEET_NAME}: ${missing.join(', ')}. Rename them back or update REQUIRED_HEADERS in the script.`);
+  }
+  Object.entries(OPTIONAL_HEADERS).forEach(([key, names]) => {
+    col[key] = names.map((name) => find(name)).find(Boolean) || 0;
+  });
+  Object.entries(HIDDEN_HEADERS).forEach(([key, name]) => (col[key] = find(name)));
+
+  col.WIDTH = Math.max(...Object.values(col));
+  return col;
 }
 
-function checkHeaders_(sheet) {
-  const row = sheet.getRange(1, 1, 1, COL.ROW_ID).getValues()[0];
-  const wrong = Object.entries(HEADERS)
-    .filter(([col, name]) => String(row[col - 1]).trim() !== name)
-    .map(([col, name]) => `column ${col} should be "${name}" but is "${row[col - 1]}"`);
-  if (wrong.length) {
-    throw new Error(`Sheet columns have moved — update COL in the script. ${wrong.join('; ')}`);
+function columnLetter_(col) {
+  let letters = '';
+  for (let n = col; n > 0; n = Math.floor((n - 1) / 26)) {
+    letters = String.fromCharCode(65 + ((n - 1) % 26)) + letters;
   }
+  return letters;
 }
