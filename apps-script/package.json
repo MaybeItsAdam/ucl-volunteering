@@ -1,0 +1,6 @@
+{
+  "private": true,
+  "scripts": {
+    "deploy": "clasp push -f && clasp update-deployment AKfycbxyfS1T9IGgIzIbjosc4hZvvJSg9QLmpSUScdxcBmmk72EBkIYGCwCa3d_m3d-owtIq -d \"$(date +%F) update\""
+  }
+}

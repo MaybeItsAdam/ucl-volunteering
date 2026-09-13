@@ -1,0 +1,642 @@
+/**
+ * Volsoc Master Plan — bound to the "Volsoc Master Plan" spreadsheet.
+ *
+ * - syncFromGoogleCalendar: pulls every event run by the UCL Student Social
+ *   Impact organiser from Adam's Campus Toolbox's iCal feed into Sheet1, updating rows it already knows and adding new ones,
+ *   then keeps the sheet in date order. VolSoc-only rows (no Union Event) are
+ *   never touched.
+ * - Doc Detail "＋ Create doc" button: a link to this script's web app, which
+ *   drafts a planning doc from that row and puts the doc's link in the cell.
+ * - setup: run once from the VolSoc menu to add formatting, buttons and triggers.
+ *
+ * Source of truth is apps-script/ in the ucl-volunteering repo; deploy with
+ * `npm run deploy` from that folder (push + update the web app deployment).
+ */
+
+const CONFIG = {
+  SPREADSHEET_ID: '1QRxAfvIjHU_23beHWh-cd2oV7a1bk1bhdQPYGYMPBXA',
+  // The /exec URL of the web app deployment the Create doc buttons point at.
+  WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbxyfS1T9IGgIzIbjosc4hZvvJSg9QLmpSUScdxcBmmk72EBkIYGCwCa3d_m3d-owtIq/exec',
+  // Adam's Campus Toolbox organiser feed (src/app/api/organiser/[id]/ical in
+  // adams-campus-toolbox). ucl-suu-pipeline files What's On listings under
+  // this organiser, so this is every Social Impact event and nothing else.
+  ICAL_URL: 'https://www.adamscampustoolbox.org.uk/api/organiser/org_uni_juev5rp0v/ical',
+  SHEET_NAME: 'Sheet1',
+  DAYS_AHEAD: 90,
+  // Leave blank to create docs in the same Drive folder as the spreadsheet.
+  DOC_FOLDER_ID: '',
+};
+
+// 1-based column numbers. checkHeaders_ stops the script if these move, so a
+// column inserted by hand can't make the sync write into the wrong place.
+const COL = {
+  DATE: 1,
+  UNION_EVENT: 2,
+  UNION_START: 3,
+  UNION_END: 4,
+  LOCATION: 5,
+  LINK: 6,
+  VOLSOC_EVENT: 7,
+  VOLSOC_START: 8,
+  VOLSOC_END: 9,
+  DOC: 10,
+  WHATSON: 11,
+  INSTAGRAM: 12,
+  PUBLISHED: 13,
+  LEAD: 14,
+  EVENT_KEY: 15,
+  ROW_ID: 16,
+};
+
+const HEADERS = {
+  [COL.DATE]: 'Date',
+  [COL.UNION_EVENT]: 'Union Event',
+  [COL.LINK]: 'Link',
+  [COL.VOLSOC_EVENT]: 'Volsoc Event',
+  [COL.DOC]: 'Doc Detail',
+  [COL.LEAD]: 'Activity Lead?',
+  [COL.EVENT_KEY]: 'Calendar Event Key',
+  [COL.ROW_ID]: 'Row ID',
+};
+
+// Doc Detail cells are styled as chips: tinted fill, bold text, no underline.
+const DOC_CHIPS = {
+  create: { label: 'Create doc', text: '#007fff', fill: '#e5f2ff' },
+  open: { label: 'Open doc ↗', text: '#444054', fill: '#e8f6ef' },
+};
+// Labels from earlier versions, recognised so they get restyled.
+const LEGACY_CREATE_LABELS = ['＋ Create doc'];
+
+const MISSING_VOLSOC_FORMULA = '=AND($G2="",OR($A2<>"",$B2<>""))';
+const MISSING_VOLSOC_COLOUR = '#f4c7c3';
+
+// ── Menu and one-off setup ────────────────────────────────────────────────
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('VolSoc')
+    .addItem('Sync Social Impact events now', 'syncFromGoogleCalendar')
+    .addItem('Create doc for selected row', 'createDocForSelectedRow')
+    .addSeparator()
+    .addItem('Set up sheet and triggers', 'setup')
+    .addToUi();
+}
+
+function setup() {
+  const sheet = getSheet_();
+  ensureHiddenColumns_(sheet);
+  checkHeaders_(sheet);
+  addMissingVolsocRule_(sheet);
+  refreshDocButtons_(sheet);
+  installTriggers_();
+  syncFromGoogleCalendar();
+}
+
+function installTriggers_() {
+  const handlers = ['syncFromGoogleCalendar', 'handleEdit'];
+  ScriptApp.getProjectTriggers()
+    .filter((t) => handlers.includes(t.getHandlerFunction()))
+    .forEach((t) => ScriptApp.deleteTrigger(t));
+
+  // handleEdit is from the old checkbox version; deleted above, not recreated.
+  ScriptApp.newTrigger('syncFromGoogleCalendar').timeBased().everyHours(1).create();
+}
+
+function addMissingVolsocRule_(sheet) {
+  const rules = sheet.getConditionalFormatRules();
+  const exists = rules.some((rule) => {
+    const condition = rule.getBooleanCondition();
+    return condition && condition.getCriteriaValues()[0] === MISSING_VOLSOC_FORMULA;
+  });
+  if (exists) return;
+
+  rules.push(
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(MISSING_VOLSOC_FORMULA)
+      .setBackground(MISSING_VOLSOC_COLOUR)
+      .setRanges([sheet.getRange(2, COL.VOLSOC_EVENT, sheet.getMaxRows() - 1, 1)])
+      .build()
+  );
+  sheet.setConditionalFormatRules(rules);
+}
+
+// ── Event sync ────────────────────────────────────────────────────────────
+
+// Name kept from the original Calendar-based script so existing triggers and
+// menu items still point at it.
+function syncFromGoogleCalendar() {
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(30 * 1000)) return;
+  try {
+    sync_();
+  } finally {
+    // Also after a failed sync, so a feed problem never hides the buttons.
+    refreshDocButtons_(getSheet_());
+    lock.releaseLock();
+  }
+}
+
+function sync_() {
+  const tz = spreadsheet_().getSpreadsheetTimeZone();
+  const sheet = getSheet_();
+  ensureHiddenColumns_(sheet);
+  checkHeaders_(sheet);
+
+  const windowStart = new Date();
+  windowStart.setHours(0, 0, 0, 0);
+  const windowEnd = new Date(windowStart);
+  windowEnd.setDate(windowEnd.getDate() + CONFIG.DAYS_AHEAD);
+  const events = fetchEvents_(tz).filter((event) => event.start >= windowStart && event.start < windowEnd);
+
+  const lastRow = sheet.getLastRow();
+  const rowCount = Math.max(lastRow - 1, 0);
+  const values = rowCount ? sheet.getRange(2, 1, rowCount, COL.EVENT_KEY).getValues() : [];
+  const display = rowCount ? sheet.getRange(2, 1, rowCount, COL.EVENT_KEY).getDisplayValues() : [];
+  const struck = rowCount
+    ? sheet.getRange(2, COL.UNION_EVENT, rowCount, 1).getFontLines().map((r) => r[0] === 'line-through')
+    : [];
+
+  // Rows synced by this version carry a key. Rows from the old title-only sync
+  // don't, so they're matched once on date + title + start time and adopted.
+  const rowByKey = new Map();
+  const legacyRowByMatch = new Map();
+  values.forEach((row, i) => {
+    const key = String(row[COL.EVENT_KEY - 1]);
+    if (key) rowByKey.set(key, i);
+    else if (row[COL.UNION_EVENT - 1]) legacyRowByMatch.set(currentMatch_(row, display[i], tz), i);
+  });
+
+  const seenKeys = new Set();
+  const matchedRows = new Set();
+  const newRows = [];
+  let datesChanged = false;
+
+  events.forEach((event) => {
+    const fields = eventFields_(event, tz);
+    const key = event.uid;
+    seenKeys.add(key);
+
+    let i = rowByKey.get(key);
+    if (i === undefined) {
+      const match = [fields[0], fields[1], fields[2]].join('|');
+      i = legacyRowByMatch.get(match);
+      if (i !== undefined) legacyRowByMatch.delete(match);
+    }
+
+    if (i === undefined) {
+      const row = new Array(COL.EVENT_KEY).fill('');
+      fields.forEach((value, c) => (row[c] = value));
+      row[COL.EVENT_KEY - 1] = key;
+      newRows.push(row);
+      return;
+    }
+
+    matchedRows.add(i);
+    const current = currentFields_(values[i], display[i], tz);
+    const changed = fields.some((value, c) => value !== current[c]);
+    const sheetRow = i + 2;
+    if (changed) {
+      if (fields[0] !== current[0]) datesChanged = true;
+      sheet.getRange(sheetRow, 1, 1, fields.length).setValues([fields]);
+    }
+    if (String(values[i][COL.EVENT_KEY - 1]) !== key) {
+      sheet.getRange(sheetRow, COL.EVENT_KEY).setValue(key);
+    }
+    if (struck[i]) {
+      sheet.getRange(sheetRow, COL.UNION_EVENT).setFontLine('none').clearNote();
+    }
+  });
+
+  // An upcoming Union Event that isn't in the feed — cancelled, moved, or never
+  // a Social Impact event — may still have VolSoc plans hanging off it, so
+  // strike it through rather than delete the row. Skipped when the feed was
+  // empty, which is more likely an outage than every event being cancelled.
+  if (events.length) {
+    values.forEach((row, i) => {
+      const key = String(row[COL.EVENT_KEY - 1]);
+      const date = row[COL.DATE - 1];
+      if (!row[COL.UNION_EVENT - 1] || seenKeys.has(key) || matchedRows.has(i) || struck[i]) return;
+      if (!(date instanceof Date) || date < windowStart || date >= windowEnd) return;
+      sheet
+        .getRange(i + 2, COL.UNION_EVENT)
+        .setFontLine('line-through')
+        .setNote('Not in the UCL Student Social Impact feed — cancelled, moved, or not a Social Impact event?');
+    });
+  }
+
+  if (newRows.length) {
+    const start = sheet.getLastRow() + 1;
+    const end = start + newRows.length - 1;
+    if (end > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(), end - sheet.getMaxRows());
+    if (start > 2) {
+      sheet.getRange(2, 1, 1, COL.EVENT_KEY).copyFormatToRange(sheet, 1, COL.EVENT_KEY, start, end);
+    }
+    sheet.getRange(start, 1, newRows.length, COL.EVENT_KEY).setValues(newRows);
+    sheet.getRange(start, COL.UNION_EVENT, newRows.length, 1).setFontLine('none');
+  }
+
+  if (newRows.length || datesChanged) sortByDate_(sheet);
+}
+
+function eventFields_(event, tz) {
+  return [
+    Utilities.formatDate(event.start, tz, 'yyyy-MM-dd'),
+    event.title,
+    Utilities.formatDate(event.start, tz, 'HH:mm'),
+    Utilities.formatDate(event.end || event.start, tz, 'HH:mm'),
+    event.location,
+    event.url,
+  ];
+}
+
+// ── iCal feed ─────────────────────────────────────────────────────────────
+
+function fetchEvents_(tz) {
+  const response = UrlFetchApp.fetch(CONFIG.ICAL_URL, { muteHttpExceptions: true });
+  if (response.getResponseCode() !== 200) {
+    throw new Error(`Social Impact feed returned HTTP ${response.getResponseCode()}: ${CONFIG.ICAL_URL}`);
+  }
+  return parseIcal_(response.getContentText(), tz);
+}
+
+// Enough of RFC 5545 for the toolbox feed and ordinary exports: folded lines,
+// escaped text, UTC / TZID / all-day dates. Recurrence rules aren't expanded;
+// the toolbox writes one VEVENT per occurrence.
+function parseIcal_(text, tz) {
+  const lines = text.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '').split(/\r?\n/);
+  const events = [];
+  let current = null;
+
+  lines.forEach((line) => {
+    if (line === 'BEGIN:VEVENT') {
+      current = {};
+      return;
+    }
+    if (line === 'END:VEVENT') {
+      if (current && current.uid && current.start) events.push(current);
+      current = null;
+      return;
+    }
+    if (!current) return;
+
+    const colon = line.indexOf(':');
+    if (colon === -1) return;
+    const [name, ...params] = line.slice(0, colon).split(';');
+    const value = line.slice(colon + 1);
+    const param = (key) => (params.find((p) => p.startsWith(key + '=')) || '').split('=')[1];
+
+    switch (name.toUpperCase()) {
+      case 'UID':
+        current.uid = value;
+        break;
+      case 'SUMMARY':
+        current.title = unescapeIcal_(value);
+        break;
+      case 'LOCATION':
+        current.location = unescapeIcal_(value);
+        break;
+      case 'URL':
+        current.url = unescapeIcal_(value);
+        break;
+      case 'DTSTART':
+        current.start = parseIcalDate_(value, param('TZID') || tz);
+        break;
+      case 'DTEND':
+        current.end = parseIcalDate_(value, param('TZID') || tz);
+        break;
+      case 'STATUS':
+        if (value.toUpperCase() === 'CANCELLED') current.cancelled = true;
+        break;
+    }
+  });
+
+  return events
+    .filter((event) => !event.cancelled)
+    .map((event) => ({ title: '', location: '', url: '', ...event }));
+}
+
+function parseIcalDate_(value, tz) {
+  const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/.exec(value.trim());
+  if (!m) return null;
+  const [, y, mo, d, h = '00', mi = '00', sec = '00', utc] = m;
+  if (utc) return new Date(Date.UTC(+y, +mo - 1, +d, +h, +mi, +sec));
+  return Utilities.parseDate(`${y}-${mo}-${d} ${h}:${mi}:${sec}`, tz, 'yyyy-MM-dd HH:mm:ss');
+}
+
+function unescapeIcal_(value) {
+  return value.replace(/\\([\\;,nN])/g, (_, c) => (c === 'n' || c === 'N' ? '\n' : c)).trim();
+}
+
+function currentFields_(row, displayRow, tz) {
+  return [
+    dateKey_(row[COL.DATE - 1], tz),
+    String(row[COL.UNION_EVENT - 1]),
+    timeKey_(displayRow[COL.UNION_START - 1]),
+    timeKey_(displayRow[COL.UNION_END - 1]),
+    String(row[COL.LOCATION - 1]),
+    String(row[COL.LINK - 1]),
+  ];
+}
+
+function currentMatch_(row, displayRow, tz) {
+  const fields = currentFields_(row, displayRow, tz);
+  return [fields[0], fields[1], fields[2]].join('|');
+}
+
+function dateKey_(value, tz) {
+  return value instanceof Date ? Utilities.formatDate(value, tz, 'yyyy-MM-dd') : String(value);
+}
+
+// Times are compared through their displayed text, whatever the cell's number
+// format, because 1899-epoch time values don't survive timezone conversion.
+function timeKey_(text) {
+  const m = String(text).match(/(\d{1,2}):(\d{2})(?::\d{2})?\s*(am|pm)?/i);
+  if (!m) return String(text);
+  let hours = Number(m[1]) % (m[3] ? 12 : 24);
+  if (m[3] && m[3].toLowerCase() === 'pm') hours += 12;
+  return String(hours).padStart(2, '0') + ':' + m[2];
+}
+
+function sortByDate_(sheet) {
+  const rows = sheet.getLastRow() - 1;
+  if (rows < 2) return;
+  // Social Impact start time first, then VolSoc start time for VolSoc-only rows.
+  sheet.getRange(2, 1, rows, sheet.getLastColumn()).sort([
+    { column: COL.DATE, ascending: true },
+    { column: COL.UNION_START, ascending: true },
+    { column: COL.VOLSOC_START, ascending: true },
+  ]);
+}
+
+// Every row with content gets a Create doc chip in Doc Detail, which becomes
+// an Open doc chip once the doc exists. Rebuilt on each sync so sorted, pasted
+// or hand-added rows always get one. Anything else typed into the cell is left
+// alone.
+function refreshDocButtons_(sheet) {
+  const rows = sheet.getLastRow() - 1;
+  if (rows < 1) return;
+  const values = sheet.getRange(2, 1, rows, COL.ROW_ID).getValues();
+  const docRange = sheet.getRange(2, COL.DOC, rows, 1);
+  const docs = docRange.getRichTextValues();
+  const fills = docRange.getBackgrounds();
+  const ids = values.map((row) => [String(row[COL.ROW_ID - 1]) || (hasContent_(row) ? Utilities.getUuid() : '')]);
+  sheet.getRange(2, COL.ROW_ID, rows, 1).setValues(ids);
+  docRange.clearDataValidations();
+
+  values.forEach((row, i) => {
+    const raw = row[COL.DOC - 1];
+    // Rich text is null for non-text cells, e.g. the FALSE an old checkbox left.
+    const text = docs[i][0] ? docs[i][0].getText() : '';
+    const link = docs[i][0] ? docs[i][0].getLinkUrl() : null;
+    const isCreate = text === DOC_CHIPS.create.label || LEGACY_CREATE_LABELS.includes(text);
+    const isDoc = !isCreate && /^https:\/\/docs\.google\.com\//.test(link || '');
+    const isBlank = raw === '' || typeof raw === 'boolean';
+    const cell = sheet.getRange(i + 2, COL.DOC);
+    const isChipFill = (fill) => [DOC_CHIPS.create.fill, DOC_CHIPS.open.fill].includes(fill);
+
+    if (hasContent_(row) && (isBlank || isCreate)) {
+      const url = createDocUrl_(ids[i][0]);
+      if (text !== DOC_CHIPS.create.label || link !== url) cell.setRichTextValue(docChip_(DOC_CHIPS.create, url));
+      fills[i][0] = DOC_CHIPS.create.fill;
+    } else if (isDoc) {
+      if (text !== DOC_CHIPS.open.label) cell.setRichTextValue(docChip_(DOC_CHIPS.open, link));
+      fills[i][0] = DOC_CHIPS.open.fill;
+    } else {
+      if (isCreate || typeof raw === 'boolean') cell.clearContent();
+      if (isChipFill(fills[i][0])) fills[i][0] = null;
+    }
+  });
+
+  docRange
+    .setBackgrounds(fills)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+}
+
+function hasContent_(row) {
+  return [COL.DATE, COL.UNION_EVENT, COL.VOLSOC_EVENT].some((c) => row[c - 1] !== '');
+}
+
+function docChip_(chip, url) {
+  const style = SpreadsheetApp.newTextStyle()
+    .setBold(true)
+    .setUnderline(false)
+    .setForegroundColor(chip.text)
+    .build();
+  return SpreadsheetApp.newRichTextValue().setText(chip.label).setLinkUrl(url).setTextStyle(style).build();
+}
+
+function createDocUrl_(rowId) {
+  return `${CONFIG.WEB_APP_URL}?row=${encodeURIComponent(rowId)}`;
+}
+
+// ── Planning docs ─────────────────────────────────────────────────────────
+
+// Clicking a Create doc link lands here. The page itself creates nothing: its
+// script calls createDocFromWebApp once it loads in a browser, so a link
+// preview or crawler fetching the URL can't make docs.
+function doGet(e) {
+  const template = HtmlService.createTemplateFromFile('CreateDoc');
+  template.rowId = (e && e.parameter && e.parameter.row) || '';
+  return template
+    .evaluate()
+    .setTitle('VolSoc — create doc')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function createDocFromWebApp(rowId) {
+  const sheet = getSheet_();
+  const rows = sheet.getLastRow() - 1;
+  const ids = rows > 0 ? sheet.getRange(2, COL.ROW_ID, rows, 1).getValues() : [];
+  const i = ids.findIndex((r) => String(r[0]) === String(rowId));
+  if (!rowId || i === -1) {
+    throw new Error('Could not find that row — it may have been deleted. Refresh the sheet and try again.');
+  }
+  return createDocForRow_(i + 2);
+}
+
+function createDocForSelectedRow() {
+  const ss = spreadsheet_();
+  const range = SpreadsheetApp.getActiveRange();
+  if (range.getSheet().getName() !== CONFIG.SHEET_NAME || range.getRow() < 2) {
+    SpreadsheetApp.getUi().alert(`Select a row in ${CONFIG.SHEET_NAME} first.`);
+    return;
+  }
+  const result = createDocForRow_(range.getRow());
+  ss.toast(result.existed ? 'This row already has a doc.' : 'Doc created.', 'VolSoc');
+}
+
+// Returns { url, existed }. Throws with a readable message on failure.
+function createDocForRow_(row) {
+  const ss = spreadsheet_();
+  const sheet = getSheet_();
+  const cell = sheet.getRange(row, COL.DOC);
+
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(30 * 1000)) throw new Error('The sheet is busy syncing — try again in a moment.');
+
+  try {
+    const current = cell.getRichTextValue();
+    const existingUrl = /^https:\/\/docs\.google\.com\//.test(current.getLinkUrl() || '') ? current.getLinkUrl() : '';
+    if (existingUrl) return { url: existingUrl, existed: true };
+
+    const tz = ss.getSpreadsheetTimeZone();
+    const values = sheet.getRange(row, 1, 1, COL.LEAD).getValues()[0];
+    const text = sheet.getRange(row, 1, 1, COL.LEAD).getDisplayValues()[0];
+    const info = {
+      date: dateKey_(values[COL.DATE - 1], tz),
+      unionEvent: text[COL.UNION_EVENT - 1],
+      unionTime: timeRange_(text[COL.UNION_START - 1], text[COL.UNION_END - 1]),
+      location: text[COL.LOCATION - 1],
+      link: text[COL.LINK - 1],
+      volsocEvent: text[COL.VOLSOC_EVENT - 1],
+      volsocTime: timeRange_(text[COL.VOLSOC_START - 1], text[COL.VOLSOC_END - 1]),
+      whatsOn: text[COL.WHATSON - 1],
+      instagram: text[COL.INSTAGRAM - 1],
+      lead: text[COL.LEAD - 1],
+    };
+    if (!info.date && !info.unionEvent && !info.volsocEvent) {
+      throw new Error('This row is empty — nothing to make a doc from.');
+    }
+
+    const name = [info.date, 'VolSoc', info.volsocEvent || info.unionEvent || 'event'].filter(Boolean).join(' – ');
+    const doc = DocumentApp.create(name);
+    try {
+      writePlanningDoc_(doc, info);
+      doc.saveAndClose();
+      DriveApp.getFileById(doc.getId()).moveTo(docFolder_(ss));
+    } catch (err) {
+      // Don't leave a half-written doc lying around in My Drive.
+      DriveApp.getFileById(doc.getId()).setTrashed(true);
+      throw err;
+    }
+
+    cell.setRichTextValue(docChip_(DOC_CHIPS.open, doc.getUrl())).setBackground(DOC_CHIPS.open.fill);
+    SpreadsheetApp.flush();
+    return { url: doc.getUrl(), name, existed: false };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function writePlanningDoc_(doc, info) {
+  const body = doc.getBody();
+  const tbc = 'TBC';
+
+  // Paragraph.setText returns nothing, so it can't be chained.
+  const title = body.getParagraphs()[0];
+  title.setText(info.volsocEvent || 'VolSoc event — name TBC');
+  title.setHeading(DocumentApp.ParagraphHeading.TITLE);
+  body.appendParagraph([formatDay_(info.date), info.volsocTime].filter(Boolean).join(' · '))
+    .setHeading(DocumentApp.ParagraphHeading.SUBTITLE);
+
+  body.appendParagraph('At a glance').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  factTable_(body, [
+    ['Date', formatDay_(info.date) || tbc],
+    ['Time', info.volsocTime || tbc],
+    ['Activity lead', info.lead || tbc],
+    ['Meeting point', info.unionEvent ? `After the Social Impact event — ${info.location || 'location TBC'}` : tbc],
+    ["What's On listing", info.whatsOn || 'Not created yet'],
+    ['Instagram post', info.instagram || 'Not posted yet'],
+  ]);
+
+  if (info.unionEvent) {
+    body.appendParagraph('Social Impact event this follows').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+    factTable_(body, [
+      ['Event', info.unionEvent],
+      ['Time', info.unionTime || tbc],
+      ['Location', info.location || tbc],
+      ['Listing', info.link || '—'],
+    ]);
+  }
+
+  body.appendParagraph('Timings').setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  const timings = [['Time', 'What']];
+  if (info.unionEvent && info.unionTime) timings.push([info.unionTime, `Social Impact: ${info.unionEvent}`]);
+  timings.push([info.volsocTime ? info.volsocTime.split('–')[0] : '', 'Meet and head off']);
+  timings.push(['', info.volsocEvent || 'Main activity']);
+  timings.push([info.volsocTime ? info.volsocTime.split('–')[1] || '' : '', 'Finish']);
+  const table = body.appendTable(timings);
+  table.getRow(0).editAsText().setBold(true);
+
+  section_(body, 'Plan', 'What are we doing, and what does someone joining straight from the Social Impact event need to know?');
+  section_(body, 'Getting there', 'Route from the meeting point, travel time and cost, step-free access.');
+  section_(body, 'Costs', 'Entry, travel, anything we are covering.');
+  section_(body, 'Risks and accessibility', 'Anything the activity lead should plan around.');
+  section_(body, 'Notes', '');
+}
+
+function factTable_(body, rows) {
+  const table = body.appendTable(rows);
+  table.setColumnWidth(0, 140);
+  rows.forEach((row, r) => {
+    table.getCell(r, 0).editAsText().setBold(true);
+    if (/^https?:\/\//.test(row[1])) table.getCell(r, 1).editAsText().setLinkUrl(row[1]);
+  });
+}
+
+function section_(body, heading, prompt) {
+  body.appendParagraph(heading).setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  const paragraph = body.appendParagraph(prompt).setHeading(DocumentApp.ParagraphHeading.NORMAL);
+  if (prompt) paragraph.editAsText().setItalic(true).setForegroundColor('#6e6b7c');
+}
+
+function timeRange_(start, end) {
+  const s = start ? timeKey_(start) : '';
+  const e = end ? timeKey_(end) : '';
+  return s && e ? `${s}–${e}` : s;
+}
+
+function formatDay_(isoDate) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  if (!m) return isoDate;
+  const date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), 'EEEE d MMMM yyyy');
+}
+
+function docFolder_(ss) {
+  if (CONFIG.DOC_FOLDER_ID) return DriveApp.getFolderById(CONFIG.DOC_FOLDER_ID);
+  const parents = DriveApp.getFileById(ss.getId()).getParents();
+  return parents.hasNext() ? parents.next() : DriveApp.getRootFolder();
+}
+
+// ── Sheet helpers ─────────────────────────────────────────────────────────
+
+// Opened by ID rather than getActiveSpreadsheet so the web app, which has no
+// active spreadsheet, uses the same code path as the menu and triggers.
+function spreadsheet_() {
+  return SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
+}
+
+function getSheet_() {
+  const sheet = spreadsheet_().getSheetByName(CONFIG.SHEET_NAME);
+  if (!sheet) throw new Error(`No sheet called "${CONFIG.SHEET_NAME}".`);
+  return sheet;
+}
+
+// The event key keeps a row tied to its feed event when the title, time or date
+// changes; the row ID lets a Create doc link find its row after a sort. Both
+// live in hidden columns.
+function ensureHiddenColumns_(sheet) {
+  if (sheet.getMaxColumns() < COL.ROW_ID) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), COL.ROW_ID - sheet.getMaxColumns());
+  }
+  [COL.EVENT_KEY, COL.ROW_ID].forEach((col) => {
+    const header = sheet.getRange(1, col);
+    if (header.getValue() === '') {
+      header.setValue(HEADERS[col]);
+      sheet.hideColumns(col);
+    }
+  });
+}
+
+function checkHeaders_(sheet) {
+  const row = sheet.getRange(1, 1, 1, COL.ROW_ID).getValues()[0];
+  const wrong = Object.entries(HEADERS)
+    .filter(([col, name]) => String(row[col - 1]).trim() !== name)
+    .map(([col, name]) => `column ${col} should be "${name}" but is "${row[col - 1]}"`);
+  if (wrong.length) {
+    throw new Error(`Sheet columns have moved — update COL in the script. ${wrong.join('; ')}`);
+  }
+}
