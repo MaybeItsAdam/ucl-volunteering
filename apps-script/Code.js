@@ -7,6 +7,10 @@
  *   never touched.
  * - Doc Detail "＋ Create doc" button: a link to this script's web app, which
  *   drafts a planning doc from that row and puts the doc's link in the cell.
+ * - VolSoc Calendar dropdown: Provisional or Confirmed puts the row's VolSoc
+ *   event in the shared "VolSoc" Google Calendar and keeps it in step with the
+ *   sheet; clearing it removes the event.
+ * - A thick rule under the last row of each day.
  * - setup: run once from the VolSoc menu to add formatting, buttons and triggers.
  *
  * Source of truth is apps-script/ in the ucl-volunteering repo; deploy with
@@ -23,6 +27,8 @@ const CONFIG = {
   ICAL_URL: 'https://www.adamscampustoolbox.org.uk/api/organiser/org_uni_juev5rp0v/ical',
   SHEET_NAME: 'Sheet1',
   DAYS_AHEAD: 90,
+  // Created on first use; its ID is kept in Script Properties.
+  VOLSOC_CALENDAR_NAME: 'VolSoc',
   // Leave blank to create docs in the same Drive folder as the spreadsheet.
   DOC_FOLDER_ID: '',
 };
@@ -50,11 +56,13 @@ const OPTIONAL_HEADERS = {
   SOCIAL_POST: ['Canva Post', 'Instagram Post'],
   COMMITTEE: ['Committee Present'],
   LEAD: ['Activity Lead?', 'Activity Lead'],
+  CALENDAR: ['VolSoc Calendar'],
 };
 // Script-owned columns, created hidden at the end of the sheet if missing.
 const HIDDEN_HEADERS = {
   EVENT_KEY: 'Calendar Event Key',
   ROW_ID: 'Row ID',
+  CALENDAR_EVENT_ID: 'VolSoc Calendar Event ID',
 };
 // The fields the feed owns, in eventFields_ order.
 const FEED_COLUMNS = ['DATE', 'UNION_EVENT', 'UNION_START', 'UNION_END', 'LOCATION', 'LINK'];
@@ -73,6 +81,14 @@ const LEGACY_CREATE_LABELS = ['＋ Create doc'];
 
 const MISSING_VOLSOC_COLOUR = '#f4c7c3';
 
+const CALENDAR_STATUS = {
+  PROVISIONAL: { label: 'Provisional', fill: '#fff5d6' },
+  CONFIRMED: { label: 'Confirmed', fill: '#e8f6ef' },
+};
+
+// Matches the rule under the header row.
+const DAY_DIVIDER_COLOUR = '#051c33';
+
 // ── Menu and one-off setup ────────────────────────────────────────────────
 
 function onOpen() {
@@ -88,7 +104,9 @@ function onOpen() {
 function setup() {
   const sheet = getSheet_();
   addMissingVolsocRule_(sheet);
+  addCalendarStatusRules_(sheet);
   refreshDocButtons_(sheet);
+  if (COL.CALENDAR) volsocCalendar_();
   installTriggers_();
   syncFromGoogleCalendar();
 }
@@ -99,8 +117,10 @@ function installTriggers_() {
     .filter((t) => handlers.includes(t.getHandlerFunction()))
     .forEach((t) => ScriptApp.deleteTrigger(t));
 
-  // handleEdit is from the old checkbox version; deleted above, not recreated.
   ScriptApp.newTrigger('syncFromGoogleCalendar').timeBased().everyHours(1).create();
+  // Installable, not a simple onEdit: calendar changes need authorisation, and
+  // it runs as you whoever edits, so events always land in your calendar.
+  ScriptApp.newTrigger('handleEdit').forSpreadsheet(CONFIG.SPREADSHEET_ID).onEdit().create();
 }
 
 function addMissingVolsocRule_(sheet) {
@@ -134,7 +154,10 @@ function syncFromGoogleCalendar() {
     sync_();
   } finally {
     // Also after a failed sync, so a feed problem never hides the buttons.
-    refreshDocButtons_(getSheet_());
+    const sheet = getSheet_();
+    refreshDocButtons_(sheet);
+    refreshCalendarColumn_(sheet);
+    refreshDayDividers_(sheet);
     lock.releaseLock();
   }
 }
@@ -239,6 +262,12 @@ function sync_() {
   }
 
   if (newRows.length || datesChanged) sortByDate_(sheet);
+
+  if (COL.CALENDAR) {
+    const all = sheet.getLastRow() - 1;
+    syncCalendarRows_(sheet, Array.from({ length: all }, (_, i) => i + 2));
+    removeOrphanCalendarEvents_(sheet, windowStart);
+  }
 }
 
 function eventFields_(event, tz) {
@@ -432,6 +461,233 @@ function docChip_(chip, url) {
 
 function createDocUrl_(rowId) {
   return `${CONFIG.WEB_APP_URL}?row=${encodeURIComponent(rowId)}`;
+}
+
+// ── Day dividers ──────────────────────────────────────────────────────────
+
+// Sheets can't draw borders from conditional formatting, so the rules are
+// redrawn after every sync and whenever a date is edited.
+function refreshDayDividers_(sheet) {
+  const rows = sheet.getLastRow() - 1;
+  if (rows < 1) return;
+  const tz = spreadsheet_().getSpreadsheetTimeZone();
+  const dates = sheet.getRange(2, COL.DATE, rows, 1).getValues().map((r) => dateKey_(r[0], tz));
+  const lastCol = columnLetter_(sheet.getLastColumn());
+  const rowA1 = (row) => `A${row}:${lastCol}${row}`;
+
+  const thin = [rowA1(rows + 2)];
+  const thick = [];
+  dates.forEach((date, i) => {
+    (date !== '' && date !== dates[i + 1] ? thick : thin).push(rowA1(i + 2));
+  });
+
+  sheet.getRangeList(thin).setBorder(null, null, false, null, null, null);
+  if (thick.length) {
+    sheet
+      .getRangeList(thick)
+      .setBorder(null, null, true, null, null, null, DAY_DIVIDER_COLOUR, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
+  }
+}
+
+// ── VolSoc calendar ───────────────────────────────────────────────────────
+
+function handleEdit(e) {
+  const range = e.range;
+  if (range.getSheet().getName() !== CONFIG.SHEET_NAME || range.getLastRow() < 2) return;
+
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(20 * 1000)) return; // the hourly sync will catch up
+  try {
+    const sheet = getSheet_();
+    const touches = (...cols) =>
+      cols.some((col) => col && range.getColumn() <= col && range.getLastColumn() >= col);
+
+    if (touches(COL.DATE)) refreshDayDividers_(sheet);
+
+    if (COL.CALENDAR && touches(COL.CALENDAR, COL.DATE, COL.VOLSOC_EVENT, COL.VOLSOC_START, COL.VOLSOC_END)) {
+      const first = Math.max(range.getRow(), 2);
+      const last = Math.min(range.getLastRow(), first + 99);
+      syncCalendarRows_(sheet, Array.from({ length: last - first + 1 }, (_, i) => first + i));
+    }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function volsocCalendar_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('VOLSOC_CALENDAR_ID');
+  let calendar = id ? CalendarApp.getCalendarById(id) : null;
+  if (!calendar) {
+    calendar = CalendarApp.createCalendar(CONFIG.VOLSOC_CALENDAR_NAME, {
+      summary: 'VolSoc events, managed from the Volsoc Master Plan sheet.',
+      timeZone: spreadsheet_().getSpreadsheetTimeZone(),
+    });
+    props.setProperty('VOLSOC_CALENDAR_ID', calendar.getId());
+  }
+  return calendar;
+}
+
+// Makes the calendar match the VolSoc Calendar column for the given rows: an
+// event per Provisional or Confirmed row, none for a blank one. The sheet is
+// the source of truth, so an event deleted in Calendar comes back while the
+// row still asks for it.
+function syncCalendarRows_(sheet, rowNumbers) {
+  if (!rowNumbers.length) return;
+  const tz = spreadsheet_().getSpreadsheetTimeZone();
+  const first = Math.min(...rowNumbers);
+  const count = Math.max(...rowNumbers) - first + 1;
+  const values = sheet.getRange(first, 1, count, COL.WIDTH).getValues();
+  const text = sheet.getRange(first, 1, count, COL.WIDTH).getDisplayValues();
+  const docLinks = sheet.getRange(first, COL.DOC, count, 1).getRichTextValues();
+  let calendar = null;
+
+  rowNumbers.forEach((row) => {
+    const i = row - first;
+    const status = String(values[i][COL.CALENDAR - 1]).trim();
+    const eventId = String(values[i][COL.CALENDAR_EVENT_ID - 1]);
+    if (!status && !eventId) return;
+
+    calendar = calendar || volsocCalendar_();
+    const statusCell = sheet.getRange(row, COL.CALENDAR);
+    const idCell = sheet.getRange(row, COL.CALENDAR_EVENT_ID);
+    let event = eventId ? calendar.getEventById(eventId) : null;
+
+    if (!status) {
+      if (event) event.deleteEvent();
+      idCell.clearContent();
+      statusCell.clearNote();
+      return;
+    }
+
+    const docRich = docLinks[i][0];
+    const docUrl = docRich && /^https:\/\/docs\.google\.com\//.test(docRich.getLinkUrl() || '') ? docRich.getLinkUrl() : '';
+    const details = calendarDetails_(values[i], text[i], status, docUrl, tz);
+    if (details.error) {
+      statusCell.setNote(`Not in the calendar yet: ${details.error}`);
+      return;
+    }
+    if (statusCell.getNote()) statusCell.clearNote();
+
+    if (!event) {
+      event = details.allDay
+        ? calendar.createAllDayEvent(details.title, details.start, { description: details.description })
+        : calendar.createEvent(details.title, details.start, details.end, { description: details.description });
+      event.setTag('volsocRowId', String(values[i][COL.ROW_ID - 1]));
+      idCell.setValue(event.getId());
+      return;
+    }
+
+    if (event.getTitle() !== details.title) event.setTitle(details.title);
+    if (event.getDescription() !== details.description) event.setDescription(details.description);
+    if (details.allDay) {
+      if (!event.isAllDayEvent() || event.getAllDayStartDate().getTime() !== details.start.getTime()) {
+        event.setAllDayDate(details.start);
+      }
+    } else if (
+      event.isAllDayEvent() ||
+      event.getStartTime().getTime() !== details.start.getTime() ||
+      event.getEndTime().getTime() !== details.end.getTime()
+    ) {
+      event.setTime(details.start, details.end);
+    }
+    event.setTag('volsocRowId', String(values[i][COL.ROW_ID - 1]));
+  });
+}
+
+function calendarDetails_(values, text, status, docUrl, tz) {
+  const date = dateKey_(values[COL.DATE - 1], tz);
+  const name = text[COL.VOLSOC_EVENT - 1].trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: 'add a date.' };
+  if (!name) return { error: 'add a Volsoc Event name.' };
+
+  const confirmed = status === CALENDAR_STATUS.CONFIRMED.label;
+  const at = (hhmm) => Utilities.parseDate(`${date} ${hhmm}`, tz, 'yyyy-MM-dd HH:mm');
+  const startText = timeKey_(text[COL.VOLSOC_START - 1]);
+  const endText = timeKey_(text[COL.VOLSOC_END - 1]);
+  const isTime = (t) => /^\d{2}:\d{2}$/.test(t);
+
+  const union = text[COL.UNION_EVENT - 1];
+  const lines = [];
+  if (union) {
+    const unionTime = timeRange_(text[COL.UNION_START - 1], text[COL.UNION_END - 1]);
+    const where = text[COL.LOCATION - 1];
+    lines.push(`Follows the Social Impact event: ${union}${unionTime ? `, ${unionTime}` : ''}${where ? `, ${where}` : ''}`);
+    if (text[COL.LINK - 1]) lines.push(text[COL.LINK - 1]);
+  }
+  if (COL.LEAD && text[COL.LEAD - 1]) lines.push(`Activity lead: ${text[COL.LEAD - 1]}`);
+  if (docUrl) lines.push(`Planning doc: ${docUrl}`);
+  if (!confirmed) lines.push('', 'Provisional — not confirmed yet.');
+  lines.push('', 'Managed from the Volsoc Master Plan sheet. Edit the sheet, not this event.');
+
+  const details = {
+    title: confirmed ? name : `[Provisional] ${name}`,
+    description: lines.join('\n'),
+  };
+  if (!isTime(startText)) {
+    return { ...details, allDay: true, start: at('00:00') };
+  }
+  const start = at(startText);
+  let end = isTime(endText) ? at(endText) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
+  if (end <= start) end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+  return { ...details, allDay: false, start, end };
+}
+
+// Events whose row was deleted from the sheet. Only upcoming ones, and only
+// ones this script made (tagged with a row ID).
+function removeOrphanCalendarEvents_(sheet, from) {
+  const props = PropertiesService.getScriptProperties();
+  if (!props.getProperty('VOLSOC_CALENDAR_ID')) return;
+  const rows = sheet.getLastRow() - 1;
+  if (rows < 1) return;
+  const known = new Set(
+    sheet.getRange(2, COL.CALENDAR_EVENT_ID, rows, 1).getValues().map((r) => String(r[0])).filter(Boolean)
+  );
+  const until = new Date(from);
+  until.setFullYear(until.getFullYear() + 1);
+  volsocCalendar_()
+    .getEvents(from, until)
+    .filter((event) => event.getTag('volsocRowId') && !known.has(event.getId()))
+    .forEach((event) => event.deleteEvent());
+}
+
+function refreshCalendarColumn_(sheet) {
+  if (!COL.CALENDAR) return;
+  const rows = sheet.getLastRow() - 1;
+  if (rows < 1) return;
+  const values = sheet.getRange(2, 1, rows, COL.WIDTH).getValues();
+  const dropdown = SpreadsheetApp.newDataValidation()
+    .requireValueInList([CALENDAR_STATUS.PROVISIONAL.label, CALENDAR_STATUS.CONFIRMED.label], true)
+    .setAllowInvalid(false)
+    .build();
+  sheet.getRange(2, COL.CALENDAR, rows, 1).setDataValidations(values.map((row) => [hasContent_(row) ? dropdown : null]));
+}
+
+function addCalendarStatusRules_(sheet) {
+  if (!COL.CALENDAR) return;
+  const rules = sheet.getConditionalFormatRules();
+  const range = sheet.getRange(2, COL.CALENDAR, sheet.getMaxRows() - 1, 1);
+  Object.values(CALENDAR_STATUS).forEach((status) => {
+    const exists = rules.some((rule) => {
+      const condition = rule.getBooleanCondition();
+      return (
+        condition &&
+        condition.getCriteriaType() === SpreadsheetApp.BooleanCriteria.TEXT_EQUAL_TO &&
+        condition.getCriteriaValues()[0] === status.label &&
+        rule.getRanges().some((r) => r.getColumn() === COL.CALENDAR)
+      );
+    });
+    if (exists) return;
+    rules.push(
+      SpreadsheetApp.newConditionalFormatRule()
+        .whenTextEqualTo(status.label)
+        .setBackground(status.fill)
+        .setBold(true)
+        .setRanges([range])
+        .build()
+    );
+  });
+  sheet.setConditionalFormatRules(rules);
 }
 
 // ── Planning docs ─────────────────────────────────────────────────────────
