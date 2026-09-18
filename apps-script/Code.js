@@ -271,7 +271,8 @@ function sync_() {
 
   if (COL.CALENDAR) {
     const all = sheet.getLastRow() - 1;
-    syncCalendarRows_(sheet, Array.from({ length: all }, (_, i) => i + 2));
+    const moved = syncCalendarRows_(sheet, Array.from({ length: all }, (_, i) => i + 2), { pull: true });
+    if (moved) sortByDate_(sheet);
     removeOrphanCalendarEvents_(sheet, windowStart);
   }
 }
@@ -579,17 +580,20 @@ function volsocCalendar_() {
   }
 }
 
-// Keeps events already in the calendar in step with their rows: title, time
-// and description follow the sheet. An event deleted in Calendar is treated
+// Keeps events already in the calendar in step with their rows: title and
+// description always follow the sheet, and so does the time unless the event
+// has been moved in Calendar since we last wrote it, which the hourly sweep
+// pulls back into the row instead. An event deleted in Calendar is treated
 // as taken out, and the row goes back to an Add to calendar button.
-function syncCalendarRows_(sheet, rowNumbers) {
-  if (!rowNumbers.length) return;
+function syncCalendarRows_(sheet, rowNumbers, { pull = false } = {}) {
+  if (!rowNumbers.length) return false;
   const tz = spreadsheet_().getSpreadsheetTimeZone();
   const first = Math.min(...rowNumbers);
   const count = Math.max(...rowNumbers) - first + 1;
   const values = sheet.getRange(first, 1, count, COL.WIDTH).getValues();
   const text = sheet.getRange(first, 1, count, COL.WIDTH).getDisplayValues();
   let calendar = null;
+  let datesChanged = false;
 
   rowNumbers.forEach((row) => {
     const i = row - first;
@@ -604,8 +608,21 @@ function syncCalendarRows_(sheet, rowNumbers) {
     }
     const details = calendarDetails_(values[i], text[i], docUrl_(sheet, row), tz);
     if (details.error) return; // keep the event as it was until the row is fixed
-    updateEvent_(event, details, values[i][COL.ROW_ID - 1]);
+
+    // Dragging the event in Calendar is a deliberate act, so on the hourly
+    // sweep the calendar wins and the move is pulled back into the row rather
+    // than silently undone. A sheet edit pushes the other way the moment it
+    // happens; the stamp tells the two apart, differing only when the event
+    // was moved in Calendar after we last wrote it.
+    const stamped = event.getTag('volsocSyncedTime');
+    if (pull && stamped && stamped !== eventStamp_(event, tz)) {
+      if (pullEventIntoRow_(sheet, row, event, values[i], tz)) datesChanged = true;
+      return;
+    }
+    updateEvent_(event, details, values[i][COL.ROW_ID - 1], tz);
   });
+
+  return datesChanged;
 }
 
 // Returns { url, existed }. Throws with a readable message on failure.
@@ -633,6 +650,7 @@ function addToCalendarForRow_(row) {
       ? calendar.createAllDayEvent(details.title, details.start, { description: details.description })
       : calendar.createEvent(details.title, details.start, details.end, { description: details.description });
     event.setTag('volsocRowId', String(values[COL.ROW_ID - 1]));
+    event.setTag('volsocSyncedTime', stamp_(details.allDay, details.start, details.end, tz));
     sheet.getRange(row, COL.CALENDAR_EVENT_ID).setValue(event.getId());
     refreshCalendarButtons_(sheet);
     SpreadsheetApp.flush();
@@ -655,7 +673,7 @@ function removeClearedCalendarEvents_(sheet, rowNumbers) {
   });
 }
 
-function updateEvent_(event, details, rowId) {
+function updateEvent_(event, details, rowId, tz) {
   if (event.getTitle() !== details.title) event.setTitle(details.title);
   if (event.getDescription() !== details.description) event.setDescription(details.description);
   if (details.allDay) {
@@ -670,6 +688,73 @@ function updateEvent_(event, details, rowId) {
     event.setTime(details.start, details.end);
   }
   if (event.getTag('volsocRowId') !== String(rowId)) event.setTag('volsocRowId', String(rowId));
+  event.setTag('volsocSyncedTime', stamp_(details.allDay, details.start, details.end, tz));
+}
+
+// What we last wrote to the event. Compared against the event's live times to
+// spot a move made in Calendar, so an untouched event is never mistaken for
+// one someone dragged.
+function stamp_(allDay, start, end, tz) {
+  const at = (d) => Utilities.formatDate(d, tz, 'yyyy-MM-dd HH:mm');
+  return allDay ? `${Utilities.formatDate(start, tz, 'yyyy-MM-dd')} all-day` : `${at(start)}/${at(end)}`;
+}
+
+function eventStamp_(event, tz) {
+  return event.isAllDayEvent()
+    ? stamp_(true, event.getAllDayStartDate(), null, tz)
+    : stamp_(false, event.getStartTime(), event.getEndTime(), tz);
+}
+
+// Writes an event moved in Calendar back into its row. Returns true when the
+// day changed and the sheet needs re-sorting.
+function pullEventIntoRow_(sheet, row, event, values, tz) {
+  const allDay = event.isAllDayEvent();
+  const start = allDay ? event.getAllDayStartDate() : event.getStartTime();
+  const date = Utilities.formatDate(start, tz, 'yyyy-MM-dd');
+  const startText = allDay ? '' : Utilities.formatDate(start, tz, 'HH:mm');
+  const endText = allDay ? '' : Utilities.formatDate(event.getEndTime(), tz, 'HH:mm');
+
+  sheet.getRange(row, COL.VOLSOC_START).setValue(startText);
+  sheet.getRange(row, COL.VOLSOC_END).setValue(endText);
+
+  const dateCell = sheet.getRange(row, COL.DATE);
+  const sheetDate = dateKey_(values[COL.DATE - 1], tz);
+  if (date === sheetDate) {
+    dateCell.clearNote();
+    event.setTag('volsocSyncedTime', eventStamp_(event, tz));
+    return false;
+  }
+
+  // The Date column belongs to the Social Impact feed on rows that came from
+  // it, so moving one of those to another day would only be undone at the next
+  // sync. Keep the new time, put the day back, and say so on the cell.
+  if (String(values[COL.EVENT_KEY - 1])) {
+    dateCell.setNote(
+      `The calendar event was moved to ${date}, but this row follows a Social Impact event on ${sheetDate}. ` +
+        'The day has been put back and the new time kept — move the union event, or split this out into its own row.'
+    );
+    if (/^\d{4}-\d{2}-\d{2}$/.test(sheetDate)) moveEventToDate_(event, sheetDate, allDay, startText, endText, tz);
+    else event.setTag('volsocSyncedTime', eventStamp_(event, tz));
+    return false;
+  }
+
+  dateCell.setValue(date).clearNote();
+  event.setTag('volsocSyncedTime', eventStamp_(event, tz));
+  return true;
+}
+
+// Puts an event back on a given day, keeping the time of day it was moved to.
+function moveEventToDate_(event, date, allDay, startText, endText, tz) {
+  const at = (hhmm) => Utilities.parseDate(`${date} ${hhmm}`, tz, 'yyyy-MM-dd HH:mm');
+  if (allDay) {
+    event.setAllDayDate(at('00:00'));
+  } else {
+    const start = at(startText);
+    let end = at(endText);
+    if (end <= start) end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+    event.setTime(start, end);
+  }
+  event.setTag('volsocSyncedTime', eventStamp_(event, tz));
 }
 
 function docUrl_(sheet, row) {
