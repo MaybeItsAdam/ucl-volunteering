@@ -5,15 +5,16 @@
  *   Impact organiser from Adam's Campus Toolbox's iCal feed into Sheet1, updating rows it already knows and adding new ones,
  *   then keeps the sheet in date order. Standalone VolSoc rows (a Volsoc Event
  *   with no Union Event) are never changed or struck through, only sorted.
- * - Doc Detail "＋ Create doc" button: a link to this script's web app, which
- *   drafts a planning doc from that row and puts the doc's link in the cell.
- * - VolSoc Calendar "Add to calendar" button: puts the row's VolSoc event in
- *   the shared "VolSoc" Google Calendar as "[Provisional] …" and keeps it in
- *   step with the sheet. Clearing the cell removes the event.
- * - Delete doc / Remove event ✕ columns beside those two, and matching links
- *   in each planning doc: they open the web app, which asks, then trashes the
- *   row's doc or deletes its event and puts the Create doc / Add to calendar
- *   button back.
+ * - Button columns are checkboxes; ticking one runs it through handleEdit,
+ *   which runs as the script owner whoever ticks:
+ *   - Doc Detail: drafts a planning doc from the row and becomes an
+ *     "Open doc ↗" link to it.
+ *   - VolSoc Calendar: puts the row's VolSoc event in the shared "VolSoc"
+ *     Google Calendar as "[Provisional] …", keeps it in step with the sheet,
+ *     and becomes an "In calendar ↗" link. Clearing the cell removes the event.
+ *   - Delete doc (tick twice) trashes the doc; Remove event deletes the event.
+ * - Each planning doc also links to the web app, which asks, then deletes
+ *   the doc or the event.
  * - A thick rule under the last row of each day.
  * - setup: run once from the VolSoc menu to add formatting, buttons and triggers.
  *
@@ -68,8 +69,8 @@ const HIDDEN_HEADERS = {
   ROW_ID: 'Row ID',
   CALENDAR_EVENT_ID: 'VolSoc Calendar Event ID',
 };
-// Narrow ✕ columns the script inserts just right of the column they act on.
-// Their chips open the web app's confirm page for that row.
+// Narrow checkbox columns the script inserts just right of the column they
+// act on.
 const DELETE_HEADERS = {
   DELETE_DOC: ['Delete doc', 'DOC'],
   REMOVE_EVENT: ['Remove event', 'CALENDAR'],
@@ -83,22 +84,28 @@ const FEED_COLUMNS = ['DATE', 'UNION_EVENT', 'UNION_START', 'UNION_END', 'LOCATI
 let COL = null;
 
 // Doc Detail cells are styled as chips: tinted fill, bold text, no underline.
+// Rows without a doc get a checkbox (BUTTON_BOX) instead.
 const DOC_CHIPS = {
-  create: { label: 'Create doc', text: '#007fff', fill: '#e5f2ff' },
   open: { label: 'Open doc ↗', text: '#444054', fill: '#e8f6ef' },
+  // Shown after the first tick of Delete doc, until the second or it expires.
+  confirm: { label: 'Tick again to delete', text: '#d62246', fill: '#fbe9ec' },
 };
-// Labels from earlier versions, recognised so they get restyled.
-const LEGACY_CREATE_LABELS = ['＋ Create doc'];
+// Create doc links from earlier versions, replaced by a checkbox.
+const LEGACY_CREATE_LABELS = ['Create doc', '＋ Create doc'];
+const DELETE_CONFIRM_SECONDS = 5 * 60;
 
 const MISSING_VOLSOC_COLOUR = '#f4c7c3';
 
 // VolSoc Calendar cells, styled like the Doc Detail chips.
+// Rows not in the calendar get a checkbox (BUTTON_BOX) instead.
 const CALENDAR_CHIPS = {
-  add: { label: 'Add to calendar', text: '#007fff', fill: '#e5f2ff' },
   added: { label: 'In calendar ↗', text: '#444054', fill: '#fff5d6' },
 };
-// The ✕ in the Delete doc and Remove event columns.
-const DELETE_CHIP = { label: '✕', text: '#d62246', fill: '#fbe9ec' };
+
+// Checkboxes stand in for buttons: a cell can't hold a real one, and ticking
+// a box fires the edit trigger. The tick colour is the cell's font colour.
+const BUTTON_BOX = { text: '#007fff', fill: '#e5f2ff' };
+const DELETE_BOX = { text: '#d62246', fill: '#fbe9ec' };
 // Values the old Provisional / Confirmed dropdown left, cleared on refresh.
 const LEGACY_CALENDAR_VALUES = ['Provisional', 'Confirmed'];
 
@@ -429,10 +436,10 @@ function sortByDate_(sheet) {
   ]);
 }
 
-// Every row with content gets a Create doc chip in Doc Detail, which becomes
-// an Open doc chip once the doc exists. Rebuilt on each sync so sorted, pasted
-// or hand-added rows always get one. Anything else typed into the cell is left
-// alone.
+// Every row with content gets a Create doc checkbox in Doc Detail, which
+// becomes an Open doc link once the doc exists, with a Delete doc checkbox
+// beside it. Rebuilt on each sync so sorted, pasted or hand-added rows always
+// get one. Anything else typed into the cell is left alone.
 function refreshDocButtons_(sheet) {
   const rows = sheet.getLastRow() - 1;
   if (rows < 1) return;
@@ -442,31 +449,38 @@ function refreshDocButtons_(sheet) {
   const fills = docRange.getBackgrounds();
   const ids = values.map((row) => [String(row[COL.ROW_ID - 1]) || (hasContent_(row) ? Utilities.getUuid() : '')]);
   sheet.getRange(2, COL.ROW_ID, rows, 1).setValues(ids);
-  docRange.clearDataValidations();
-  const deleteUrls = values.map(() => '');
+  const pending = pendingDocDeletes_(ids.map((r) => r[0]));
+  const chipFills = [BUTTON_BOX.fill, ...Object.values(DOC_CHIPS).map((chip) => chip.fill)];
 
-  values.forEach((row, i) => {
+  // Decide first, so validations are set before anything is written: a
+  // checkbox cell rejects a link written into it.
+  const plan = values.map((row, i) => {
     const raw = row[COL.DOC - 1];
-    // Rich text is null for non-text cells, e.g. the FALSE an old checkbox left.
+    // Rich text is null for non-text cells, such as a checkbox.
     const text = docs[i][0] ? docs[i][0].getText() : '';
     const link = docs[i][0] ? docs[i][0].getLinkUrl() : null;
-    const isCreate = text === DOC_CHIPS.create.label || LEGACY_CREATE_LABELS.includes(text);
-    const isDoc = !isCreate && /^https:\/\/docs\.google\.com\//.test(link || '');
-    const isBlank = raw === '' || typeof raw === 'boolean';
-    const cell = sheet.getRange(i + 2, COL.DOC);
-    const isChipFill = (fill) => [DOC_CHIPS.create.fill, DOC_CHIPS.open.fill].includes(fill);
+    const isLegacy = LEGACY_CREATE_LABELS.includes(text);
+    if (!isLegacy && /^https:\/\/docs\.google\.com\//.test(link || '')) {
+      const chip = pending.has(ids[i][0]) ? DOC_CHIPS.confirm : DOC_CHIPS.open;
+      return { kind: 'chip', chip, url: link, text };
+    }
+    const isBlank = raw === '' || typeof raw === 'boolean' || isLegacy;
+    if (hasContent_(row) && isBlank) return { kind: 'box', raw };
+    return { kind: isLegacy || typeof raw === 'boolean' ? 'clear' : 'keep' };
+  });
 
-    if (hasContent_(row) && (isBlank || isCreate)) {
-      const url = createDocUrl_(ids[i][0]);
-      if (text !== DOC_CHIPS.create.label || link !== url) cell.setRichTextValue(docChip_(DOC_CHIPS.create, url));
-      fills[i][0] = DOC_CHIPS.create.fill;
-    } else if (isDoc) {
-      if (text !== DOC_CHIPS.open.label) cell.setRichTextValue(docChip_(DOC_CHIPS.open, link));
-      fills[i][0] = DOC_CHIPS.open.fill;
-      if (ids[i][0]) deleteUrls[i] = rowActionUrl_('deleteDoc', ids[i][0]);
+  docRange.setDataValidations(plan.map((p) => [p.kind === 'box' ? checkboxRule_() : null]));
+  plan.forEach((p, i) => {
+    const cell = sheet.getRange(i + 2, COL.DOC);
+    if (p.kind === 'chip') {
+      if (p.text !== p.chip.label) cell.setRichTextValue(docChip_(p.chip, p.url));
+      fills[i][0] = p.chip.fill;
+    } else if (p.kind === 'box') {
+      if (p.raw !== false) cell.setValue(false).setFontColor(BUTTON_BOX.text).setFontWeight('normal');
+      fills[i][0] = BUTTON_BOX.fill;
     } else {
-      if (isCreate || typeof raw === 'boolean') cell.clearContent();
-      if (isChipFill(fills[i][0])) fills[i][0] = null;
+      if (p.kind === 'clear') cell.clearContent();
+      if (chipFills.includes(fills[i][0])) fills[i][0] = null;
     }
   });
 
@@ -475,36 +489,40 @@ function refreshDocButtons_(sheet) {
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
-  refreshDeleteColumn_(sheet, COL.DELETE_DOC, deleteUrls);
+  refreshDeleteColumn_(sheet, COL.DELETE_DOC, plan.map((p) => p.kind === 'chip'));
 }
 
-// A ✕ chip on rows with something to delete, blank everywhere else. Like the
-// other button columns it's script-owned, so anything typed in is replaced.
-function refreshDeleteColumn_(sheet, column, urls) {
-  if (!column || !urls.length) return;
-  const range = sheet.getRange(2, column, urls.length, 1);
-  const current = range.getRichTextValues();
+// A red checkbox on rows with something to delete, blank everywhere else.
+// Like the other button columns it's script-owned, so anything typed in is
+// replaced.
+function refreshDeleteColumn_(sheet, column, show) {
+  if (!column || !show.length) return;
+  const range = sheet.getRange(2, column, show.length, 1);
+  const values = range.getValues();
   const fills = range.getBackgrounds();
+  range.setDataValidations(show.map((on) => [on ? checkboxRule_() : null]));
 
-  urls.forEach((url, i) => {
-    const text = current[i][0] ? current[i][0].getText() : '';
-    const link = current[i][0] ? current[i][0].getLinkUrl() : null;
+  show.forEach((on, i) => {
     const cell = sheet.getRange(i + 2, column);
-    if (url) {
-      if (text !== DELETE_CHIP.label || link !== url) cell.setRichTextValue(docChip_(DELETE_CHIP, url));
-      fills[i][0] = DELETE_CHIP.fill;
+    if (on) {
+      if (values[i][0] !== false) cell.setValue(false);
+      fills[i][0] = DELETE_BOX.fill;
     } else {
-      if (text) cell.clearContent();
-      if (fills[i][0] === DELETE_CHIP.fill) fills[i][0] = null;
+      if (values[i][0] !== '') cell.clearContent();
+      if (fills[i][0] === DELETE_BOX.fill) fills[i][0] = null;
     }
   });
 
   range
-    .clearDataValidations()
     .setBackgrounds(fills)
+    .setFontColor(DELETE_BOX.text)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+}
+
+function checkboxRule_() {
+  return SpreadsheetApp.newDataValidation().requireCheckbox().build();
 }
 
 function hasContent_(row) {
@@ -518,10 +536,6 @@ function docChip_(chip, url) {
     .setForegroundColor(chip.text)
     .build();
   return SpreadsheetApp.newRichTextValue().setText(chip.label).setLinkUrl(url).setTextStyle(style).build();
-}
-
-function createDocUrl_(rowId) {
-  return `${CONFIG.WEB_APP_URL}?row=${encodeURIComponent(rowId)}`;
 }
 
 // ── Day dividers ──────────────────────────────────────────────────────────
@@ -563,6 +577,9 @@ function handleEdit(e) {
     const touches = (...cols) =>
       cols.some((col) => col && range.getColumn() <= col && range.getLastColumn() >= col);
 
+    // A ticked button runs its action, which redraws the buttons itself.
+    if (runTickedBoxes_(sheet, range, e.source)) return;
+
     if (touches(COL.DATE)) refreshDayDividers_(sheet);
 
     // A row typed in by hand, such as a standalone VolSoc event with no Union
@@ -584,6 +601,60 @@ function handleEdit(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+// Which action each button column's checkbox runs. handleEdit already holds
+// the document lock.
+const BOX_ACTIONS = [
+  ['DOC', (sheet, row) => createDocForRow_(row)],
+  ['CALENDAR', (sheet, row) => addToCalendarForRow_(row)],
+  ['DELETE_DOC', (sheet, row) => deleteDocAfterSecondTick_(sheet, row)],
+  ['REMOVE_EVENT', (sheet, row) => removeCalendarForRow_(row)],
+];
+
+// Returns true if any box in the edited range was ticked. A box whose action
+// fails is unticked, with the reason in a toast.
+function runTickedBoxes_(sheet, range, source) {
+  let ticked = false;
+  const first = Math.max(range.getRow(), 2);
+  const count = range.getLastRow() - first + 1;
+  BOX_ACTIONS.forEach(([key, run]) => {
+    const col = COL[key];
+    if (!col || range.getColumn() > col || range.getLastColumn() < col) return;
+    sheet.getRange(first, col, count, 1).getValues().forEach(([value], i) => {
+      if (value !== true) return;
+      ticked = true;
+      try {
+        run(sheet, first + i);
+      } catch (err) {
+        sheet.getRange(first + i, col).setValue(false);
+        source.toast(err.message, "Couldn't do that", 10);
+      }
+    });
+  });
+  return ticked;
+}
+
+// Trashing a doc takes two ticks within DELETE_CONFIRM_SECONDS. The first
+// turns the Open doc link red and asks for the second.
+function deleteDocAfterSecondTick_(sheet, row) {
+  const rowId = String(sheet.getRange(row, COL.ROW_ID).getValue());
+  const cache = CacheService.getScriptCache();
+  const key = `deleteDoc:${rowId}`;
+  if (rowId && cache.get(key)) {
+    cache.remove(key);
+    deleteDocForRow_(row);
+    return;
+  }
+  if (rowId) cache.put(key, '1', DELETE_CONFIRM_SECONDS);
+  refreshDocButtons_(sheet);
+}
+
+function pendingDocDeletes_(rowIds) {
+  const keys = rowIds.filter(Boolean).map((id) => `deleteDoc:${id}`);
+  if (!keys.length) return new Set();
+  const found = CacheService.getScriptCache().getAll(keys);
+  return new Set(Object.keys(found).map((key) => key.slice('deleteDoc:'.length)));
 }
 
 const VOLSOC_CALENDAR_SUMMARY = 'VolSoc events, managed from the Volsoc Master Plan sheet.';
@@ -674,36 +745,29 @@ function syncCalendarRows_(sheet, rowNumbers, { pull = false } = {}) {
 // Returns { url, existed }. Throws with a readable message on failure.
 function addToCalendarForRow_(row) {
   const sheet = getSheet_();
-  const lock = LockService.getDocumentLock();
-  if (!lock.tryLock(30 * 1000)) throw new Error('The sheet is busy syncing — try again in a moment.');
-
-  try {
-    const calendar = volsocCalendar_();
-    const values = sheet.getRange(row, 1, 1, COL.WIDTH).getValues()[0];
-    const text = sheet.getRange(row, 1, 1, COL.WIDTH).getDisplayValues()[0];
-    const existingId = String(values[COL.CALENDAR_EVENT_ID - 1]);
-    const existing = existingId ? calendar.getEventById(existingId) : null;
-    if (existing) {
-      refreshCalendarButtons_(sheet);
-      return { url: eventUrl_(existing, calendar), existed: true };
-    }
-
-    const tz = spreadsheet_().getSpreadsheetTimeZone();
-    const details = calendarDetails_(values, text, docUrl_(sheet, row), tz);
-    if (details.error) throw new Error(`Can't add this row to the calendar yet — ${details.error}`);
-
-    const event = details.allDay
-      ? calendar.createAllDayEvent(details.title, details.start, { description: details.description })
-      : calendar.createEvent(details.title, details.start, details.end, { description: details.description });
-    event.setTag('volsocRowId', String(values[COL.ROW_ID - 1]));
-    event.setTag('volsocSyncedTime', stamp_(details.allDay, details.start, details.end, tz));
-    sheet.getRange(row, COL.CALENDAR_EVENT_ID).setValue(event.getId());
+  const calendar = volsocCalendar_();
+  const values = sheet.getRange(row, 1, 1, COL.WIDTH).getValues()[0];
+  const text = sheet.getRange(row, 1, 1, COL.WIDTH).getDisplayValues()[0];
+  const existingId = String(values[COL.CALENDAR_EVENT_ID - 1]);
+  const existing = existingId ? calendar.getEventById(existingId) : null;
+  if (existing) {
     refreshCalendarButtons_(sheet);
-    SpreadsheetApp.flush();
-    return { url: eventUrl_(event, calendar), existed: false };
-  } finally {
-    lock.releaseLock();
+    return { url: eventUrl_(existing, calendar), existed: true };
   }
+
+  const tz = spreadsheet_().getSpreadsheetTimeZone();
+  const details = calendarDetails_(values, text, docUrl_(sheet, row), tz);
+  if (details.error) throw new Error(`Can't add this row to the calendar yet — ${details.error}`);
+
+  const event = details.allDay
+    ? calendar.createAllDayEvent(details.title, details.start, { description: details.description })
+    : calendar.createEvent(details.title, details.start, details.end, { description: details.description });
+  event.setTag('volsocRowId', String(values[COL.ROW_ID - 1]));
+  event.setTag('volsocSyncedTime', stamp_(details.allDay, details.start, details.end, tz));
+  sheet.getRange(row, COL.CALENDAR_EVENT_ID).setValue(event.getId());
+  refreshCalendarButtons_(sheet);
+  SpreadsheetApp.flush();
+  return { url: eventUrl_(event, calendar), existed: false };
 }
 
 function removeClearedCalendarEvents_(sheet, rowNumbers) {
@@ -871,9 +935,10 @@ function removeOrphanCalendarEvents_(sheet, from) {
     .forEach((event) => event.deleteEvent());
 }
 
-// Every row with content shows Add to calendar, or In calendar once its event
-// exists. The column is script-owned: dropdowns and anything typed are
-// replaced, except that a cell cleared by hand is handled by handleEdit first.
+// Every row with content shows an Add to calendar checkbox, or an In
+// calendar link once its event exists, with a Remove event checkbox beside
+// it. The column is script-owned: dropdowns and anything typed are replaced,
+// except that a cell cleared by hand is handled by handleEdit first.
 function refreshCalendarButtons_(sheet) {
   if (!COL.CALENDAR) return;
   const rows = sheet.getLastRow() - 1;
@@ -882,34 +947,32 @@ function refreshCalendarButtons_(sheet) {
   const range = sheet.getRange(2, COL.CALENDAR, rows, 1);
   const current = range.getRichTextValues();
   const fills = range.getBackgrounds();
-  const chipFills = Object.values(CALENDAR_CHIPS).map((chip) => chip.fill);
+  const chipFills = [BUTTON_BOX.fill, ...Object.values(CALENDAR_CHIPS).map((chip) => chip.fill)];
   const calendarId = PropertiesService.getScriptProperties().getProperty('VOLSOC_CALENDAR_ID');
-  range.clearDataValidations();
-  const removeUrls = values.map(() => '');
 
-  values.forEach((row, i) => {
-    const cell = sheet.getRange(i + 2, COL.CALENDAR);
-    const text = current[i][0] ? current[i][0].getText() : String(row[COL.CALENDAR - 1]);
+  const plan = values.map((row, i) => {
+    const raw = row[COL.CALENDAR - 1];
+    const text = current[i][0] ? current[i][0].getText() : '';
     const link = current[i][0] ? current[i][0].getLinkUrl() : null;
     const eventId = String(row[COL.CALENDAR_EVENT_ID - 1]);
-    const rowId = String(row[COL.ROW_ID - 1]);
-
-    let chip = null;
-    let url = null;
     if (eventId && calendarId) {
-      chip = CALENDAR_CHIPS.added;
-      url = eventUrlFromIds_(eventId, calendarId);
-      if (rowId) removeUrls[i] = rowActionUrl_('removeCalendar', rowId);
-    } else if (hasContent_(row) && rowId) {
-      chip = CALENDAR_CHIPS.add;
-      url = rowActionUrl_('calendar', rowId);
+      return { kind: 'chip', chip: CALENDAR_CHIPS.added, url: eventUrlFromIds_(eventId, calendarId), text, link };
     }
+    if (hasContent_(row)) return { kind: 'box', raw };
+    return { kind: raw === '' ? 'keep' : 'clear' };
+  });
 
-    if (chip) {
-      if (text !== chip.label || link !== url) cell.setRichTextValue(docChip_(chip, url));
-      fills[i][0] = chip.fill;
+  range.setDataValidations(plan.map((p) => [p.kind === 'box' ? checkboxRule_() : null]));
+  plan.forEach((p, i) => {
+    const cell = sheet.getRange(i + 2, COL.CALENDAR);
+    if (p.kind === 'chip') {
+      if (p.text !== p.chip.label || p.link !== p.url) cell.setRichTextValue(docChip_(p.chip, p.url));
+      fills[i][0] = p.chip.fill;
+    } else if (p.kind === 'box') {
+      if (p.raw !== false) cell.setValue(false).setFontColor(BUTTON_BOX.text).setFontWeight('normal');
+      fills[i][0] = BUTTON_BOX.fill;
     } else {
-      if (text) cell.clearContent();
+      if (p.kind === 'clear') cell.clearContent();
       if (chipFills.includes(fills[i][0])) fills[i][0] = null;
     }
   });
@@ -919,7 +982,7 @@ function refreshCalendarButtons_(sheet) {
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
-  refreshDeleteColumn_(sheet, COL.REMOVE_EVENT, removeUrls);
+  refreshDeleteColumn_(sheet, COL.REMOVE_EVENT, plan.map((p) => p.kind === 'chip'));
 }
 
 // The Provisional / Confirmed dropdown had colour rules of its own.
@@ -973,7 +1036,19 @@ function runRowAction(action, rowId) {
   if (!rowId || i === -1) {
     throw new Error('Could not find that row — it may have been deleted. Refresh the sheet and try again.');
   }
-  return (ROW_ACTIONS[action] || ROW_ACTIONS.doc).run(i + 2);
+  return withSheetLock_(() => (ROW_ACTIONS[action] || ROW_ACTIONS.doc).run(i + 2));
+}
+
+// The row actions expect the document lock to be held already, as it is in
+// handleEdit, so the web app and menu take it here.
+function withSheetLock_(fn) {
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(30 * 1000)) throw new Error('The sheet is busy syncing — try again in a moment.');
+  try {
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ── Deleting docs and events ──────────────────────────────────────────────
@@ -1044,56 +1119,42 @@ function addDocControlsToExistingDocs_(sheet) {
 // from Drive for 30 days.
 function deleteDocForRow_(row) {
   const sheet = getSheet_();
-  const lock = LockService.getDocumentLock();
-  if (!lock.tryLock(30 * 1000)) throw new Error('The sheet is busy syncing — try again in a moment.');
+  const url = docUrl_(sheet, row);
+  if (!url) return { url: sheetUrl_(sheet, row), existed: true };
 
-  try {
-    const url = docUrl_(sheet, row);
-    if (!url) return { url: sheetUrl_(sheet, row), existed: true };
-
-    const id = (/\/d\/([\w-]+)/.exec(url) || [])[1];
-    if (id) {
-      try {
-        DriveApp.getFileById(id).setTrashed(true);
-      } catch (err) {
-        // Already deleted by hand, or a doc someone else owns and pasted in.
-        if (!/not found|no item/i.test(err.message)) {
-          throw new Error(`Couldn't move the doc to the trash — ${err.message}`);
-        }
+  const id = (/\/d\/([\w-]+)/.exec(url) || [])[1];
+  if (id) {
+    try {
+      DriveApp.getFileById(id).setTrashed(true);
+    } catch (err) {
+      // Already deleted by hand, or a doc someone else owns and pasted in.
+      if (!/not found|no item/i.test(err.message)) {
+        throw new Error(`Couldn't move the doc to the trash — ${err.message}`);
       }
     }
-
-    sheet.getRange(row, COL.DOC).clearContent();
-    refreshDocButtons_(sheet);
-    // Drops the planning doc line from the event description.
-    if (COL.CALENDAR) syncCalendarRows_(sheet, [row]);
-    SpreadsheetApp.flush();
-    return { url: sheetUrl_(sheet, row), existed: false };
-  } finally {
-    lock.releaseLock();
   }
+
+  sheet.getRange(row, COL.DOC).clearContent();
+  refreshDocButtons_(sheet);
+  // Drops the planning doc line from the event description.
+  if (COL.CALENDAR) syncCalendarRows_(sheet, [row]);
+  SpreadsheetApp.flush();
+  return { url: sheetUrl_(sheet, row), existed: false };
 }
 
 function removeCalendarForRow_(row) {
   const sheet = getSheet_();
-  const lock = LockService.getDocumentLock();
-  if (!lock.tryLock(30 * 1000)) throw new Error('The sheet is busy syncing — try again in a moment.');
+  if (!COL.CALENDAR) throw new Error('The sheet has no VolSoc Calendar column.');
+  const idCell = sheet.getRange(row, COL.CALENDAR_EVENT_ID);
+  const eventId = String(idCell.getValue());
+  if (!eventId) return { url: sheetUrl_(sheet, row), existed: true };
 
-  try {
-    if (!COL.CALENDAR) throw new Error('The sheet has no VolSoc Calendar column.');
-    const idCell = sheet.getRange(row, COL.CALENDAR_EVENT_ID);
-    const eventId = String(idCell.getValue());
-    if (!eventId) return { url: sheetUrl_(sheet, row), existed: true };
-
-    const event = volsocCalendar_().getEventById(eventId);
-    if (event) event.deleteEvent();
-    idCell.clearContent();
-    refreshCalendarButtons_(sheet);
-    SpreadsheetApp.flush();
-    return { url: sheetUrl_(sheet, row), existed: false };
-  } finally {
-    lock.releaseLock();
-  }
+  const event = volsocCalendar_().getEventById(eventId);
+  if (event) event.deleteEvent();
+  idCell.clearContent();
+  refreshCalendarButtons_(sheet);
+  SpreadsheetApp.flush();
+  return { url: sheetUrl_(sheet, row), existed: false };
 }
 
 function sheetUrl_(sheet, row) {
@@ -1112,7 +1173,7 @@ function createDocForSelectedRow() {
     SpreadsheetApp.getUi().alert(`Select a row in ${CONFIG.SHEET_NAME} first.`);
     return;
   }
-  const result = createDocForRow_(range.getRow());
+  const result = withSheetLock_(() => createDocForRow_(range.getRow()));
   ss.toast(result.existed ? 'This row already has a doc.' : 'Doc created.', 'VolSoc');
 }
 
@@ -1122,54 +1183,46 @@ function createDocForRow_(row) {
   const sheet = getSheet_();
   const cell = sheet.getRange(row, COL.DOC);
 
-  const lock = LockService.getDocumentLock();
-  if (!lock.tryLock(30 * 1000)) throw new Error('The sheet is busy syncing — try again in a moment.');
+  const existingUrl = docUrl_(sheet, row);
+  if (existingUrl) return { url: existingUrl, existed: true };
 
-  try {
-    const current = cell.getRichTextValue();
-    const existingUrl = /^https:\/\/docs\.google\.com\//.test(current.getLinkUrl() || '') ? current.getLinkUrl() : '';
-    if (existingUrl) return { url: existingUrl, existed: true };
-
-    const tz = ss.getSpreadsheetTimeZone();
-    const values = sheet.getRange(row, 1, 1, COL.WIDTH).getValues()[0];
-    const text = sheet.getRange(row, 1, 1, COL.WIDTH).getDisplayValues()[0];
-    const optional = (col) => (col ? text[col - 1] : '');
-    const info = {
-      date: dateKey_(values[COL.DATE - 1], tz),
-      unionEvent: text[COL.UNION_EVENT - 1],
-      unionTime: timeRange_(text[COL.UNION_START - 1], text[COL.UNION_END - 1]),
-      location: text[COL.LOCATION - 1],
-      link: text[COL.LINK - 1],
-      volsocEvent: text[COL.VOLSOC_EVENT - 1],
-      volsocTime: timeRange_(text[COL.VOLSOC_START - 1], text[COL.VOLSOC_END - 1]),
-      whatsOn: optional(COL.WHATSON),
-      socialPost: optional(COL.SOCIAL_POST),
-      committee: optional(COL.COMMITTEE),
-      lead: optional(COL.LEAD),
-    };
-    if (!info.date && !info.unionEvent && !info.volsocEvent) {
-      throw new Error('This row is empty — nothing to make a doc from.');
-    }
-
-    const name = [info.date, 'VolSoc', info.volsocEvent || info.unionEvent || 'event'].filter(Boolean).join(' – ');
-    const doc = DocumentApp.create(name);
-    try {
-      writePlanningDoc_(doc, info, String(values[COL.ROW_ID - 1]));
-      doc.saveAndClose();
-      DriveApp.getFileById(doc.getId()).moveTo(docFolder_(ss));
-    } catch (err) {
-      // Don't leave a half-written doc lying around in My Drive.
-      DriveApp.getFileById(doc.getId()).setTrashed(true);
-      throw err;
-    }
-
-    cell.setRichTextValue(docChip_(DOC_CHIPS.open, doc.getUrl())).setBackground(DOC_CHIPS.open.fill);
-    refreshDocButtons_(sheet); // puts the ✕ beside it
-    SpreadsheetApp.flush();
-    return { url: doc.getUrl(), name, existed: false };
-  } finally {
-    lock.releaseLock();
+  const tz = ss.getSpreadsheetTimeZone();
+  const values = sheet.getRange(row, 1, 1, COL.WIDTH).getValues()[0];
+  const text = sheet.getRange(row, 1, 1, COL.WIDTH).getDisplayValues()[0];
+  const optional = (col) => (col ? text[col - 1] : '');
+  const info = {
+    date: dateKey_(values[COL.DATE - 1], tz),
+    unionEvent: text[COL.UNION_EVENT - 1],
+    unionTime: timeRange_(text[COL.UNION_START - 1], text[COL.UNION_END - 1]),
+    location: text[COL.LOCATION - 1],
+    link: text[COL.LINK - 1],
+    volsocEvent: text[COL.VOLSOC_EVENT - 1],
+    volsocTime: timeRange_(text[COL.VOLSOC_START - 1], text[COL.VOLSOC_END - 1]),
+    whatsOn: optional(COL.WHATSON),
+    socialPost: optional(COL.SOCIAL_POST),
+    committee: optional(COL.COMMITTEE),
+    lead: optional(COL.LEAD),
+  };
+  if (!info.date && !info.unionEvent && !info.volsocEvent) {
+    throw new Error('This row is empty — nothing to make a doc from.');
   }
+
+  const name = [info.date, 'VolSoc', info.volsocEvent || info.unionEvent || 'event'].filter(Boolean).join(' – ');
+  const doc = DocumentApp.create(name);
+  try {
+    writePlanningDoc_(doc, info, String(values[COL.ROW_ID - 1]));
+    doc.saveAndClose();
+    DriveApp.getFileById(doc.getId()).moveTo(docFolder_(ss));
+  } catch (err) {
+    // Don't leave a half-written doc lying around in My Drive.
+    DriveApp.getFileById(doc.getId()).setTrashed(true);
+    throw err;
+  }
+
+  cell.clearDataValidations().setRichTextValue(docChip_(DOC_CHIPS.open, doc.getUrl())).setBackground(DOC_CHIPS.open.fill);
+  refreshDocButtons_(sheet); // puts the Delete doc box beside it
+  SpreadsheetApp.flush();
+  return { url: doc.getUrl(), name, existed: false };
 }
 
 function writePlanningDoc_(doc, info, rowId) {
@@ -1300,7 +1353,7 @@ function resolveColumns_(sheet) {
   });
   Object.entries(HIDDEN_HEADERS).forEach(([key, name]) => (col[key] = find(name)));
 
-  // A missing ✕ column is inserted beside its column. That shifts every
+  // A missing checkbox column is inserted beside its column. That shifts every
   // column to its right, so the headers are looked up again from scratch.
   const toInsert = Object.values(DELETE_HEADERS).find(([name, beside]) => col[beside] && !find(name));
   if (toInsert) {
