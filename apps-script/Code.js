@@ -12,7 +12,8 @@
  *   - VolSoc Calendar: puts the row's VolSoc event in the shared "VolSoc"
  *     Google Calendar as "[Provisional] …", keeps it in step with the sheet,
  *     and becomes an "In calendar ↗" link. Clearing the cell removes the event.
- *   - Delete doc (tick twice) trashes the doc; Remove event deletes the event.
+ *   - Delete doc trashes the doc and Remove event deletes the event, each
+ *     after a second tick to confirm.
  * - Each planning doc also links to the web app, which asks, then deletes
  *   the doc or the event.
  * - A thick rule under the last row of each day.
@@ -88,11 +89,10 @@ let COL = null;
 const DOC_CHIPS = {
   open: { label: 'Open doc ↗', text: '#444054', fill: '#e8f6ef' },
   // Shown after the first tick of Delete doc, until the second or it expires.
-  confirm: { label: 'Tick again to delete', text: '#d62246', fill: '#fbe9ec' },
+  confirm: { label: 'Tick ✕ again to delete', text: '#d62246', fill: '#fbe9ec' },
 };
 // Create doc links from earlier versions, replaced by a checkbox.
 const LEGACY_CREATE_LABELS = ['Create doc', '＋ Create doc'];
-const DELETE_CONFIRM_SECONDS = 5 * 60;
 
 const MISSING_VOLSOC_COLOUR = '#f4c7c3';
 
@@ -100,12 +100,15 @@ const MISSING_VOLSOC_COLOUR = '#f4c7c3';
 // Rows not in the calendar get a checkbox (BUTTON_BOX) instead.
 const CALENDAR_CHIPS = {
   added: { label: 'In calendar ↗', text: '#444054', fill: '#fff5d6' },
+  confirm: { label: 'Tick ✕ again to remove', text: '#d62246', fill: '#fbe9ec' },
 };
 
 // Checkboxes stand in for buttons: a cell can't hold a real one, and ticking
 // a box fires the edit trigger. The tick colour is the cell's font colour.
 const BUTTON_BOX = { text: '#007fff', fill: '#e5f2ff' };
 const DELETE_BOX = { text: '#d62246', fill: '#fbe9ec' };
+// Deleting takes a second tick within this long.
+const DELETE_CONFIRM_SECONDS = 5 * 60;
 // Values the old Provisional / Confirmed dropdown left, cleared on refresh.
 const LEGACY_CALENDAR_VALUES = ['Provisional', 'Confirmed'];
 
@@ -449,7 +452,7 @@ function refreshDocButtons_(sheet) {
   const fills = docRange.getBackgrounds();
   const ids = values.map((row) => [String(row[COL.ROW_ID - 1]) || (hasContent_(row) ? Utilities.getUuid() : '')]);
   sheet.getRange(2, COL.ROW_ID, rows, 1).setValues(ids);
-  const pending = pendingDocDeletes_(ids.map((r) => r[0]));
+  const pending = pendingDeletes_('deleteDoc', ids.map((r) => r[0]));
   const chipFills = [BUTTON_BOX.fill, ...Object.values(DOC_CHIPS).map((chip) => chip.fill)];
 
   // Decide first, so validations are set before anything is written: a
@@ -489,28 +492,29 @@ function refreshDocButtons_(sheet) {
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
-  refreshDeleteColumn_(sheet, COL.DELETE_DOC, plan.map((p) => p.kind === 'chip'));
+  refreshDeleteColumn_(sheet, COL.DELETE_DOC, plan.map((p, i) => deleteCellState_(p, values[i])));
 }
 
-// A red checkbox on rows with something to delete, blank everywhere else.
-// Like the other button columns it's script-owned, so anything typed in is
-// replaced.
-function refreshDeleteColumn_(sheet, column, show) {
-  if (!column || !show.length) return;
-  const range = sheet.getRange(2, column, show.length, 1);
+// A red checkbox on rows with something to delete. Other rows with content
+// keep the red tint with no box, so the column reads as one strip and doesn't
+// lose its colour once something is deleted. Like the other button columns
+// it's script-owned, so anything typed in is replaced.
+function refreshDeleteColumn_(sheet, column, states) {
+  if (!column || !states.length) return;
+  const range = sheet.getRange(2, column, states.length, 1);
   const values = range.getValues();
   const fills = range.getBackgrounds();
-  range.setDataValidations(show.map((on) => [on ? checkboxRule_() : null]));
+  range.setDataValidations(states.map((state) => [state === 'box' ? checkboxRule_() : null]));
 
-  show.forEach((on, i) => {
+  states.forEach((state, i) => {
     const cell = sheet.getRange(i + 2, column);
-    if (on) {
+    if (state === 'box') {
       if (values[i][0] !== false) cell.setValue(false);
-      fills[i][0] = DELETE_BOX.fill;
-    } else {
-      if (values[i][0] !== '') cell.clearContent();
-      if (fills[i][0] === DELETE_BOX.fill) fills[i][0] = null;
+    } else if (values[i][0] !== '') {
+      cell.clearContent();
     }
+    if (state !== 'none') fills[i][0] = DELETE_BOX.fill;
+    else if (fills[i][0] === DELETE_BOX.fill) fills[i][0] = null;
   });
 
   range
@@ -519,6 +523,11 @@ function refreshDeleteColumn_(sheet, column, show) {
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+}
+
+function deleteCellState_(plan, row) {
+  if (plan.kind === 'chip') return 'box';
+  return hasContent_(row) ? 'tint' : 'none';
 }
 
 function checkboxRule_() {
@@ -608,8 +617,8 @@ function handleEdit(e) {
 const BOX_ACTIONS = [
   ['DOC', (sheet, row) => createDocForRow_(row)],
   ['CALENDAR', (sheet, row) => addToCalendarForRow_(row)],
-  ['DELETE_DOC', (sheet, row) => deleteDocAfterSecondTick_(sheet, row)],
-  ['REMOVE_EVENT', (sheet, row) => removeCalendarForRow_(row)],
+  ['DELETE_DOC', (sheet, row, source) => afterSecondTick_(sheet, row, source, 'deleteDoc')],
+  ['REMOVE_EVENT', (sheet, row, source) => afterSecondTick_(sheet, row, source, 'removeEvent')],
 ];
 
 // Returns true if any box in the edited range was ticked. A box whose action
@@ -625,7 +634,7 @@ function runTickedBoxes_(sheet, range, source) {
       if (value !== true) return;
       ticked = true;
       try {
-        run(sheet, first + i);
+        run(sheet, first + i, source);
       } catch (err) {
         sheet.getRange(first + i, col).setValue(false);
         source.toast(err.message, "Couldn't do that", 10);
@@ -635,26 +644,44 @@ function runTickedBoxes_(sheet, range, source) {
   return ticked;
 }
 
-// Trashing a doc takes two ticks within DELETE_CONFIRM_SECONDS. The first
-// turns the Open doc link red and asks for the second.
-function deleteDocAfterSecondTick_(sheet, row) {
+// Deleting takes two ticks within DELETE_CONFIRM_SECONDS. The first turns
+// the link beside the box red and pops up a toast asking for the second.
+const SECOND_TICK = {
+  deleteDoc: {
+    ask: 'Tick ✕ again to move the doc for {name} to the Drive trash.',
+    run: (sheet, row) => deleteDocForRow_(row),
+    refresh: (sheet) => refreshDocButtons_(sheet),
+  },
+  removeEvent: {
+    ask: 'Tick ✕ again to remove {name} from the VolSoc calendar.',
+    run: (sheet, row) => removeCalendarForRow_(row),
+    refresh: (sheet) => refreshCalendarButtons_(sheet),
+  },
+};
+
+function afterSecondTick_(sheet, row, source, kind) {
+  const step = SECOND_TICK[kind];
   const rowId = String(sheet.getRange(row, COL.ROW_ID).getValue());
+  if (!rowId) throw new Error('This row has no ID yet — run VolSoc → Sync now, then try again.');
   const cache = CacheService.getScriptCache();
-  const key = `deleteDoc:${rowId}`;
-  if (rowId && cache.get(key)) {
+  const key = `${kind}:${rowId}`;
+  if (cache.get(key)) {
     cache.remove(key);
-    deleteDocForRow_(row);
+    step.run(sheet, row);
     return;
   }
-  if (rowId) cache.put(key, '1', DELETE_CONFIRM_SECONDS);
-  refreshDocButtons_(sheet);
+  cache.put(key, '1', DELETE_CONFIRM_SECONDS);
+  step.refresh(sheet);
+  const text = sheet.getRange(row, 1, 1, COL.WIDTH).getDisplayValues()[0];
+  const name = text[COL.VOLSOC_EVENT - 1] || text[COL.UNION_EVENT - 1] || `row ${row}`;
+  source.toast(step.ask.replace('{name}', `"${name}"`), 'Are you sure?', 15);
 }
 
-function pendingDocDeletes_(rowIds) {
-  const keys = rowIds.filter(Boolean).map((id) => `deleteDoc:${id}`);
+function pendingDeletes_(kind, rowIds) {
+  const keys = rowIds.filter(Boolean).map((id) => `${kind}:${id}`);
   if (!keys.length) return new Set();
   const found = CacheService.getScriptCache().getAll(keys);
-  return new Set(Object.keys(found).map((key) => key.slice('deleteDoc:'.length)));
+  return new Set(Object.keys(found).map((key) => key.slice(kind.length + 1)));
 }
 
 const VOLSOC_CALENDAR_SUMMARY = 'VolSoc events, managed from the Volsoc Master Plan sheet.';
@@ -949,6 +976,7 @@ function refreshCalendarButtons_(sheet) {
   const fills = range.getBackgrounds();
   const chipFills = [BUTTON_BOX.fill, ...Object.values(CALENDAR_CHIPS).map((chip) => chip.fill)];
   const calendarId = PropertiesService.getScriptProperties().getProperty('VOLSOC_CALENDAR_ID');
+  const pending = pendingDeletes_('removeEvent', values.map((row) => String(row[COL.ROW_ID - 1])));
 
   const plan = values.map((row, i) => {
     const raw = row[COL.CALENDAR - 1];
@@ -956,7 +984,8 @@ function refreshCalendarButtons_(sheet) {
     const link = current[i][0] ? current[i][0].getLinkUrl() : null;
     const eventId = String(row[COL.CALENDAR_EVENT_ID - 1]);
     if (eventId && calendarId) {
-      return { kind: 'chip', chip: CALENDAR_CHIPS.added, url: eventUrlFromIds_(eventId, calendarId), text, link };
+      const chip = pending.has(String(row[COL.ROW_ID - 1])) ? CALENDAR_CHIPS.confirm : CALENDAR_CHIPS.added;
+      return { kind: 'chip', chip, url: eventUrlFromIds_(eventId, calendarId), text, link };
     }
     if (hasContent_(row)) return { kind: 'box', raw };
     return { kind: raw === '' ? 'keep' : 'clear' };
@@ -982,7 +1011,7 @@ function refreshCalendarButtons_(sheet) {
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
-  refreshDeleteColumn_(sheet, COL.REMOVE_EVENT, plan.map((p) => p.kind === 'chip'));
+  refreshDeleteColumn_(sheet, COL.REMOVE_EVENT, plan.map((p, i) => deleteCellState_(p, values[i])));
 }
 
 // The Provisional / Confirmed dropdown had colour rules of its own.
