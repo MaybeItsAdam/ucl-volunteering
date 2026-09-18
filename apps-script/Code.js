@@ -10,9 +10,10 @@
  * - VolSoc Calendar "Add to calendar" button: puts the row's VolSoc event in
  *   the shared "VolSoc" Google Calendar as "[Provisional] …" and keeps it in
  *   step with the sheet. Clearing the cell removes the event.
- * - Planning docs carry "Remove from VolSoc calendar" and "Delete this doc"
- *   links to the web app, which asks, then deletes the row's event or trashes
- *   the doc and puts the Add to calendar / Create doc button back.
+ * - Delete doc / Remove event ✕ columns beside those two, and matching links
+ *   in each planning doc: they open the web app, which asks, then trashes the
+ *   row's doc or deletes its event and puts the Create doc / Add to calendar
+ *   button back.
  * - A thick rule under the last row of each day.
  * - setup: run once from the VolSoc menu to add formatting, buttons and triggers.
  *
@@ -67,6 +68,13 @@ const HIDDEN_HEADERS = {
   ROW_ID: 'Row ID',
   CALENDAR_EVENT_ID: 'VolSoc Calendar Event ID',
 };
+// Narrow ✕ columns the script inserts just right of the column they act on.
+// Their chips open the web app's confirm page for that row.
+const DELETE_HEADERS = {
+  DELETE_DOC: ['Delete doc', 'DOC'],
+  REMOVE_EVENT: ['Remove event', 'CALENDAR'],
+};
+const DELETE_COLUMN_WIDTH = 56;
 // The fields the feed owns, in eventFields_ order.
 const FEED_COLUMNS = ['DATE', 'UNION_EVENT', 'UNION_START', 'UNION_END', 'LOCATION', 'LINK'];
 
@@ -89,6 +97,8 @@ const CALENDAR_CHIPS = {
   add: { label: 'Add to calendar', text: '#007fff', fill: '#e5f2ff' },
   added: { label: 'In calendar ↗', text: '#444054', fill: '#fff5d6' },
 };
+// The ✕ in the Delete doc and Remove event columns.
+const DELETE_CHIP = { label: '✕', text: '#d62246', fill: '#fbe9ec' };
 // Values the old Provisional / Confirmed dropdown left, cleared on refresh.
 const LEGACY_CALENDAR_VALUES = ['Provisional', 'Confirmed'];
 
@@ -433,6 +443,7 @@ function refreshDocButtons_(sheet) {
   const ids = values.map((row) => [String(row[COL.ROW_ID - 1]) || (hasContent_(row) ? Utilities.getUuid() : '')]);
   sheet.getRange(2, COL.ROW_ID, rows, 1).setValues(ids);
   docRange.clearDataValidations();
+  const deleteUrls = values.map(() => '');
 
   values.forEach((row, i) => {
     const raw = row[COL.DOC - 1];
@@ -452,6 +463,7 @@ function refreshDocButtons_(sheet) {
     } else if (isDoc) {
       if (text !== DOC_CHIPS.open.label) cell.setRichTextValue(docChip_(DOC_CHIPS.open, link));
       fills[i][0] = DOC_CHIPS.open.fill;
+      if (ids[i][0]) deleteUrls[i] = rowActionUrl_('deleteDoc', ids[i][0]);
     } else {
       if (isCreate || typeof raw === 'boolean') cell.clearContent();
       if (isChipFill(fills[i][0])) fills[i][0] = null;
@@ -459,6 +471,36 @@ function refreshDocButtons_(sheet) {
   });
 
   docRange
+    .setBackgrounds(fills)
+    .setHorizontalAlignment('center')
+    .setVerticalAlignment('middle')
+    .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+  refreshDeleteColumn_(sheet, COL.DELETE_DOC, deleteUrls);
+}
+
+// A ✕ chip on rows with something to delete, blank everywhere else. Like the
+// other button columns it's script-owned, so anything typed in is replaced.
+function refreshDeleteColumn_(sheet, column, urls) {
+  if (!column || !urls.length) return;
+  const range = sheet.getRange(2, column, urls.length, 1);
+  const current = range.getRichTextValues();
+  const fills = range.getBackgrounds();
+
+  urls.forEach((url, i) => {
+    const text = current[i][0] ? current[i][0].getText() : '';
+    const link = current[i][0] ? current[i][0].getLinkUrl() : null;
+    const cell = sheet.getRange(i + 2, column);
+    if (url) {
+      if (text !== DELETE_CHIP.label || link !== url) cell.setRichTextValue(docChip_(DELETE_CHIP, url));
+      fills[i][0] = DELETE_CHIP.fill;
+    } else {
+      if (text) cell.clearContent();
+      if (fills[i][0] === DELETE_CHIP.fill) fills[i][0] = null;
+    }
+  });
+
+  range
+    .clearDataValidations()
     .setBackgrounds(fills)
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
@@ -843,6 +885,7 @@ function refreshCalendarButtons_(sheet) {
   const chipFills = Object.values(CALENDAR_CHIPS).map((chip) => chip.fill);
   const calendarId = PropertiesService.getScriptProperties().getProperty('VOLSOC_CALENDAR_ID');
   range.clearDataValidations();
+  const removeUrls = values.map(() => '');
 
   values.forEach((row, i) => {
     const cell = sheet.getRange(i + 2, COL.CALENDAR);
@@ -856,6 +899,7 @@ function refreshCalendarButtons_(sheet) {
     if (eventId && calendarId) {
       chip = CALENDAR_CHIPS.added;
       url = eventUrlFromIds_(eventId, calendarId);
+      if (rowId) removeUrls[i] = rowActionUrl_('removeCalendar', rowId);
     } else if (hasContent_(row) && rowId) {
       chip = CALENDAR_CHIPS.add;
       url = rowActionUrl_('calendar', rowId);
@@ -875,6 +919,7 @@ function refreshCalendarButtons_(sheet) {
     .setHorizontalAlignment('center')
     .setVerticalAlignment('middle')
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
+  refreshDeleteColumn_(sheet, COL.REMOVE_EVENT, removeUrls);
 }
 
 // The Provisional / Confirmed dropdown had colour rules of its own.
@@ -1119,6 +1164,7 @@ function createDocForRow_(row) {
     }
 
     cell.setRichTextValue(docChip_(DOC_CHIPS.open, doc.getUrl())).setBackground(DOC_CHIPS.open.fill);
+    refreshDocButtons_(sheet); // puts the ✕ beside it
     SpreadsheetApp.flush();
     return { url: doc.getUrl(), name, existed: false };
   } finally {
@@ -1253,6 +1299,18 @@ function resolveColumns_(sheet) {
     col[key] = names.map((name) => find(name)).find(Boolean) || 0;
   });
   Object.entries(HIDDEN_HEADERS).forEach(([key, name]) => (col[key] = find(name)));
+
+  // A missing ✕ column is inserted beside its column. That shifts every
+  // column to its right, so the headers are looked up again from scratch.
+  const toInsert = Object.values(DELETE_HEADERS).find(([name, beside]) => col[beside] && !find(name));
+  if (toInsert) {
+    const at = col[toInsert[1]] + 1;
+    sheet.insertColumnAfter(at - 1);
+    sheet.getRange(1, at).setValue(toInsert[0]).setWrap(true);
+    sheet.setColumnWidth(at, DELETE_COLUMN_WIDTH);
+    return resolveColumns_(sheet);
+  }
+  Object.entries(DELETE_HEADERS).forEach(([key, [name]]) => (col[key] = find(name)));
 
   col.WIDTH = Math.max(...Object.values(col));
   return col;
