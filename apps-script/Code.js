@@ -10,9 +10,9 @@
  * - VolSoc Calendar "Add to calendar" button: puts the row's VolSoc event in
  *   the shared "VolSoc" Google Calendar as "[Provisional] …" and keeps it in
  *   step with the sheet. Clearing the cell removes the event.
- * - VolSoc menu "Delete doc…" / "Remove … from calendar…": confirm, then hand
- *   off to the web app, which trashes the row's doc or deletes its event and
- *   puts the Create doc / Add to calendar button back.
+ * - Planning docs carry "Remove from VolSoc calendar" and "Delete this doc"
+ *   links to the web app, which asks, then deletes the row's event or trashes
+ *   the doc and puts the Add to calendar / Create doc button back.
  * - A thick rule under the last row of each day.
  * - setup: run once from the VolSoc menu to add formatting, buttons and triggers.
  *
@@ -102,8 +102,6 @@ function onOpen() {
     .createMenu('VolSoc')
     .addItem('Sync Social Impact events now', 'syncFromGoogleCalendar')
     .addItem('Create doc for selected row', 'createDocForSelectedRow')
-    .addItem('Delete doc for selected row…', 'deleteDocForSelectedRow')
-    .addItem('Remove selected row from calendar…', 'removeCalendarForSelectedRow')
     .addSeparator()
     .addItem('Set up sheet and triggers', 'setup')
     .addToUi();
@@ -166,6 +164,7 @@ function syncFromGoogleCalendar() {
     refreshDocButtons_(sheet);
     refreshCalendarButtons_(sheet);
     refreshDayDividers_(sheet);
+    addDocControlsToExistingDocs_(sheet);
     lock.releaseLock();
   }
 }
@@ -859,7 +858,7 @@ function refreshCalendarButtons_(sheet) {
       url = eventUrlFromIds_(eventId, calendarId);
     } else if (hasContent_(row) && rowId) {
       chip = CALENDAR_CHIPS.add;
-      url = `${CONFIG.WEB_APP_URL}?action=calendar&row=${encodeURIComponent(rowId)}`;
+      url = rowActionUrl_('calendar', rowId);
     }
 
     if (chip) {
@@ -934,67 +933,66 @@ function runRowAction(action, rowId) {
 
 // ── Deleting docs and events ──────────────────────────────────────────────
 
-// Menu items run as whoever clicks them, who usually can't trash a doc or
-// edit the calendar the script owner made. So they only confirm, and the
-// deleting is done by the web app, which runs as the owner.
-function deleteDocForSelectedRow() {
-  const selected = selectedRow_();
-  if (!selected) return;
-  const { sheet, row } = selected;
-  if (!docUrl_(sheet, row)) {
-    SpreadsheetApp.getUi().alert('This row has no doc to delete.');
-    return;
-  }
-  confirmRowAction_(sheet, row, 'deleteDoc', {
-    title: 'Delete this doc?',
-    text: "The planning doc for {name} goes to the Drive trash, where it can be restored for 30 days. The row gets a Create doc button again.",
-    button: 'Delete doc',
+// Each planning doc carries "Remove from VolSoc calendar" and "Delete this
+// doc" links to the web app, which runs as the script owner, so anyone on the
+// committee can use them. The web app page asks before doing either.
+const DOC_CONTROLS = {
+  marker: 'Delete this doc',
+  colour: '#d62246',
+};
+
+function rowActionUrl_(action, rowId) {
+  return `${CONFIG.WEB_APP_URL}?action=${action}&row=${encodeURIComponent(rowId)}`;
+}
+
+// Inserts the links as a small line at `index` in the doc body.
+function insertDocControls_(body, index, rowId) {
+  const links = [
+    ['Remove from VolSoc calendar', rowActionUrl_('removeCalendar', rowId)],
+    [DOC_CONTROLS.marker, rowActionUrl_('deleteDoc', rowId)],
+  ];
+  const separator = '  ·  ';
+  const line = links.map(([label]) => label).join(separator);
+  const paragraph =
+    index >= body.getNumChildren() ? body.appendParagraph(line) : body.insertParagraph(index, line);
+  paragraph.setHeading(DocumentApp.ParagraphHeading.NORMAL);
+  const text = paragraph.editAsText().setFontSize(9).setItalic(false).setForegroundColor('#6e6b7c');
+  let at = 0;
+  links.forEach(([label, url]) => {
+    text.setLinkUrl(at, at + label.length - 1, url).setForegroundColor(at, at + label.length - 1, DOC_CONTROLS.colour);
+    at += label.length + separator.length;
   });
 }
 
-function removeCalendarForSelectedRow() {
-  const selected = selectedRow_();
-  if (!selected) return;
-  const { sheet, row } = selected;
-  if (!COL.CALENDAR || !String(sheet.getRange(row, COL.CALENDAR_EVENT_ID).getValue())) {
-    SpreadsheetApp.getUi().alert("This row isn't in the VolSoc calendar.");
-    return;
-  }
-  confirmRowAction_(sheet, row, 'removeCalendar', {
-    title: 'Remove from calendar?',
-    text: 'The VolSoc calendar event for {name} is deleted. The row gets an Add to calendar button again.',
-    button: 'Remove event',
+// Docs made before the links existed get them once, just under the subtitle.
+// Meant for the hourly sync, which runs as the owner of the docs; if any doc
+// can't be edited (say a sync started by someone else) it tries again next time.
+function addDocControlsToExistingDocs_(sheet) {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('DOC_CONTROLS_ADDED')) return;
+  const rows = sheet.getLastRow() - 1;
+  if (rows < 1) return;
+  const ids = sheet.getRange(2, COL.ROW_ID, rows, 1).getValues();
+  let failed = 0;
+
+  ids.forEach(([rowId], i) => {
+    const url = docUrl_(sheet, i + 2);
+    if (!url || !rowId) return;
+    try {
+      const doc = DocumentApp.openByUrl(url);
+      const body = doc.getBody();
+      if (body.findText(DOC_CONTROLS.marker)) return;
+      const paragraphs = body.getParagraphs();
+      const subtitle = paragraphs.findIndex((p) => p.getHeading() === DocumentApp.ParagraphHeading.SUBTITLE);
+      const index = subtitle === -1 ? 0 : body.getChildIndex(paragraphs[subtitle]) + 1;
+      insertDocControls_(body, index, String(rowId));
+      doc.saveAndClose();
+    } catch (err) {
+      failed++;
+      console.warn(`Couldn't add delete links to ${url}: ${err.message}`);
+    }
   });
-}
-
-function selectedRow_() {
-  const sheet = getSheet_();
-  const range = SpreadsheetApp.getActiveRange();
-  if (!range || range.getSheet().getName() !== CONFIG.SHEET_NAME || range.getRow() < 2) {
-    SpreadsheetApp.getUi().alert(`Select a row in ${CONFIG.SHEET_NAME} first.`);
-    return null;
-  }
-  return { sheet, row: range.getRow() };
-}
-
-// A small dialog whose button opens the web app in a new tab, so the click
-// counts as the user's and isn't blocked as a pop-up.
-function confirmRowAction_(sheet, row, action, copy) {
-  const idCell = sheet.getRange(row, COL.ROW_ID);
-  let rowId = String(idCell.getValue());
-  if (!rowId) {
-    rowId = Utilities.getUuid();
-    idCell.setValue(rowId);
-  }
-  const text = sheet.getRange(row, 1, 1, COL.WIDTH).getDisplayValues()[0];
-  const name = text[COL.VOLSOC_EVENT - 1] || text[COL.UNION_EVENT - 1] || `row ${row}`;
-
-  const template = HtmlService.createTemplateFromFile('Confirm');
-  template.title = copy.title;
-  template.text = copy.text.replace('{name}', `"${name}"`);
-  template.button = copy.button;
-  template.url = `${CONFIG.WEB_APP_URL}?action=${action}&row=${encodeURIComponent(rowId)}`;
-  SpreadsheetApp.getUi().showModalDialog(template.evaluate().setWidth(380).setHeight(200), copy.title);
+  if (!failed) props.setProperty('DOC_CONTROLS_ADDED', new Date().toISOString());
 }
 
 // Trashes rather than deletes, so a doc removed by mistake can be restored
@@ -1111,7 +1109,7 @@ function createDocForRow_(row) {
     const name = [info.date, 'VolSoc', info.volsocEvent || info.unionEvent || 'event'].filter(Boolean).join(' – ');
     const doc = DocumentApp.create(name);
     try {
-      writePlanningDoc_(doc, info);
+      writePlanningDoc_(doc, info, String(values[COL.ROW_ID - 1]));
       doc.saveAndClose();
       DriveApp.getFileById(doc.getId()).moveTo(docFolder_(ss));
     } catch (err) {
@@ -1128,7 +1126,7 @@ function createDocForRow_(row) {
   }
 }
 
-function writePlanningDoc_(doc, info) {
+function writePlanningDoc_(doc, info, rowId) {
   const body = doc.getBody();
   const tbc = 'TBC';
 
@@ -1138,6 +1136,7 @@ function writePlanningDoc_(doc, info) {
   title.setHeading(DocumentApp.ParagraphHeading.TITLE);
   body.appendParagraph([formatDay_(info.date), info.volsocTime].filter(Boolean).join(' · '))
     .setHeading(DocumentApp.ParagraphHeading.SUBTITLE);
+  if (rowId) insertDocControls_(body, body.getNumChildren(), rowId);
 
   body.appendParagraph('At a glance').setHeading(DocumentApp.ParagraphHeading.HEADING2);
   factTable_(body, [
