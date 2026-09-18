@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_blank">
+    <style>
+      body {
+        margin: 0;
+        padding: 4px 2px;
+        color: #444054;
+        font: 14px/1.5 Arvo, Georgia, serif;
+      }
+      p { margin: 0 0 20px; }
+      .actions { display: flex; gap: 8px; justify-content: flex-end; }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        min-height: 36px;
+        padding: 0 14px;
+        border: 1px solid #d8d5dd;
+        border-radius: 6px;
+        background: #fff;
+        color: #444054;
+        font: inherit;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .danger { border-color: #d62246; background: #d62246; color: #fff; }
+    </style>
+  </head>
+  <body>
+    <p><?= text ?></p>
+    <div class="actions">
+      <button class="button" onclick="google.script.host.close()">Cancel</button>
+      <a class="button danger" href="<?= url ?>" onclick="setTimeout(() => google.script.host.close(), 300)"><?= button ?></a>
+    </div>
+  </body>
+</html>

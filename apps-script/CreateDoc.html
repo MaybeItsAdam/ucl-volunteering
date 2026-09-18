@@ -50,7 +50,7 @@
 
       <div id="working">
         <h1 id="working-title"></h1>
-        <p>Filling it in from the sheet. This takes a few seconds.</p>
+        <p id="working-text"></p>
       </div>
 
       <div id="done" hidden>
@@ -69,27 +69,52 @@
       const rowId = <?= rowId ?>;
       const action = <?= action ?>;
 
+      // redirect: jump straight to what was made. Deletions stay on this page
+      // so the confirmation is seen, with a button back to the sheet.
       const copy = {
         doc: {
           working: 'Creating doc…',
+          detail: 'Filling it in from the sheet. This takes a few seconds.',
           done: 'Doc created',
           existed: 'This row already has a doc',
           text: "It's linked in the Doc Detail cell for this row.",
           open: 'Open doc',
           failed: "Couldn't create the doc",
+          redirect: true,
         },
         calendar: {
           working: 'Adding to calendar…',
+          detail: 'Filling it in from the sheet. This takes a few seconds.',
           done: 'Added as provisional',
           existed: 'Already in the calendar',
-          text: 'It\'s in the VolSoc calendar as "[Provisional] …" and follows the sheet. Clear the cell in the sheet to take it out.',
+          text: 'It\'s in the VolSoc calendar as "[Provisional] …" and follows the sheet. Use VolSoc → Remove selected row from calendar in the sheet to take it out.',
           open: 'Open event',
           failed: "Couldn't add it to the calendar",
+          redirect: true,
+        },
+        deleteDoc: {
+          working: 'Deleting doc…',
+          detail: 'Moving it to the Drive trash.',
+          done: 'Doc deleted',
+          existed: 'This row has no doc',
+          text: 'It can be restored from the Drive trash for 30 days. The row has a Create doc button again.',
+          open: 'Back to the sheet',
+          failed: "Couldn't delete the doc",
+        },
+        removeCalendar: {
+          working: 'Removing from calendar…',
+          detail: 'Deleting the VolSoc calendar event.',
+          done: 'Removed from the calendar',
+          existed: "This row isn't in the calendar",
+          text: 'The row has an Add to calendar button again.',
+          open: 'Back to the sheet',
+          failed: "Couldn't remove the event",
         },
       }[action];
 
       const setText = (id, text) => (document.getElementById(id).textContent = text);
       setText('working-title', copy.working);
+      setText('working-text', copy.detail);
       setText('done-text', copy.text);
       setText('open', copy.open);
       setText('failed-title', copy.failed);
@@ -106,7 +131,9 @@
           document.getElementById('open').href = result.url;
           show('done');
           // Works where the sandbox allows it; the button is there if not.
-          try { window.top.location.href = result.url; } catch (e) {}
+          if (copy.redirect) {
+            try { window.top.location.href = result.url; } catch (e) {}
+          }
         })
         .withFailureHandler((err) => {
           document.getElementById('message').textContent = err.message || String(err);

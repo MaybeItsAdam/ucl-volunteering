@@ -10,6 +10,9 @@
  * - VolSoc Calendar "Add to calendar" button: puts the row's VolSoc event in
  *   the shared "VolSoc" Google Calendar as "[Provisional] …" and keeps it in
  *   step with the sheet. Clearing the cell removes the event.
+ * - VolSoc menu "Delete doc…" / "Remove … from calendar…": confirm, then hand
+ *   off to the web app, which trashes the row's doc or deletes its event and
+ *   puts the Create doc / Add to calendar button back.
  * - A thick rule under the last row of each day.
  * - setup: run once from the VolSoc menu to add formatting, buttons and triggers.
  *
@@ -99,6 +102,8 @@ function onOpen() {
     .createMenu('VolSoc')
     .addItem('Sync Social Impact events now', 'syncFromGoogleCalendar')
     .addItem('Create doc for selected row', 'createDocForSelectedRow')
+    .addItem('Delete doc for selected row…', 'deleteDocForSelectedRow')
+    .addItem('Remove selected row from calendar…', 'removeCalendarForSelectedRow')
     .addSeparator()
     .addItem('Set up sheet and triggers', 'setup')
     .addToUi();
@@ -891,17 +896,28 @@ function removeCalendarStatusRules_(sheet) {
 
 // ── Planning docs ─────────────────────────────────────────────────────────
 
-// Clicking a Create doc or Add to calendar link lands here. The page itself
-// changes nothing: its script calls runRowAction once it loads in a browser,
-// so a link preview or crawler fetching the URL can't make docs or events.
+// What the web app can do to a row. Every action returns { url, existed },
+// where existed means the row was already in the state asked for.
+const ROW_ACTIONS = {
+  doc: { title: 'VolSoc — create doc', run: (row) => createDocForRow_(row) },
+  calendar: { title: 'VolSoc — add to calendar', run: (row) => addToCalendarForRow_(row) },
+  deleteDoc: { title: 'VolSoc — delete doc', run: (row) => deleteDocForRow_(row) },
+  removeCalendar: { title: 'VolSoc — remove from calendar', run: (row) => removeCalendarForRow_(row) },
+};
+
+// Clicking a Create doc or Add to calendar link lands here, as do the delete
+// menu items. The page itself changes nothing: its script calls runRowAction
+// once it loads in a browser, so a link preview or crawler fetching the URL
+// can't make or delete anything. It runs as the script owner, so anyone on
+// the committee can delete docs and events the owner's account made.
 function doGet(e) {
   const params = (e && e.parameter) || {};
   const template = HtmlService.createTemplateFromFile('CreateDoc');
   template.rowId = params.row || '';
-  template.action = params.action === 'calendar' ? 'calendar' : 'doc';
+  template.action = ROW_ACTIONS[params.action] ? params.action : 'doc';
   return template
     .evaluate()
-    .setTitle(template.action === 'calendar' ? 'VolSoc — add to calendar' : 'VolSoc — create doc')
+    .setTitle(ROW_ACTIONS[template.action].title)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
@@ -913,7 +929,132 @@ function runRowAction(action, rowId) {
   if (!rowId || i === -1) {
     throw new Error('Could not find that row — it may have been deleted. Refresh the sheet and try again.');
   }
-  return action === 'calendar' ? addToCalendarForRow_(i + 2) : createDocForRow_(i + 2);
+  return (ROW_ACTIONS[action] || ROW_ACTIONS.doc).run(i + 2);
+}
+
+// ── Deleting docs and events ──────────────────────────────────────────────
+
+// Menu items run as whoever clicks them, who usually can't trash a doc or
+// edit the calendar the script owner made. So they only confirm, and the
+// deleting is done by the web app, which runs as the owner.
+function deleteDocForSelectedRow() {
+  const selected = selectedRow_();
+  if (!selected) return;
+  const { sheet, row } = selected;
+  if (!docUrl_(sheet, row)) {
+    SpreadsheetApp.getUi().alert('This row has no doc to delete.');
+    return;
+  }
+  confirmRowAction_(sheet, row, 'deleteDoc', {
+    title: 'Delete this doc?',
+    text: "The planning doc for {name} goes to the Drive trash, where it can be restored for 30 days. The row gets a Create doc button again.",
+    button: 'Delete doc',
+  });
+}
+
+function removeCalendarForSelectedRow() {
+  const selected = selectedRow_();
+  if (!selected) return;
+  const { sheet, row } = selected;
+  if (!COL.CALENDAR || !String(sheet.getRange(row, COL.CALENDAR_EVENT_ID).getValue())) {
+    SpreadsheetApp.getUi().alert("This row isn't in the VolSoc calendar.");
+    return;
+  }
+  confirmRowAction_(sheet, row, 'removeCalendar', {
+    title: 'Remove from calendar?',
+    text: 'The VolSoc calendar event for {name} is deleted. The row gets an Add to calendar button again.',
+    button: 'Remove event',
+  });
+}
+
+function selectedRow_() {
+  const sheet = getSheet_();
+  const range = SpreadsheetApp.getActiveRange();
+  if (!range || range.getSheet().getName() !== CONFIG.SHEET_NAME || range.getRow() < 2) {
+    SpreadsheetApp.getUi().alert(`Select a row in ${CONFIG.SHEET_NAME} first.`);
+    return null;
+  }
+  return { sheet, row: range.getRow() };
+}
+
+// A small dialog whose button opens the web app in a new tab, so the click
+// counts as the user's and isn't blocked as a pop-up.
+function confirmRowAction_(sheet, row, action, copy) {
+  const idCell = sheet.getRange(row, COL.ROW_ID);
+  let rowId = String(idCell.getValue());
+  if (!rowId) {
+    rowId = Utilities.getUuid();
+    idCell.setValue(rowId);
+  }
+  const text = sheet.getRange(row, 1, 1, COL.WIDTH).getDisplayValues()[0];
+  const name = text[COL.VOLSOC_EVENT - 1] || text[COL.UNION_EVENT - 1] || `row ${row}`;
+
+  const template = HtmlService.createTemplateFromFile('Confirm');
+  template.title = copy.title;
+  template.text = copy.text.replace('{name}', `"${name}"`);
+  template.button = copy.button;
+  template.url = `${CONFIG.WEB_APP_URL}?action=${action}&row=${encodeURIComponent(rowId)}`;
+  SpreadsheetApp.getUi().showModalDialog(template.evaluate().setWidth(380).setHeight(200), copy.title);
+}
+
+// Trashes rather than deletes, so a doc removed by mistake can be restored
+// from Drive for 30 days.
+function deleteDocForRow_(row) {
+  const sheet = getSheet_();
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(30 * 1000)) throw new Error('The sheet is busy syncing — try again in a moment.');
+
+  try {
+    const url = docUrl_(sheet, row);
+    if (!url) return { url: sheetUrl_(sheet, row), existed: true };
+
+    const id = (/\/d\/([\w-]+)/.exec(url) || [])[1];
+    if (id) {
+      try {
+        DriveApp.getFileById(id).setTrashed(true);
+      } catch (err) {
+        // Already deleted by hand, or a doc someone else owns and pasted in.
+        if (!/not found|no item/i.test(err.message)) {
+          throw new Error(`Couldn't move the doc to the trash — ${err.message}`);
+        }
+      }
+    }
+
+    sheet.getRange(row, COL.DOC).clearContent();
+    refreshDocButtons_(sheet);
+    // Drops the planning doc line from the event description.
+    if (COL.CALENDAR) syncCalendarRows_(sheet, [row]);
+    SpreadsheetApp.flush();
+    return { url: sheetUrl_(sheet, row), existed: false };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function removeCalendarForRow_(row) {
+  const sheet = getSheet_();
+  const lock = LockService.getDocumentLock();
+  if (!lock.tryLock(30 * 1000)) throw new Error('The sheet is busy syncing — try again in a moment.');
+
+  try {
+    if (!COL.CALENDAR) throw new Error('The sheet has no VolSoc Calendar column.');
+    const idCell = sheet.getRange(row, COL.CALENDAR_EVENT_ID);
+    const eventId = String(idCell.getValue());
+    if (!eventId) return { url: sheetUrl_(sheet, row), existed: true };
+
+    const event = volsocCalendar_().getEventById(eventId);
+    if (event) event.deleteEvent();
+    idCell.clearContent();
+    refreshCalendarButtons_(sheet);
+    SpreadsheetApp.flush();
+    return { url: sheetUrl_(sheet, row), existed: false };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function sheetUrl_(sheet, row) {
+  return `${spreadsheet_().getUrl()}#gid=${sheet.getSheetId()}&range=A${row}`;
 }
 
 // Links made before the calendar button still call this name.
