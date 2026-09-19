@@ -18,8 +18,9 @@
  *   the doc or the event.
  * - A thick rule under the last row of each day, a shaded bar above each new
  *   week, and a dark bar above each new term.
- * - Five narrow columns beside the VolSoc event, one per committee member,
- *   say who's coming, who might, who can't, and who hasn't answered yet.
+ * - Five narrow columns beside each event, one per committee member, say
+ *   who's coming, who might, who can't, and who hasn't answered yet. One
+ *   block for the Social Impact event, one for the VolSoc event.
  * - setup: run once from the VolSoc menu to add formatting, buttons and triggers.
  *
  * Source of truth is apps-script/ in the ucl-volunteering repo; deploy with
@@ -84,23 +85,33 @@ const DELETE_HEADERS = {
 };
 const DELETE_COLUMN_WIDTH = 56;
 
-// One narrow column per committee member, sitting with the VolSoc event they
-// answer for, right of its end time: ✓ they're coming, ? they might, ✕ they
-// can't, and blank means they haven't said yet — the difference a free-text
-// column couldn't show. They're the replacement for "Committee Present".
+// One narrow column per committee member, twice over: a block beside the
+// Social Impact event and a block beside the VolSoc event, each right of its
+// event's end time, because being free for the afternoon isn't the same as
+// being free for the evening. ✓ coming, ? might, ✕ can't, and blank means
+// they haven't said yet — the difference a free-text column couldn't show.
+// They replace "Committee Present".
 // The headers are yours: put the committee's initials in them and rename them
 // whenever the committee changes. These names are only what a new column is
-// made with; the script keeps track of its own columns by the note on their
+// made with, and a new column copies the same member's name from the other
+// block. The script keeps track of its own columns by the note on their
 // header, so renaming or moving one doesn't lose it.
 const COMMITTEE_HEADERS = ['C1', 'C2', 'C3', 'C4', 'C5'];
 const COMMITTEE_COLUMNS = COMMITTEE_HEADERS.length;
-const COMMITTEE_COLUMN_WIDTH = 36;
-const COMMITTEE_NOTE =
+const COMMITTEE_COLUMN_WIDTH = 30;
+// Each block sits after `anchor` and only shows on rows that have `event`.
+const COMMITTEE_BLOCKS = [
+  { key: 'UNION', anchor: 'UNION_END', event: 'UNION_EVENT', of: 'the Social Impact event' },
+  { key: 'VOLSOC', anchor: 'VOLSOC_END', event: 'VOLSOC_EVENT', of: 'the VolSoc event' },
+];
+const committeeNote_ = (block) =>
   "✓ coming, ? maybe, ✕ can't. Blank means they haven't said yet.\n\n" +
-  "Rename this column to whoever it's for. Managed by the VolSoc script.";
-// The second is the note the first columns were made with, so they're picked
-// up where they are rather than made again.
-const COMMITTEE_MARKERS = ['Managed by the VolSoc script.', "Rename this to whoever it's for."];
+  `Who's free for ${block.of}. Rename this column to whoever it's for.\n` +
+  `Managed by the VolSoc script (${block.key}).`;
+const committeeMarker_ = (block) => `Managed by the VolSoc script (${block.key}).`;
+// The notes the first block was made with, before there were two of them.
+// A column carrying one of these is the VolSoc block, and gets renoted.
+const COMMITTEE_LEGACY_MARKERS = ['Managed by the VolSoc script.', "Rename this to whoever it's for."];
 // Picked from the dropdown, or typed: anything in `typed` becomes the mark.
 // The fills are the sheet's own green, amber and red, so a tick here reads
 // like a yes anywhere else — #f4c7c3 is already MISSING_VOLSOC_COLOUR.
@@ -118,10 +129,10 @@ const FEED_COLUMNS = ['DATE', 'UNION_EVENT', 'UNION_START', 'UNION_END', 'LOCATI
 // 1-based column numbers for this run, filled in by getSheet_. Optional
 // columns that aren't in the sheet are 0. WIDTH covers every known column.
 let COL = null;
-// One shift of the committee block per run, whatever the outcome: the columns
-// work wherever they are, so a move that doesn't land where it was aimed is
-// worth leaving alone rather than nudging again on every resolve.
-let COMMITTEE_MOVED = false;
+// One shift per block per run, whatever the outcome: the columns work
+// wherever they are, so a move that doesn't land where it was aimed is worth
+// leaving alone rather than nudging again on every resolve.
+const COMMITTEE_MOVED = new Set();
 
 // Doc Detail cells are styled as chips: tinted fill, bold text, no underline.
 // Rows without a doc get a checkbox (BUTTON_BOX) instead.
@@ -827,27 +838,54 @@ function shortDate_(iso) {
   return `${Number(iso.slice(8, 10))} ${MONTHS[Number(iso.slice(5, 7)) - 1]}`;
 }
 
-// ── Committee tick/cross columns ──────────────────────────────────────────
+// ── Committee availability columns ────────────────────────────────────────
 
-// The dropdown and the widths, rebuilt on each sync so rows added by hand or
+const committeeBlockOf_ = (key) => COMMITTEE_BLOCKS.find((block) => block.key === key);
+
+// Which columns a block covers, 0 when it hasn't been made yet.
+function committeeBlock_(block) {
+  return COL[`${block.key}_MARKS_FIRST`] || 0;
+}
+
+function committeeRange_(sheet, block, row, rows) {
+  const first = committeeBlock_(block);
+  return first ? sheet.getRange(row, first, rows, COMMITTEE_COLUMNS) : null;
+}
+
+// A column belongs to a block if its header note says so. The first block
+// made predates the two-block note, and is the VolSoc one.
+function committeeColumnsOf_(notes, block) {
+  const columns = [];
+  notes.forEach((note, i) => {
+    const legacy = block.key === 'VOLSOC' && COMMITTEE_LEGACY_MARKERS.some((marker) => note.includes(marker));
+    if (note.includes(committeeMarker_(block)) || legacy) columns.push(i + 1);
+  });
+  return columns;
+}
+
+// The dropdowns and the widths, rebuilt on each sync so rows added by hand or
 // by the feed get them too. The marks themselves are coloured by conditional
-// format rules, which setup puts in.
+// format rules, which addCommitteeRules_ keeps in place.
 function refreshCommitteeColumns_(sheet) {
-  if (!COL.COMMITTEE_FIRST) return;
   const rows = sheet.getLastRow() - 1;
   if (rows < 1) return;
-  const count = COMMITTEE_COLUMNS;
   const values = sheet.getRange(2, 1, rows, COL.WIDTH).getValues();
   const rule = committeeRule_();
-  const range = sheet.getRange(2, COL.COMMITTEE_FIRST, rows, count);
-  // Only a row with a VolSoc event of its own has anyone to ask about.
-  range.setDataValidations(
-    values.map((row) =>
-      new Array(count).fill(!isBanner_(row) && row[COL.VOLSOC_EVENT - 1] !== '' ? rule : null)
-    )
-  );
-  range.setHorizontalAlignment('center').setVerticalAlignment('middle');
-  sheet.setColumnWidths(COL.COMMITTEE_FIRST, count, COMMITTEE_COLUMN_WIDTH);
+
+  COMMITTEE_BLOCKS.forEach((block) => {
+    const range = committeeRange_(sheet, block, 2, rows);
+    if (!range) return;
+    // Only a row that has this event has anyone to ask about it.
+    range.setDataValidations(
+      values.map((row) =>
+        new Array(COMMITTEE_COLUMNS).fill(
+          !isBanner_(row) && row[COL[block.event] - 1] !== '' ? rule : null
+        )
+      )
+    );
+    range.setHorizontalAlignment('center').setVerticalAlignment('middle');
+    sheet.setColumnWidths(committeeBlock_(block), COMMITTEE_COLUMNS, COMMITTEE_COLUMN_WIDTH);
+  });
 }
 
 function committeeRule_() {
@@ -858,35 +896,41 @@ function committeeRule_() {
     .build();
 }
 
-// Typing y or n is quicker than picking from the dropdown, so anything that
-// reads as a yes or a no becomes the tick or the cross. Pasting a block of
-// them works the same way.
+// Typing y, m or n is quicker than picking from the dropdown, so anything
+// that reads as one becomes the mark. Pasting a block of them works the same
+// way, and an edit spanning both blocks is handled a block at a time.
 function normaliseCommitteeMarks_(sheet, range) {
-  const first = Math.max(range.getColumn(), COL.COMMITTEE_FIRST);
-  const last = Math.min(range.getLastColumn(), COL.COMMITTEE_LAST);
-  if (last < first) return;
-  const top = Math.max(range.getRow(), 2);
-  const block = sheet.getRange(top, first, range.getLastRow() - top + 1, last - first + 1);
-  let changed = false;
-  const marked = block.getValues().map((row) =>
-    row.map((value) => {
-      const typed = String(value).trim().toLowerCase();
-      const mark = typed && Object.values(COMMITTEE_MARKS).find((m) => m.typed.includes(typed));
-      if (!mark || mark.value === value) return value;
-      changed = true;
-      return mark.value;
-    })
-  );
-  if (changed) block.setValues(marked);
+  COMMITTEE_BLOCKS.forEach((block) => {
+    const start = committeeBlock_(block);
+    if (!start) return;
+    const first = Math.max(range.getColumn(), start);
+    const last = Math.min(range.getLastColumn(), start + COMMITTEE_COLUMNS - 1);
+    if (last < first) return;
+
+    const top = Math.max(range.getRow(), 2);
+    const cells = sheet.getRange(top, first, range.getLastRow() - top + 1, last - first + 1);
+    let changed = false;
+    const marked = cells.getValues().map((row) =>
+      row.map((value) => {
+        const typed = String(value).trim().toLowerCase();
+        const mark = typed && Object.values(COMMITTEE_MARKS).find((m) => m.typed.includes(typed));
+        if (!mark || mark.value === value) return value;
+        changed = true;
+        return mark.value;
+      })
+    );
+    if (changed) cells.setValues(marked);
+  });
 }
 
-// Green tick, red cross, and a pale amber cell for anyone who hasn't answered
-// on a row that has an event in it — the whole point of the columns is that
-// "can't" and "hasn't said" don't look the same. Rules already on these
-// columns are replaced, since the script owns them.
+// Green tick, amber maybe, red cross across both blocks, and a grey well for
+// anyone who hasn't answered on a row that has the event — the whole point of
+// the columns is that "can't" and "hasn't said" don't look the same. Rules
+// already on these columns are replaced, since the script owns them.
 function addCommitteeRules_(sheet) {
-  if (!COL.COMMITTEE_FIRST) return;
-  const range = sheet.getRange(2, COL.COMMITTEE_FIRST, sheet.getMaxRows() - 1, COMMITTEE_COLUMNS);
+  const rows = sheet.getMaxRows() - 1;
+  const ranges = COMMITTEE_BLOCKS.map((block) => committeeRange_(sheet, block, 2, rows)).filter(Boolean);
+  if (!ranges.length) return;
   const wanted = [];
 
   Object.values(COMMITTEE_MARKS).forEach((mark) => {
@@ -896,26 +940,34 @@ function addCommitteeRules_(sheet) {
         .setBackground(mark.fill)
         .setFontColor(mark.text)
         .setBold(true)
+        .setRanges(ranges)
+        .build()
+    );
+  });
+
+  // One per block: the cell reference is relative to the top-left of the
+  // range it's set on, and each block asks about its own event.
+  COMMITTEE_BLOCKS.forEach((block) => {
+    const range = committeeRange_(sheet, block, 2, rows);
+    if (!range) return;
+    const cell = `${columnLetter_(committeeBlock_(block))}2`;
+    const event = `$${columnLetter_(COL[block.event])}2`;
+    wanted.push(
+      SpreadsheetApp.newConditionalFormatRule()
+        .whenFormulaSatisfied(`=AND(${cell}="",${event}<>"",${notBanner_()})`)
+        .setBackground(COMMITTEE_WAITING_FILL)
         .setRanges([range])
         .build()
     );
   });
 
-  // Relative to the top-left of the range, so each cell tests itself.
-  const cell = `${columnLetter_(COL.COMMITTEE_FIRST)}2`;
-  const event = `$${columnLetter_(COL.VOLSOC_EVENT)}2`;
-  wanted.push(
-    SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied(`=AND(${cell}="",${event}<>"",${notBanner_()})`)
-      .setBackground(COMMITTEE_WAITING_FILL)
-      .setRanges([range])
-      .build()
-  );
-
+  const inABlock = (r) =>
+    COMMITTEE_BLOCKS.some((block) => {
+      const first = committeeBlock_(block);
+      return first && r.getColumn() >= first && r.getLastColumn() <= first + COMMITTEE_COLUMNS - 1;
+    });
   const rules = sheet.getConditionalFormatRules();
-  const mine = rules.filter((rule) =>
-    rule.getRanges().every((r) => r.getColumn() >= COL.COMMITTEE_FIRST && r.getLastColumn() <= COL.COMMITTEE_LAST)
-  );
+  const mine = rules.filter((rule) => rule.getRanges().every(inABlock));
   if (ruleKeys_(mine) === ruleKeys_(wanted)) return;
   sheet.setConditionalFormatRules(rules.filter((rule) => !mine.includes(rule)).concat(wanted));
 }
@@ -933,23 +985,23 @@ function ruleKeys_(rules) {
     .join('\n');
 }
 
-// For the planning doc: who's coming, who can't, and who still owes an
-// answer, by whatever the columns are headed at the time.
-function committeeSummary_(sheet, text) {
-  if (!COL.COMMITTEE_FIRST) return '';
-  const names = sheet.getRange(1, COL.COMMITTEE_FIRST, 1, COMMITTEE_COLUMNS).getDisplayValues()[0];
+// For the planning doc: who's coming to this event, who might, who can't and
+// who still owes an answer, by whatever the columns are headed at the time.
+function committeeSummary_(sheet, text, block) {
+  const first = committeeBlock_(block);
+  if (!first) return '';
+  const names = sheet.getRange(1, first, 1, COMMITTEE_COLUMNS).getDisplayValues()[0];
   const marks = names.map((name, i) => [
     String(name).trim() || `Member ${i + 1}`,
-    String(text[COL.COMMITTEE_FIRST - 1 + i]).trim(),
+    String(text[first - 1 + i]).trim(),
   ]);
   const named = (mark) => marks.filter(([, value]) => value === mark).map(([name]) => name);
-  const parts = [
+  return [
     ['Coming', named(COMMITTEE_MARKS.yes.value)],
     ['Maybe', named(COMMITTEE_MARKS.maybe.value)],
     ["Can't", named(COMMITTEE_MARKS.no.value)],
     ['No answer yet', named('')],
-  ];
-  return parts
+  ]
     .filter(([, who]) => who.length)
     .map(([label, who]) => `${label}: ${who.join(', ')}`)
     .join(' · ');
@@ -971,7 +1023,7 @@ function handleEdit(e) {
     // A ticked button runs its action, which redraws the buttons itself.
     if (runTickedBoxes_(sheet, range, e.source)) return;
 
-    if (COL.COMMITTEE_FIRST) normaliseCommitteeMarks_(sheet, range);
+    normaliseCommitteeMarks_(sheet, range);
 
     if (touches(COL.DATE)) refreshDayDividers_(sheet);
 
@@ -1613,7 +1665,8 @@ function createDocForRow_(row) {
     volsocTime: timeRange_(text[COL.VOLSOC_START - 1], text[COL.VOLSOC_END - 1]),
     whatsOn: optional(COL.WHATSON),
     socialPost: optional(COL.SOCIAL_POST),
-    committee: committeeSummary_(sheet, text) || optional(COL.COMMITTEE),
+    committee: committeeSummary_(sheet, text, committeeBlockOf_('VOLSOC')) || optional(COL.COMMITTEE),
+    committeeUnion: committeeSummary_(sheet, text, committeeBlockOf_('UNION')),
     lead: optional(COL.LEAD),
   };
   if (!info.date && !info.unionEvent && !info.volsocEvent) {
@@ -1667,6 +1720,7 @@ function writePlanningDoc_(doc, info, rowId) {
       ['Event', info.unionEvent],
       ['Time', info.unionTime || tbc],
       ['Location', info.location || tbc],
+      ["Who's free", info.committeeUnion || tbc],
       ['Listing', info.link || '—'],
     ]);
   }
@@ -1778,37 +1832,52 @@ function resolveColumns_(sheet) {
   }
   Object.entries(DELETE_HEADERS).forEach(([key, [name]]) => (col[key] = find(name)));
 
-  // The committee columns belong with the VolSoc event, right of its end
-  // time. The script knows its own by the note on their header rather than by
-  // where they sit or what they're called, so they can be renamed, and were
-  // moved here from beside "Committee Present" without losing their ticks.
+  // A block of availability columns for each event, right of that event's end
+  // time. The script knows its own columns by the note on their header rather
+  // than by where they sit or what they're called, so they can be renamed,
+  // and the VolSoc block was carried over from beside "Committee Present"
+  // this way, ticks and all.
   const notes = sheet.getRange(1, 1, 1, headers.length).getNotes()[0];
-  const ours = [];
-  notes.forEach((note, i) => {
-    if (COMMITTEE_MARKERS.some((marker) => note.includes(marker))) ours.push(i + 1);
-  });
-  const anchor = col.VOLSOC_END;
-  if (ours.length && ours[0] !== anchor + 1 && !COMMITTEE_MOVED) {
-    COMMITTEE_MOVED = true;
-    sheet.moveColumns(sheet.getRange(1, ours[0], 1, ours.length), anchor + 1);
-    return resolveColumns_(sheet);
+  for (const block of COMMITTEE_BLOCKS) {
+    const ours = committeeColumnsOf_(notes, block);
+    const anchor = col[block.anchor];
+
+    if (ours.length && ours[0] !== anchor + 1 && !COMMITTEE_MOVED.has(block.key)) {
+      COMMITTEE_MOVED.add(block.key);
+      sheet.moveColumns(sheet.getRange(1, ours[0], 1, ours.length), anchor + 1);
+      return resolveColumns_(sheet);
+    }
+    if (ours.length < COMMITTEE_COLUMNS) {
+      const at = (ours.length ? ours[ours.length - 1] : anchor) + 1;
+      sheet.insertColumnAfter(at - 1);
+      sheet
+        .getRange(1, at)
+        .setValue(committeeHeaderFor_(headers, notes, ours.length))
+        .setWrap(true)
+        .setNote(committeeNote_(block));
+      sheet.setColumnWidth(at, COMMITTEE_COLUMN_WIDTH);
+      return resolveColumns_(sheet);
+    }
+    // Brings the block made before there were two of them up to date.
+    ours.forEach((c) => {
+      if (!notes[c - 1].includes(committeeMarker_(block))) sheet.getRange(1, c).setNote(committeeNote_(block));
+    });
+    col[`${block.key}_MARKS_FIRST`] = ours[0];
+    col[`${block.key}_MARKS_LAST`] = ours[0] + COMMITTEE_COLUMNS - 1;
   }
-  if (ours.length < COMMITTEE_COLUMNS) {
-    const at = (ours.length ? ours[ours.length - 1] : anchor) + 1;
-    sheet.insertColumnAfter(at - 1);
-    sheet
-      .getRange(1, at)
-      .setValue(COMMITTEE_HEADERS[ours.length])
-      .setWrap(true)
-      .setNote(COMMITTEE_NOTE);
-    sheet.setColumnWidth(at, COMMITTEE_COLUMN_WIDTH);
-    return resolveColumns_(sheet);
-  }
-  col.COMMITTEE_FIRST = ours[0];
-  col.COMMITTEE_LAST = ours[0] + COMMITTEE_COLUMNS - 1;
 
   col.WIDTH = Math.max(...Object.values(col));
   return col;
+}
+
+// A new column takes the same member's name from the other block, so initials
+// typed in once cover both, and only falls back to C1–C5 for the first block
+// of all.
+function committeeHeaderFor_(headers, notes, index) {
+  const names = COMMITTEE_BLOCKS.map((block) => committeeColumnsOf_(notes, block))
+    .filter((columns) => columns.length > index)
+    .map((columns) => headers[columns[index] - 1]);
+  return names.find(Boolean) || COMMITTEE_HEADERS[index];
 }
 
 function columnLetter_(col) {
