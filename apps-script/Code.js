@@ -18,8 +18,8 @@
  *   the doc or the event.
  * - A thick rule under the last row of each day, a shaded bar above each new
  *   week, and a dark bar above each new term.
- * - Five narrow tick/cross columns, one per committee member, say who is
- *   coming, who can't, and who hasn't answered yet.
+ * - Five narrow columns beside the VolSoc event, one per committee member,
+ *   say who's coming, who might, who can't, and who hasn't answered yet.
  * - setup: run once from the VolSoc menu to add formatting, buttons and triggers.
  *
  * Source of truth is apps-script/ in the ucl-volunteering repo; deploy with
@@ -63,7 +63,8 @@ const REQUIRED_HEADERS = {
 const OPTIONAL_HEADERS = {
   WHATSON: ['Created Whats on Event Link'],
   SOCIAL_POST: ['Canva Post', 'Instagram Post'],
-  // The five tick/cross columns hang off this one, so it has to stay.
+  // Replaced by the tick columns; still read for the planning doc while it's
+  // there, so the notes typed into it aren't lost. Safe to delete.
   COMMITTEE: ['Committee Present', 'Committee'],
   LEAD: ['Activity Lead?', 'Activity Lead'],
   CALENDAR: ['VolSoc Calendar'],
@@ -83,29 +84,44 @@ const DELETE_HEADERS = {
 };
 const DELETE_COLUMN_WIDTH = 56;
 
-// One narrow tick/cross column per committee member, sitting right of
-// "Committee Present": ✓ they're coming, ✕ they can't, and blank means they
-// haven't said yet — the difference a free-text column couldn't show.
-// They're found by where they sit, not by what they're called, so the headers
-// are yours: put the committee's initials in them and rename them whenever
-// the committee changes. These names are only what the columns are made with.
+// One narrow column per committee member, sitting with the VolSoc event they
+// answer for, right of its end time: ✓ they're coming, ? they might, ✕ they
+// can't, and blank means they haven't said yet — the difference a free-text
+// column couldn't show. They're the replacement for "Committee Present".
+// The headers are yours: put the committee's initials in them and rename them
+// whenever the committee changes. These names are only what a new column is
+// made with; the script keeps track of its own columns by the note on their
+// header, so renaming or moving one doesn't lose it.
 const COMMITTEE_HEADERS = ['C1', 'C2', 'C3', 'C4', 'C5'];
 const COMMITTEE_COLUMNS = COMMITTEE_HEADERS.length;
 const COMMITTEE_COLUMN_WIDTH = 36;
+const COMMITTEE_NOTE =
+  "✓ coming, ? maybe, ✕ can't. Blank means they haven't said yet.\n\n" +
+  "Rename this column to whoever it's for. Managed by the VolSoc script.";
+// The second is the note the first columns were made with, so they're picked
+// up where they are rather than made again.
+const COMMITTEE_MARKERS = ['Managed by the VolSoc script.', "Rename this to whoever it's for."];
 // Picked from the dropdown, or typed: anything in `typed` becomes the mark.
+// The fills are the sheet's own green, amber and red, so a tick here reads
+// like a yes anywhere else — #f4c7c3 is already MISSING_VOLSOC_COLOUR.
 const COMMITTEE_MARKS = {
-  yes: { value: '✓', fill: '#e8f6ef', text: '#1f7a55', typed: ['y', 'yes', '1', 'true', 't', '✓', '✔', '✅'] },
-  no: { value: '✕', fill: '#fbe9ec', text: '#d62246', typed: ['n', 'no', '0', 'false', 'f', 'x', '✕', '✖', '❌'] },
+  yes: { value: '✓', fill: '#b7e1cd', text: '#0b6b3f', typed: ['y', 'yes', '1', 'true', 't', '✓', '✔', '✅'] },
+  maybe: { value: '?', fill: '#ffe599', text: '#7f6000', typed: ['m', 'maybe', 'tbc', '?', '~'] },
+  no: { value: '✕', fill: '#f4c7c3', text: '#a61c1c', typed: ['n', 'no', '0', 'false', 'f', 'x', '✕', '✖', '❌'] },
 };
-// Still to answer, on a row with an event in it — so an unchased name shows up
-// rather than reading as a quiet no.
-const COMMITTEE_WAITING_FILL = '#fff9e6';
+// Still to answer, on a row with a VolSoc event. A quiet well rather than a
+// colour, so it can't be read as an answer and doesn't fight the amber maybe.
+const COMMITTEE_WAITING_FILL = '#edebef';
 // The fields the feed owns, in eventFields_ order.
 const FEED_COLUMNS = ['DATE', 'UNION_EVENT', 'UNION_START', 'UNION_END', 'LOCATION', 'LINK'];
 
 // 1-based column numbers for this run, filled in by getSheet_. Optional
 // columns that aren't in the sheet are 0. WIDTH covers every known column.
 let COL = null;
+// One shift of the committee block per run, whatever the outcome: the columns
+// work wherever they are, so a move that doesn't land where it was aimed is
+// worth leaving alone rather than nudging again on every resolve.
+let COMMITTEE_MOVED = false;
 
 // Doc Detail cells are styled as chips: tinted fill, bold text, no underline.
 // Rows without a doc get a checkbox (BUTTON_BOX) instead.
@@ -821,11 +837,14 @@ function refreshCommitteeColumns_(sheet) {
   const rows = sheet.getLastRow() - 1;
   if (rows < 1) return;
   const count = COMMITTEE_COLUMNS;
-  const ids = sheet.getRange(2, COL.ROW_ID, rows, 1).getValues();
+  const values = sheet.getRange(2, 1, rows, COL.WIDTH).getValues();
   const rule = committeeRule_();
   const range = sheet.getRange(2, COL.COMMITTEE_FIRST, rows, count);
+  // Only a row with a VolSoc event of its own has anyone to ask about.
   range.setDataValidations(
-    ids.map((id) => new Array(count).fill(String(id[0]).startsWith(BANNER_PREFIX) ? null : rule))
+    values.map((row) =>
+      new Array(count).fill(!isBanner_(row) && row[COL.VOLSOC_EVENT - 1] !== '' ? rule : null)
+    )
   );
   range.setHorizontalAlignment('center').setVerticalAlignment('middle');
   sheet.setColumnWidths(COL.COMMITTEE_FIRST, count, COMMITTEE_COLUMN_WIDTH);
@@ -833,9 +852,9 @@ function refreshCommitteeColumns_(sheet) {
 
 function committeeRule_() {
   return SpreadsheetApp.newDataValidation()
-    .requireValueInList([COMMITTEE_MARKS.yes.value, COMMITTEE_MARKS.no.value], true)
-    .setAllowInvalid(true) // so typing y or n isn't rejected before handleEdit sees it
-    .setHelpText('✓ coming, ✕ can\'t, blank not asked yet — or type y or n.')
+    .requireValueInList(Object.values(COMMITTEE_MARKS).map((mark) => mark.value), true)
+    .setAllowInvalid(true) // so typing y, m or n isn't rejected before handleEdit sees it
+    .setHelpText('✓ coming, ? maybe, ✕ can\'t, blank not asked yet — or type y, m or n.')
     .build();
 }
 
@@ -884,10 +903,10 @@ function addCommitteeRules_(sheet) {
 
   // Relative to the top-left of the range, so each cell tests itself.
   const cell = `${columnLetter_(COL.COMMITTEE_FIRST)}2`;
-  const filled = [COL.DATE, COL.UNION_EVENT, COL.VOLSOC_EVENT].map((c) => `$${columnLetter_(c)}2<>""`).join(',');
+  const event = `$${columnLetter_(COL.VOLSOC_EVENT)}2`;
   wanted.push(
     SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied(`=AND(${cell}="",OR(${filled}),${notBanner_()})`)
+      .whenFormulaSatisfied(`=AND(${cell}="",${event}<>"",${notBanner_()})`)
       .setBackground(COMMITTEE_WAITING_FILL)
       .setRanges([range])
       .build()
@@ -924,11 +943,16 @@ function committeeSummary_(sheet, text) {
     String(text[COL.COMMITTEE_FIRST - 1 + i]).trim(),
   ]);
   const named = (mark) => marks.filter(([, value]) => value === mark).map(([name]) => name);
-  const parts = [];
-  if (named(COMMITTEE_MARKS.yes.value).length) parts.push(`Coming: ${named(COMMITTEE_MARKS.yes.value).join(', ')}`);
-  if (named(COMMITTEE_MARKS.no.value).length) parts.push(`Can't: ${named(COMMITTEE_MARKS.no.value).join(', ')}`);
-  if (named('').length) parts.push(`No answer yet: ${named('').join(', ')}`);
-  return parts.join(' · ');
+  const parts = [
+    ['Coming', named(COMMITTEE_MARKS.yes.value)],
+    ['Maybe', named(COMMITTEE_MARKS.maybe.value)],
+    ["Can't", named(COMMITTEE_MARKS.no.value)],
+    ['No answer yet', named('')],
+  ];
+  return parts
+    .filter(([, who]) => who.length)
+    .map(([label, who]) => `${label}: ${who.join(', ')}`)
+    .join(' · ');
 }
 
 // ── VolSoc calendar ───────────────────────────────────────────────────────
@@ -1754,50 +1778,37 @@ function resolveColumns_(sheet) {
   }
   Object.entries(DELETE_HEADERS).forEach(([key, [name]]) => (col[key] = find(name)));
 
-  // The committee columns are the five straight after "Committee Present".
-  // They're found by position so the committee can head them with whatever
-  // names they like; the run stops at the first column with a header the
-  // script knows, which is how its own columns are told from the next real
-  // one. Fewer than five there means the rest are still to be made.
-  col.COMMITTEE_FIRST = 0;
-  col.COMMITTEE_LAST = 0;
-  if (col.COMMITTEE) {
-    const known = knownHeaders_();
-    let found = 0;
-    while (found < COMMITTEE_COLUMNS) {
-      const header = headers[col.COMMITTEE + found];
-      if (!header || known.has(header)) break;
-      found++;
-    }
-    if (found < COMMITTEE_COLUMNS) {
-      const at = col.COMMITTEE + found + 1;
-      sheet.insertColumnAfter(at - 1);
-      sheet
-        .getRange(1, at)
-        .setValue(COMMITTEE_HEADERS[found])
-        .setWrap(true)
-        .setNote("✓ coming, ✕ can't, blank means they haven't said yet. Type y or n if that's quicker.\n\nRename this to whoever it's for.");
-      sheet.setColumnWidth(at, COMMITTEE_COLUMN_WIDTH);
-      return resolveColumns_(sheet);
-    }
-    col.COMMITTEE_FIRST = col.COMMITTEE + 1;
-    col.COMMITTEE_LAST = col.COMMITTEE + COMMITTEE_COLUMNS;
+  // The committee columns belong with the VolSoc event, right of its end
+  // time. The script knows its own by the note on their header rather than by
+  // where they sit or what they're called, so they can be renamed, and were
+  // moved here from beside "Committee Present" without losing their ticks.
+  const notes = sheet.getRange(1, 1, 1, headers.length).getNotes()[0];
+  const ours = [];
+  notes.forEach((note, i) => {
+    if (COMMITTEE_MARKERS.some((marker) => note.includes(marker))) ours.push(i + 1);
+  });
+  const anchor = col.VOLSOC_END;
+  if (ours.length && ours[0] !== anchor + 1 && !COMMITTEE_MOVED) {
+    COMMITTEE_MOVED = true;
+    sheet.moveColumns(sheet.getRange(1, ours[0], 1, ours.length), anchor + 1);
+    return resolveColumns_(sheet);
   }
+  if (ours.length < COMMITTEE_COLUMNS) {
+    const at = (ours.length ? ours[ours.length - 1] : anchor) + 1;
+    sheet.insertColumnAfter(at - 1);
+    sheet
+      .getRange(1, at)
+      .setValue(COMMITTEE_HEADERS[ours.length])
+      .setWrap(true)
+      .setNote(COMMITTEE_NOTE);
+    sheet.setColumnWidth(at, COMMITTEE_COLUMN_WIDTH);
+    return resolveColumns_(sheet);
+  }
+  col.COMMITTEE_FIRST = ours[0];
+  col.COMMITTEE_LAST = ours[0] + COMMITTEE_COLUMNS - 1;
 
   col.WIDTH = Math.max(...Object.values(col));
   return col;
-}
-
-// Every header the script looks up by name. A column headed with one of these
-// is somebody else's, which is what stops the committee block running on.
-function knownHeaders_() {
-  const names = new Set();
-  const add = (spec) => names.add(Array.isArray(spec) ? spec[0] : spec);
-  Object.values(REQUIRED_HEADERS).forEach(add);
-  Object.values(OPTIONAL_HEADERS).forEach((alternatives) => alternatives.forEach((name) => names.add(name)));
-  Object.values(HIDDEN_HEADERS).forEach(add);
-  Object.values(DELETE_HEADERS).forEach(add);
-  return names;
 }
 
 function columnLetter_(col) {
