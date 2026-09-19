@@ -1486,9 +1486,12 @@ function removeCalendarStatusRules_(sheet) {
 // ── Repair ────────────────────────────────────────────────────────────────
 
 // Two rows for one Social Impact event mean the sync stopped recognising the
-// row it already had. This pairs them up by date, title and start time, keeps
-// the one with the most work behind it, and refuses to delete any row with a
-// doc or a calendar event of its own — those are reported instead.
+// row it already had. Rows are paired on date and title — not start time,
+// which may be part of why they weren't recognised — and reported in full
+// before anything happens. The copy with the most work behind it is kept, a
+// row with a doc or a calendar event of its own is never deleted, and the
+// event key comes across from a copy being deleted so the pair can't come
+// back on the next sync.
 function removeDuplicateRows() {
   const ui = SpreadsheetApp.getUi();
   const sheet = getSheet_();
@@ -1502,39 +1505,54 @@ function removeDuplicateRows() {
   const groups = new Map();
   values.forEach((row, i) => {
     if (isBanner_(row) || !row[COL.UNION_EVENT - 1]) return;
-    const key = currentMatch_(row, display[i], tz);
-    groups.set(key, (groups.get(key) || []).concat(i));
+    const group = `${dateKey_(row[COL.DATE - 1], tz)}  ${row[COL.UNION_EVENT - 1]}`;
+    groups.set(group, (groups.get(group) || []).concat(i));
   });
 
+  const report = [];
   const doomed = [];
-  const found = [];
-  const manual = [];
-  groups.forEach((indexes, key) => {
+  const carry = new Map();
+  let pairs = 0;
+  groups.forEach((indexes, group) => {
     if (indexes.length < 2) return;
-    const [date, title] = key.split('|');
-    found.push(`${date}  ${title}  ×${indexes.length}`);
-    indexes
-      .map((i) => ({ i, weight: rowWeight_(sheet, values[i], i + 2) }))
-      .sort((a, b) => b.weight - a.weight)
-      .slice(1)
-      .forEach((row) => (row.weight ? manual.push(`${date}  ${title}  row ${row.i + 2}`) : doomed.push(row.i + 2)));
+    pairs++;
+    const sorted = indexes
+      .map((i) => ({
+        i,
+        weight: rowWeight_(sheet, values[i], i + 2),
+        key: String(values[i][COL.EVENT_KEY - 1]),
+        start: timeKey_(display[i][COL.UNION_START - 1]),
+      }))
+      // Heaviest first, then whichever can be matched again next sync.
+      .sort((a, b) => b.weight - a.weight || (b.key ? 1 : 0) - (a.key ? 1 : 0) || a.i - b.i);
+
+    if (report.length < 30) {
+      report.push(group);
+      sorted.forEach((row) =>
+        report.push(`   row ${row.i + 2}   ${row.start || 'no start'}   ${row.key ? 'key' : 'NO KEY'}   filled ${row.weight}`)
+      );
+    }
+    const keeper = sorted[0];
+    sorted.slice(1).forEach((row) => {
+      if (row.weight) return; // somebody's work is in it; leave it alone
+      doomed.push(row.i + 2);
+      if (!keeper.key && row.key && !carry.has(keeper.i + 2)) carry.set(keeper.i + 2, row.key);
+    });
   });
 
-  if (!found.length) return void ui.alert('No duplicates', 'Every Social Impact event appears once.', ui.ButtonSet.OK);
-  const note = manual.length ? `\n\nKept for you to look at, they have a doc or an event of their own:\n${manual.join('\n')}` : '';
-  if (!doomed.length) return void ui.alert('Duplicates found', `${found.join('\n')}${note}`, ui.ButtonSet.OK);
+  if (!pairs) return void ui.alert('No duplicates', 'Every Social Impact event appears once.', ui.ButtonSet.OK);
+  const listing = `${report.join('\n')}${report.length >= 30 ? '\n   …' : ''}`;
+  const summary = `${pairs} event${pairs === 1 ? '' : 's'} appear more than once. ${doomed.length} empty copy/copies can go.`;
+  if (!doomed.length) return void ui.alert('Duplicates found', `${summary}\n\n${listing}`, ui.ButtonSet.OK);
 
-  const answer = ui.alert(
-    `Delete ${doomed.length} duplicate row${doomed.length === 1 ? '' : 's'}?`,
-    `${found.join('\n')}\n\nThe copy with the most filled in is kept.${note}`,
-    ui.ButtonSet.YES_NO
-  );
+  const answer = ui.alert('Duplicates found', `${summary}\n\n${listing}\n\nDelete the ${doomed.length} empty copies?`, ui.ButtonSet.YES_NO);
   if (answer !== ui.Button.YES) return;
 
+  carry.forEach((key, row) => sheet.getRange(row, COL.EVENT_KEY).setValue(key));
   doomed.sort((a, b) => b - a).forEach((row) => sheet.deleteRow(row));
   refreshDocButtons_(sheet);
   refreshBanners_(sheet);
-  ui.alert(`Deleted ${doomed.length} row${doomed.length === 1 ? '' : 's'}.${note}`);
+  ui.alert(`Deleted ${doomed.length} row(s), and moved ${carry.size} event key(s) onto the copy that was kept.`);
 }
 
 // How much of a row is worth keeping: a doc or a calendar event outrank
