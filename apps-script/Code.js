@@ -230,6 +230,10 @@ function syncFromGoogleCalendar() {
   } finally {
     // Also after a failed sync, so a feed problem never hides the buttons.
     const sheet = getSheet_();
+    // Both no-ops once the rules are right, so this is a cheap way of making
+    // a deploy land without anyone running setup from the menu.
+    addMissingVolsocRule_(sheet);
+    addCommitteeRules_(sheet);
     refreshDocButtons_(sheet);
     refreshCalendarButtons_(sheet);
     refreshCommitteeColumns_(sheet);
@@ -822,13 +826,10 @@ function normaliseCommitteeMarks_(sheet, range) {
 function addCommitteeRules_(sheet) {
   if (!COL.COMMITTEE_FIRST) return;
   const range = sheet.getRange(2, COL.COMMITTEE_FIRST, sheet.getMaxRows() - 1, COMMITTEE_COLUMNS);
-  const rules = sheet.getConditionalFormatRules().filter((rule) => {
-    const ranges = rule.getRanges();
-    return !ranges.every((r) => r.getColumn() >= COL.COMMITTEE_FIRST && r.getLastColumn() <= COL.COMMITTEE_LAST);
-  });
+  const wanted = [];
 
   Object.values(COMMITTEE_MARKS).forEach((mark) => {
-    rules.push(
+    wanted.push(
       SpreadsheetApp.newConditionalFormatRule()
         .whenTextEqualTo(mark.value)
         .setBackground(mark.fill)
@@ -842,14 +843,33 @@ function addCommitteeRules_(sheet) {
   // Relative to the top-left of the range, so each cell tests itself.
   const cell = `${columnLetter_(COL.COMMITTEE_FIRST)}2`;
   const filled = [COL.DATE, COL.UNION_EVENT, COL.VOLSOC_EVENT].map((c) => `$${columnLetter_(c)}2<>""`).join(',');
-  rules.push(
+  wanted.push(
     SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied(`=AND(${cell}="",OR(${filled}),${notBanner_()})`)
       .setBackground(COMMITTEE_WAITING_FILL)
       .setRanges([range])
       .build()
   );
-  sheet.setConditionalFormatRules(rules);
+
+  const rules = sheet.getConditionalFormatRules();
+  const mine = rules.filter((rule) =>
+    rule.getRanges().every((r) => r.getColumn() >= COL.COMMITTEE_FIRST && r.getLastColumn() <= COL.COMMITTEE_LAST)
+  );
+  if (ruleKeys_(mine) === ruleKeys_(wanted)) return;
+  sheet.setConditionalFormatRules(rules.filter((rule) => !mine.includes(rule)).concat(wanted));
+}
+
+// Rules can't be compared to each other, so they're boiled down to the test
+// they make and the cells they cover — enough to tell "mine are already
+// there" from "they've been lost or changed", which is all this is for.
+function ruleKeys_(rules) {
+  return rules
+    .map((rule) => {
+      const condition = rule.getBooleanCondition();
+      const test = condition ? `${condition.getCriteriaType()} ${condition.getCriteriaValues().join('|')}` : '';
+      return `${test} @ ${rule.getRanges().map((r) => r.getA1Notation()).join(',')}`;
+    })
+    .join('\n');
 }
 
 // For the planning doc: who's coming, who can't, and who still owes an
