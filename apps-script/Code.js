@@ -16,7 +16,10 @@
  *     after a second tick to confirm.
  * - Each planning doc also links to the web app, which asks, then deletes
  *   the doc or the event.
- * - A thick rule under the last row of each day.
+ * - A thick rule under the last row of each day, a shaded bar above each new
+ *   week, and a dark bar above each new term.
+ * - Five narrow tick/cross columns, one per committee member, say who is
+ *   coming, who can't, and who hasn't answered yet.
  * - setup: run once from the VolSoc menu to add formatting, buttons and triggers.
  *
  * Source of truth is apps-script/ in the ucl-volunteering repo; deploy with
@@ -60,7 +63,8 @@ const REQUIRED_HEADERS = {
 const OPTIONAL_HEADERS = {
   WHATSON: ['Created Whats on Event Link'],
   SOCIAL_POST: ['Canva Post', 'Instagram Post'],
-  COMMITTEE: ['Committee Present'],
+  // The five tick/cross columns hang off this one, so it has to stay.
+  COMMITTEE: ['Committee Present', 'Committee'],
   LEAD: ['Activity Lead?', 'Activity Lead'],
   CALENDAR: ['VolSoc Calendar'],
 };
@@ -77,6 +81,24 @@ const DELETE_HEADERS = {
   REMOVE_EVENT: ['Remove event', 'CALENDAR'],
 };
 const DELETE_COLUMN_WIDTH = 56;
+
+// One narrow tick/cross column per committee member, sitting right of
+// "Committee Present": ✓ they're coming, ✕ they can't, and blank means they
+// haven't said yet — the difference a free-text column couldn't show.
+// They're found by where they sit, not by what they're called, so the headers
+// are yours: put the committee's initials in them and rename them whenever
+// the committee changes. These names are only what the columns are made with.
+const COMMITTEE_HEADERS = ['C1', 'C2', 'C3', 'C4', 'C5'];
+const COMMITTEE_COLUMNS = COMMITTEE_HEADERS.length;
+const COMMITTEE_COLUMN_WIDTH = 36;
+// Picked from the dropdown, or typed: anything in `typed` becomes the mark.
+const COMMITTEE_MARKS = {
+  yes: { value: '✓', fill: '#e8f6ef', text: '#1f7a55', typed: ['y', 'yes', '1', 'true', 't', '✓', '✔', '✅'] },
+  no: { value: '✕', fill: '#fbe9ec', text: '#d62246', typed: ['n', 'no', '0', 'false', 'f', 'x', '✕', '✖', '❌'] },
+};
+// Still to answer, on a row with an event in it — so an unchased name shows up
+// rather than reading as a quiet no.
+const COMMITTEE_WAITING_FILL = '#fff9e6';
 // The fields the feed owns, in eventFields_ order.
 const FEED_COLUMNS = ['DATE', 'UNION_EVENT', 'UNION_START', 'UNION_END', 'LOCATION', 'LINK'];
 
@@ -115,6 +137,25 @@ const LEGACY_CALENDAR_VALUES = ['Provisional', 'Confirmed'];
 // Matches the rule under the header row.
 const DAY_DIVIDER_COLOUR = '#051c33';
 
+// Week and term bars: full-width rows the script puts above the first row of
+// each week and each term. They're thrown away and redrawn on every sync, so
+// they never have to survive a sort; the hidden Row ID column marks them.
+const BANNER_PREFIX = 'banner:';
+const TERM_BAR = { id: 'banner:term', fill: '#444054', text: '#ffffff', size: 11, height: 26 };
+const WEEK_BAR = { id: 'banner:week', fill: '#edebef', text: '#6e6b7c', size: 10, height: 22 };
+// UCL term dates, in date order, first and last day of each term inclusive.
+// Weeks are numbered from the start of the term they're in; anything between
+// two terms is one vacation block, numbered by the Monday instead. Add the
+// next year's dates when UCL publishes them.
+const TERMS = [
+  { name: 'Term 1', start: '2026-09-28', end: '2026-12-18' },
+  { name: 'Term 2', start: '2027-01-11', end: '2027-03-25' },
+  { name: 'Term 3', start: '2027-04-26', end: '2027-06-11' },
+];
+// Mondays of the reading weeks, called out on the week bar.
+const READING_WEEKS = ['2026-11-09', '2027-02-15'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
 // ── Menu and one-off setup ────────────────────────────────────────────────
 
 function onOpen() {
@@ -130,7 +171,9 @@ function onOpen() {
 function setup() {
   const sheet = getSheet_();
   addMissingVolsocRule_(sheet);
+  addCommitteeRules_(sheet);
   removeCalendarStatusRules_(sheet);
+  refreshCommitteeColumns_(sheet);
   refreshDocButtons_(sheet);
   if (COL.CALENDAR) volsocCalendar_();
   installTriggers_();
@@ -151,22 +194,28 @@ function installTriggers_() {
 
 function addMissingVolsocRule_(sheet) {
   const [g, a, b] = [COL.VOLSOC_EVENT, COL.DATE, COL.UNION_EVENT].map(columnLetter_);
-  const formula = `=AND($${g}2="",OR($${a}2<>"",$${b}2<>""))`;
+  const formula = `=AND($${g}2="",OR($${a}2<>"",$${b}2<>""),${notBanner_()})`;
   const rules = sheet.getConditionalFormatRules();
-  const exists = rules.some((rule) => {
+  // Earlier versions of this rule left out the last test and so painted the
+  // week and term bars red, which is why the old rule is replaced rather than
+  // added to.
+  const criteria = (rule) => {
     const condition = rule.getBooleanCondition();
-    return condition && condition.getCriteriaValues()[0] === formula;
-  });
-  if (exists) return;
+    const value = condition && condition.getCriteriaValues()[0];
+    return typeof value === 'string' ? value : '';
+  };
+  const mine = rules.filter((rule) => criteria(rule).startsWith(`=AND($${g}2=""`));
+  if (mine.length === 1 && criteria(mine[0]) === formula) return;
 
-  rules.push(
+  const kept = rules.filter((rule) => !mine.includes(rule));
+  kept.push(
     SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied(formula)
       .setBackground(MISSING_VOLSOC_COLOUR)
       .setRanges([sheet.getRange(2, COL.VOLSOC_EVENT, sheet.getMaxRows() - 1, 1)])
       .build()
   );
-  sheet.setConditionalFormatRules(rules);
+  sheet.setConditionalFormatRules(kept);
 }
 
 // ── Event sync ────────────────────────────────────────────────────────────
@@ -183,7 +232,9 @@ function syncFromGoogleCalendar() {
     const sheet = getSheet_();
     refreshDocButtons_(sheet);
     refreshCalendarButtons_(sheet);
+    refreshCommitteeColumns_(sheet);
     refreshDayDividers_(sheet);
+    refreshBanners_(sheet);
     addDocControlsToExistingDocs_(sheet);
     lock.releaseLock();
   }
@@ -192,6 +243,9 @@ function syncFromGoogleCalendar() {
 function sync_() {
   const tz = spreadsheet_().getSpreadsheetTimeZone();
   const sheet = getSheet_();
+  // Out of the way before anything reads, writes, appends to or sorts the
+  // rows; the finally block in syncFromGoogleCalendar draws them again.
+  stripBanners_(sheet);
 
   const windowStart = new Date();
   windowStart.setHours(0, 0, 0, 0);
@@ -535,6 +589,7 @@ function checkboxRule_() {
 }
 
 function hasContent_(row) {
+  if (isBanner_(row)) return false;
   return [COL.DATE, COL.UNION_EVENT, COL.VOLSOC_EVENT].some((c) => row[c - 1] !== '');
 }
 
@@ -555,14 +610,19 @@ function refreshDayDividers_(sheet) {
   const rows = sheet.getLastRow() - 1;
   if (rows < 1) return;
   const tz = spreadsheet_().getSpreadsheetTimeZone();
-  const dates = sheet.getRange(2, COL.DATE, rows, 1).getValues().map((r) => dateKey_(r[0], tz));
+  const values = sheet.getRange(2, 1, rows, COL.WIDTH).getValues();
+  // A week or term bar is a separator in itself, so it's stepped over: it gets
+  // no rule of its own, and it doesn't break up the day on either side of it.
+  const dates = values.map((row) => (isBanner_(row) ? null : dateKey_(row[COL.DATE - 1], tz)));
+  const nextDate = (i) => dates.slice(i + 1).find((date) => date !== null);
   const lastCol = columnLetter_(sheet.getLastColumn());
   const rowA1 = (row) => `A${row}:${lastCol}${row}`;
 
   const thin = [rowA1(rows + 2)];
   const thick = [];
   dates.forEach((date, i) => {
-    (date !== '' && date !== dates[i + 1] ? thick : thin).push(rowA1(i + 2));
+    if (date === null) return;
+    (date !== '' && date !== nextDate(i) ? thick : thin).push(rowA1(i + 2));
   });
 
   sheet.getRangeList(thin).setBorder(null, null, false, null, null, null);
@@ -571,6 +631,242 @@ function refreshDayDividers_(sheet) {
       .getRangeList(thick)
       .setBorder(null, null, true, null, null, null, DAY_DIVIDER_COLOUR, SpreadsheetApp.BorderStyle.SOLID_MEDIUM);
   }
+}
+
+// ── Week and term bars ────────────────────────────────────────────────────
+
+// Bars are worked out over the whole sheet first and then inserted from the
+// bottom up, so the row numbers found here stay right as rows appear above
+// them. Where a term and a week start on the same row, the term bar is found
+// first and so ends up on top.
+function refreshBanners_(sheet) {
+  stripBanners_(sheet);
+  const rows = sheet.getLastRow() - 1;
+  if (rows < 1) return;
+  const tz = spreadsheet_().getSpreadsheetTimeZone();
+  const dates = sheet
+    .getRange(2, COL.DATE, rows, 1)
+    .getValues()
+    .map((r) => (r[0] instanceof Date ? dateKey_(r[0], tz) : ''));
+
+  const bars = [];
+  let term = null;
+  let week = null;
+  dates.forEach((iso, i) => {
+    if (!iso) return; // undated rows, which the sort leaves at the bottom
+    const block = termBlock_(iso);
+    const monday = mondayOf_(iso);
+    if (block.key !== term) {
+      bars.push({ row: i + 2, style: TERM_BAR, label: block.label });
+      term = block.key;
+      week = null; // a term starting mid-week still opens with a week bar
+    }
+    if (monday !== week) {
+      bars.push({ row: i + 2, style: WEEK_BAR, label: weekLabel_(block, monday) });
+      week = monday;
+    }
+  });
+
+  bars.reverse().forEach((bar) => insertBanner_(sheet, bar));
+}
+
+// Deleted from the bottom up, and a term bar and the week bar under it go in
+// one call, since a sheet edit is far slower than the loop around it.
+function stripBanners_(sheet) {
+  const rows = sheet.getLastRow() - 1;
+  if (rows < 1) return;
+  const ids = sheet.getRange(2, COL.ROW_ID, rows, 1).getValues();
+  let run = 0;
+  for (let i = ids.length - 1; i >= 0; i--) {
+    if (String(ids[i][0]).startsWith(BANNER_PREFIX)) {
+      run++;
+    } else if (run) {
+      sheet.deleteRows(i + 3, run);
+      run = 0;
+    }
+  }
+  if (run) sheet.deleteRows(2, run);
+}
+
+function isBanner_(row) {
+  return String(row[COL.ROW_ID - 1]).startsWith(BANNER_PREFIX);
+}
+
+// Used in conditional formats, which run over the bar rows too.
+function notBanner_() {
+  return `LEFT($${columnLetter_(COL.ROW_ID)}2,${BANNER_PREFIX.length})<>"${BANNER_PREFIX}"`;
+}
+
+function insertBanner_(sheet, bar) {
+  sheet.insertRowBefore(bar.row);
+  // An inserted row comes with the formatting, checkboxes and day rule of the
+  // row above it, none of which belong on a bar.
+  const row = sheet.getRange(bar.row, 1, 1, sheet.getLastColumn());
+  row.clear();
+  row.setBackground(bar.style.fill);
+  // The label sits in the first column and runs across the empty ones.
+  sheet
+    .getRange(bar.row, 1)
+    .setValue(bar.label)
+    .setFontWeight('bold')
+    .setFontSize(bar.style.size)
+    .setFontColor(bar.style.text)
+    .setVerticalAlignment('middle')
+    .setHorizontalAlignment('left')
+    .setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
+  sheet.getRange(bar.row, COL.ROW_ID).setValue(bar.style.id);
+  sheet.setRowHeight(bar.row, bar.style.height);
+}
+
+// The term a date falls in, or the vacation block between two terms. The key
+// tells one block from the next; the label goes on the bar.
+function termBlock_(iso) {
+  const term = TERMS.find((t) => iso >= t.start && iso <= t.end);
+  if (term) {
+    return {
+      key: term.start,
+      start: term.start,
+      label: `${term.name} · ${shortDate_(term.start)} – ${shortDate_(term.end)}`.toUpperCase(),
+    };
+  }
+  const before = TERMS.filter((t) => t.end < iso).pop();
+  const after = TERMS.find((t) => t.start > iso);
+  const label =
+    before && after
+      ? `Vacation · ${shortDate_(shiftDays_(before.end, 1))} – ${shortDate_(shiftDays_(after.start, -1))}`
+      : 'Out of term';
+  return { key: `gap:${before ? before.end : 'start'}`, start: null, label: label.toUpperCase() };
+}
+
+function weekLabel_(block, monday) {
+  const reading = READING_WEEKS.includes(monday) ? ' · READING WEEK' : '';
+  if (!block.start) return `W/C MON ${shortDate_(monday)}`.toUpperCase() + reading;
+  const week = Math.round((dayNumber_(monday) - dayNumber_(mondayOf_(block.start))) / 7) + 1;
+  return `WEEK ${week} · MON ${shortDate_(monday)}`.toUpperCase() + reading;
+}
+
+// Dates are handled as yyyy-MM-dd strings and counted in whole UTC days, so
+// neither the sheet's timezone nor British Summer Time can shift a week.
+function dayNumber_(iso) {
+  return Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10))) / 86400000;
+}
+
+function shiftDays_(iso, days) {
+  const date = new Date((dayNumber_(iso) + days) * 86400000);
+  return date.toISOString().slice(0, 10);
+}
+
+function mondayOf_(iso) {
+  const weekday = new Date(dayNumber_(iso) * 86400000).getUTCDay();
+  return shiftDays_(iso, -((weekday + 6) % 7));
+}
+
+function shortDate_(iso) {
+  return `${Number(iso.slice(8, 10))} ${MONTHS[Number(iso.slice(5, 7)) - 1]}`;
+}
+
+// ── Committee tick/cross columns ──────────────────────────────────────────
+
+// The dropdown and the widths, rebuilt on each sync so rows added by hand or
+// by the feed get them too. The marks themselves are coloured by conditional
+// format rules, which setup puts in.
+function refreshCommitteeColumns_(sheet) {
+  if (!COL.COMMITTEE_FIRST) return;
+  const rows = sheet.getLastRow() - 1;
+  if (rows < 1) return;
+  const count = COMMITTEE_COLUMNS;
+  const ids = sheet.getRange(2, COL.ROW_ID, rows, 1).getValues();
+  const rule = committeeRule_();
+  const range = sheet.getRange(2, COL.COMMITTEE_FIRST, rows, count);
+  range.setDataValidations(
+    ids.map((id) => new Array(count).fill(String(id[0]).startsWith(BANNER_PREFIX) ? null : rule))
+  );
+  range.setHorizontalAlignment('center').setVerticalAlignment('middle');
+  sheet.setColumnWidths(COL.COMMITTEE_FIRST, count, COMMITTEE_COLUMN_WIDTH);
+}
+
+function committeeRule_() {
+  return SpreadsheetApp.newDataValidation()
+    .requireValueInList([COMMITTEE_MARKS.yes.value, COMMITTEE_MARKS.no.value], true)
+    .setAllowInvalid(true) // so typing y or n isn't rejected before handleEdit sees it
+    .setHelpText('✓ coming, ✕ can\'t, blank not asked yet — or type y or n.')
+    .build();
+}
+
+// Typing y or n is quicker than picking from the dropdown, so anything that
+// reads as a yes or a no becomes the tick or the cross. Pasting a block of
+// them works the same way.
+function normaliseCommitteeMarks_(sheet, range) {
+  const first = Math.max(range.getColumn(), COL.COMMITTEE_FIRST);
+  const last = Math.min(range.getLastColumn(), COL.COMMITTEE_LAST);
+  if (last < first) return;
+  const top = Math.max(range.getRow(), 2);
+  const block = sheet.getRange(top, first, range.getLastRow() - top + 1, last - first + 1);
+  let changed = false;
+  const marked = block.getValues().map((row) =>
+    row.map((value) => {
+      const typed = String(value).trim().toLowerCase();
+      const mark = typed && Object.values(COMMITTEE_MARKS).find((m) => m.typed.includes(typed));
+      if (!mark || mark.value === value) return value;
+      changed = true;
+      return mark.value;
+    })
+  );
+  if (changed) block.setValues(marked);
+}
+
+// Green tick, red cross, and a pale amber cell for anyone who hasn't answered
+// on a row that has an event in it — the whole point of the columns is that
+// "can't" and "hasn't said" don't look the same. Rules already on these
+// columns are replaced, since the script owns them.
+function addCommitteeRules_(sheet) {
+  if (!COL.COMMITTEE_FIRST) return;
+  const range = sheet.getRange(2, COL.COMMITTEE_FIRST, sheet.getMaxRows() - 1, COMMITTEE_COLUMNS);
+  const rules = sheet.getConditionalFormatRules().filter((rule) => {
+    const ranges = rule.getRanges();
+    return !ranges.every((r) => r.getColumn() >= COL.COMMITTEE_FIRST && r.getLastColumn() <= COL.COMMITTEE_LAST);
+  });
+
+  Object.values(COMMITTEE_MARKS).forEach((mark) => {
+    rules.push(
+      SpreadsheetApp.newConditionalFormatRule()
+        .whenTextEqualTo(mark.value)
+        .setBackground(mark.fill)
+        .setFontColor(mark.text)
+        .setBold(true)
+        .setRanges([range])
+        .build()
+    );
+  });
+
+  // Relative to the top-left of the range, so each cell tests itself.
+  const cell = `${columnLetter_(COL.COMMITTEE_FIRST)}2`;
+  const filled = [COL.DATE, COL.UNION_EVENT, COL.VOLSOC_EVENT].map((c) => `$${columnLetter_(c)}2<>""`).join(',');
+  rules.push(
+    SpreadsheetApp.newConditionalFormatRule()
+      .whenFormulaSatisfied(`=AND(${cell}="",OR(${filled}),${notBanner_()})`)
+      .setBackground(COMMITTEE_WAITING_FILL)
+      .setRanges([range])
+      .build()
+  );
+  sheet.setConditionalFormatRules(rules);
+}
+
+// For the planning doc: who's coming, who can't, and who still owes an
+// answer, by whatever the columns are headed at the time.
+function committeeSummary_(sheet, text) {
+  if (!COL.COMMITTEE_FIRST) return '';
+  const names = sheet.getRange(1, COL.COMMITTEE_FIRST, 1, COMMITTEE_COLUMNS).getDisplayValues()[0];
+  const marks = names.map((name, i) => [
+    String(name).trim() || `Member ${i + 1}`,
+    String(text[COL.COMMITTEE_FIRST - 1 + i]).trim(),
+  ]);
+  const named = (mark) => marks.filter(([, value]) => value === mark).map(([name]) => name);
+  const parts = [];
+  if (named(COMMITTEE_MARKS.yes.value).length) parts.push(`Coming: ${named(COMMITTEE_MARKS.yes.value).join(', ')}`);
+  if (named(COMMITTEE_MARKS.no.value).length) parts.push(`Can't: ${named(COMMITTEE_MARKS.no.value).join(', ')}`);
+  if (named('').length) parts.push(`No answer yet: ${named('').join(', ')}`);
+  return parts.join(' · ');
 }
 
 // ── VolSoc calendar ───────────────────────────────────────────────────────
@@ -588,6 +884,8 @@ function handleEdit(e) {
 
     // A ticked button runs its action, which redraws the buttons itself.
     if (runTickedBoxes_(sheet, range, e.source)) return;
+
+    if (COL.COMMITTEE_FIRST) normaliseCommitteeMarks_(sheet, range);
 
     if (touches(COL.DATE)) refreshDayDividers_(sheet);
 
@@ -1229,7 +1527,7 @@ function createDocForRow_(row) {
     volsocTime: timeRange_(text[COL.VOLSOC_START - 1], text[COL.VOLSOC_END - 1]),
     whatsOn: optional(COL.WHATSON),
     socialPost: optional(COL.SOCIAL_POST),
-    committee: optional(COL.COMMITTEE),
+    committee: committeeSummary_(sheet, text) || optional(COL.COMMITTEE),
     lead: optional(COL.LEAD),
   };
   if (!info.date && !info.unionEvent && !info.volsocEvent) {
@@ -1394,8 +1692,50 @@ function resolveColumns_(sheet) {
   }
   Object.entries(DELETE_HEADERS).forEach(([key, [name]]) => (col[key] = find(name)));
 
+  // The committee columns are the five straight after "Committee Present".
+  // They're found by position so the committee can head them with whatever
+  // names they like; the run stops at the first column with a header the
+  // script knows, which is how its own columns are told from the next real
+  // one. Fewer than five there means the rest are still to be made.
+  col.COMMITTEE_FIRST = 0;
+  col.COMMITTEE_LAST = 0;
+  if (col.COMMITTEE) {
+    const known = knownHeaders_();
+    let found = 0;
+    while (found < COMMITTEE_COLUMNS) {
+      const header = headers[col.COMMITTEE + found];
+      if (!header || known.has(header)) break;
+      found++;
+    }
+    if (found < COMMITTEE_COLUMNS) {
+      const at = col.COMMITTEE + found + 1;
+      sheet.insertColumnAfter(at - 1);
+      sheet
+        .getRange(1, at)
+        .setValue(COMMITTEE_HEADERS[found])
+        .setWrap(true)
+        .setNote("✓ coming, ✕ can't, blank means they haven't said yet. Type y or n if that's quicker.\n\nRename this to whoever it's for.");
+      sheet.setColumnWidth(at, COMMITTEE_COLUMN_WIDTH);
+      return resolveColumns_(sheet);
+    }
+    col.COMMITTEE_FIRST = col.COMMITTEE + 1;
+    col.COMMITTEE_LAST = col.COMMITTEE + COMMITTEE_COLUMNS;
+  }
+
   col.WIDTH = Math.max(...Object.values(col));
   return col;
+}
+
+// Every header the script looks up by name. A column headed with one of these
+// is somebody else's, which is what stops the committee block running on.
+function knownHeaders_() {
+  const names = new Set();
+  const add = (spec) => names.add(Array.isArray(spec) ? spec[0] : spec);
+  Object.values(REQUIRED_HEADERS).forEach(add);
+  Object.values(OPTIONAL_HEADERS).forEach((alternatives) => alternatives.forEach((name) => names.add(name)));
+  Object.values(HIDDEN_HEADERS).forEach(add);
+  Object.values(DELETE_HEADERS).forEach(add);
+  return names;
 }
 
 function columnLetter_(col) {
