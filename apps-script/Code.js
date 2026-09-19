@@ -71,6 +71,7 @@ const OPTIONAL_HEADERS = {
 // Script-owned columns, created hidden at the end of the sheet if missing.
 const HIDDEN_HEADERS = {
   EVENT_KEY: 'Calendar Event Key',
+  SORT_TIME: 'Sort Time',
   ROW_ID: 'Row ID',
   CALENDAR_EVENT_ID: 'VolSoc Calendar Event ID',
 };
@@ -478,22 +479,35 @@ function timeKey_(text) {
   return String(hours).padStart(2, '0') + ':' + m[2];
 }
 
-// Rows without a date count as last, where the sort puts them.
+// When a row starts: the Social Impact event if it follows one, otherwise the
+// VolSoc event's own time. Sorting on the two columns one after the other
+// instead would drop every standalone VolSoc row to the end of its day,
+// because a sheet sort puts empty cells last whichever way it's pointed.
+function sortTime_(displayRow) {
+  return timeKey_(displayRow[COL.UNION_START - 1]) || timeKey_(displayRow[COL.VOLSOC_START - 1]);
+}
+
+// Rows without a date, and rows with no time on the day, count as last, which
+// is where the sort puts them.
 function isInDateOrder_(sheet, tz) {
   const rows = sheet.getLastRow() - 1;
   if (rows < 2) return true;
-  const dates = sheet.getRange(2, COL.DATE, rows, 1).getValues().map((r) => (r[0] === '' ? '\uffff' : dateKey_(r[0], tz)));
-  return dates.every((date, i) => i === 0 || dates[i - 1] <= date);
+  const dates = sheet.getRange(2, COL.DATE, rows, 1).getValues();
+  const text = sheet.getRange(2, 1, rows, COL.WIDTH).getDisplayValues();
+  const keys = dates.map(
+    (r, i) => `${r[0] === '' ? '\uffff' : dateKey_(r[0], tz)} ${sortTime_(text[i]) || '\uffff'}`
+  );
+  return keys.every((key, i) => i === 0 || keys[i - 1] <= key);
 }
 
 function sortByDate_(sheet) {
   const rows = sheet.getLastRow() - 1;
   if (rows < 2) return;
-  // Social Impact start time first, then VolSoc start time for VolSoc-only rows.
+  const text = sheet.getRange(2, 1, rows, COL.WIDTH).getDisplayValues();
+  sheet.getRange(2, COL.SORT_TIME, rows, 1).setValues(text.map((row) => [sortTime_(row)]));
   sheet.getRange(2, 1, rows, sheet.getLastColumn()).sort([
     { column: COL.DATE, ascending: true },
-    { column: COL.UNION_START, ascending: true },
-    { column: COL.VOLSOC_START, ascending: true },
+    { column: COL.SORT_TIME, ascending: true },
   ]);
 }
 
@@ -675,21 +689,49 @@ function refreshBanners_(sheet) {
 }
 
 // Deleted from the bottom up, and a term bar and the week bar under it go in
-// one call, since a sheet edit is far slower than the loop around it.
+// one call, since a sheet edit is far slower than the loop around it. A bar
+// that has been typed into is kept and turned into an ordinary row instead:
+// clicking on one and filling it in is an easy mistake, and deleting the row
+// would take the work with it.
 function stripBanners_(sheet) {
   const rows = sheet.getLastRow() - 1;
   if (rows < 1) return;
-  const ids = sheet.getRange(2, COL.ROW_ID, rows, 1).getValues();
+  const values = sheet.getRange(2, 1, rows, COL.WIDTH).getValues();
   let run = 0;
-  for (let i = ids.length - 1; i >= 0; i--) {
-    if (String(ids[i][0]).startsWith(BANNER_PREFIX)) {
+  for (let i = values.length - 1; i >= 0; i--) {
+    if (isBanner_(values[i]) && !typedInto_(values[i])) {
       run++;
-    } else if (run) {
+      continue;
+    }
+    if (isBanner_(values[i])) rescueBanner_(sheet, i + 2, values[i]);
+    if (run) {
       sheet.deleteRows(i + 3, run);
       run = 0;
     }
   }
   if (run) sheet.deleteRows(2, run);
+}
+
+// The labels the script writes, so anything else in the cell is somebody's.
+const BAR_LABEL = /^(TERM \d|WEEK \d|VACATION|OUT OF TERM|W\/C )/;
+
+function typedInto_(row) {
+  if (typeof row[0] !== 'string' || !BAR_LABEL.test(row[0])) return true;
+  return row.some((value, c) => c !== 0 && c !== COL.ROW_ID - 1 && value !== '');
+}
+
+// Back to a plain row, keeping whatever was typed. With the marker gone the
+// sort takes it from there, and a fresh bar is drawn for the week regardless.
+function rescueBanner_(sheet, row, values) {
+  sheet.getRange(row, COL.ROW_ID).clearContent();
+  if (typeof values[0] === 'string' && BAR_LABEL.test(values[0])) sheet.getRange(row, 1).clearContent();
+  sheet
+    .getRange(row, 1, 1, COL.WIDTH)
+    .setBackground(null)
+    .setFontColor(null)
+    .setFontSize(10)
+    .setFontWeight('normal');
+  sheet.setRowHeight(row, 21);
 }
 
 function isBanner_(row) {
