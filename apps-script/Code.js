@@ -192,6 +192,9 @@ function onOpen() {
     .addItem('Sync Social Impact events now', 'syncFromGoogleCalendar')
     .addItem('Create doc for selected row', 'createDocForSelectedRow')
     .addSeparator()
+    .addItem('Find duplicate rows…', 'removeDuplicateRows')
+    .addItem('Report sheet state', 'reportSheetState')
+    .addSeparator()
     .addItem('Set up sheet and triggers', 'setup')
     .addToUi();
 }
@@ -361,6 +364,20 @@ function sync_() {
         .setFontLine('line-through')
         .setNote('Not in the UCL Student Social Impact feed — cancelled, moved, or not a Social Impact event?');
     });
+  }
+
+  // Every feed event failing to match, in a sheet that already holds keyed
+  // rows for them, is a matching fault rather than a term's worth of new
+  // events. Appending would double the sheet, so it doesn't, and leaves word
+  // of why for "Report sheet state".
+  const keyed = values.filter((row) => row[COL.UNION_EVENT - 1] && String(row[COL.EVENT_KEY - 1])).length;
+  if (newRows.length > 2 && !matchedRows.size && keyed) {
+    const warning =
+      `${new Date().toISOString()}: ${newRows.length} feed events matched none of the ` +
+      `${keyed} keyed rows already in the sheet, so none were added.`;
+    PropertiesService.getScriptProperties().setProperty('SYNC_WARNING', warning);
+    console.warn(warning);
+    newRows.length = 0;
   }
 
   if (newRows.length) {
@@ -1464,6 +1481,90 @@ function removeCalendarStatusRules_(sheet) {
     return !isStatusRule;
   });
   if (kept.length !== rules.length) sheet.setConditionalFormatRules(kept);
+}
+
+// ── Repair ────────────────────────────────────────────────────────────────
+
+// Two rows for one Social Impact event mean the sync stopped recognising the
+// row it already had. This pairs them up by date, title and start time, keeps
+// the one with the most work behind it, and refuses to delete any row with a
+// doc or a calendar event of its own — those are reported instead.
+function removeDuplicateRows() {
+  const ui = SpreadsheetApp.getUi();
+  const sheet = getSheet_();
+  stripBanners_(sheet);
+  const tz = spreadsheet_().getSpreadsheetTimeZone();
+  const rows = sheet.getLastRow() - 1;
+  if (rows < 2) return void ui.alert('Nothing to check yet.');
+
+  const values = sheet.getRange(2, 1, rows, COL.WIDTH).getValues();
+  const display = sheet.getRange(2, 1, rows, COL.WIDTH).getDisplayValues();
+  const groups = new Map();
+  values.forEach((row, i) => {
+    if (isBanner_(row) || !row[COL.UNION_EVENT - 1]) return;
+    const key = currentMatch_(row, display[i], tz);
+    groups.set(key, (groups.get(key) || []).concat(i));
+  });
+
+  const doomed = [];
+  const found = [];
+  const manual = [];
+  groups.forEach((indexes, key) => {
+    if (indexes.length < 2) return;
+    const [date, title] = key.split('|');
+    found.push(`${date}  ${title}  ×${indexes.length}`);
+    indexes
+      .map((i) => ({ i, weight: rowWeight_(sheet, values[i], i + 2) }))
+      .sort((a, b) => b.weight - a.weight)
+      .slice(1)
+      .forEach((row) => (row.weight ? manual.push(`${date}  ${title}  row ${row.i + 2}`) : doomed.push(row.i + 2)));
+  });
+
+  if (!found.length) return void ui.alert('No duplicates', 'Every Social Impact event appears once.', ui.ButtonSet.OK);
+  const note = manual.length ? `\n\nKept for you to look at, they have a doc or an event of their own:\n${manual.join('\n')}` : '';
+  if (!doomed.length) return void ui.alert('Duplicates found', `${found.join('\n')}${note}`, ui.ButtonSet.OK);
+
+  const answer = ui.alert(
+    `Delete ${doomed.length} duplicate row${doomed.length === 1 ? '' : 's'}?`,
+    `${found.join('\n')}\n\nThe copy with the most filled in is kept.${note}`,
+    ui.ButtonSet.YES_NO
+  );
+  if (answer !== ui.Button.YES) return;
+
+  doomed.sort((a, b) => b - a).forEach((row) => sheet.deleteRow(row));
+  refreshDocButtons_(sheet);
+  refreshBanners_(sheet);
+  ui.alert(`Deleted ${doomed.length} row${doomed.length === 1 ? '' : 's'}.${note}`);
+}
+
+// How much of a row is worth keeping: a doc or a calendar event outrank
+// anything typed, and a row the feed filled in on its own counts for nothing.
+function rowWeight_(sheet, row, rowNumber) {
+  const volsoc = [COL.VOLSOC_EVENT, COL.VOLSOC_START, COL.VOLSOC_END, COL.LEAD, COL.WHATSON, COL.SOCIAL_POST]
+    .filter(Boolean)
+    .filter((c) => row[c - 1] !== '').length;
+  return (docUrl_(sheet, rowNumber) ? 8 : 0) + (String(row[COL.CALENDAR_EVENT_ID - 1]) ? 4 : 0) + volsoc;
+}
+
+// What the script can see, for when the sheet does something unexpected.
+function reportSheetState() {
+  const sheet = getSheet_();
+  const rows = Math.max(sheet.getLastRow() - 1, 0);
+  const values = rows ? sheet.getRange(2, 1, rows, COL.WIDTH).getValues() : [];
+  const union = values.filter((row) => !isBanner_(row) && row[COL.UNION_EVENT - 1]);
+  const keys = union.map((row) => String(row[COL.EVENT_KEY - 1])).filter(Boolean);
+  const warning = PropertiesService.getScriptProperties().getProperty('SYNC_WARNING');
+
+  const lines = [
+    `Rows: ${rows}, of them ${union.length} Social Impact and ${values.filter(isBanner_).length} bars`,
+    `Event keys: ${keys.length} filled, ${new Set(keys).size} distinct, ${union.length - keys.length} missing`,
+    warning ? `\nLast sync warning — ${warning}` : '',
+    '\nColumns:',
+    ...Object.entries(COL)
+      .filter(([name]) => name !== 'WIDTH')
+      .map(([name, c]) => `  ${name}: ${c ? `${columnLetter_(c)}  "${sheet.getRange(1, c).getValue()}"` : '—'}`),
+  ];
+  SpreadsheetApp.getUi().alert('VolSoc sheet state', lines.filter((line) => line !== '').join('\n'), SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
 // ── Planning docs ─────────────────────────────────────────────────────────
