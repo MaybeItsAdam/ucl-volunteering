@@ -756,11 +756,19 @@ function stripBanners_(sheet) {
   if (run) sheet.deleteRows(2, run);
 }
 
-// The labels the script writes, so anything else in the cell is somebody's.
-const BAR_LABEL = /^(TERM \d|WEEK \d|VACATION|OUT OF TERM|W\/C )/;
+// The label a bar was drawn with, kept beside its marker: comparing the cell
+// against that is what tells the script's own text from somebody's typing,
+// and it can't fall behind the labels the way a list of prefixes did.
+function bannerLabel_(row) {
+  const marker = String(row[COL.ROW_ID - 1]);
+  const split = marker.indexOf('|');
+  return split === -1 ? null : marker.slice(split + 1);
+}
 
 function typedInto_(row) {
-  if (typeof row[0] !== 'string' || !BAR_LABEL.test(row[0])) return true;
+  const label = bannerLabel_(row);
+  if (label === null) return false; // drawn before the label was recorded
+  if (String(row[0]) !== label) return true;
   return row.some((value, c) => c !== 0 && c !== COL.ROW_ID - 1 && value !== '');
 }
 
@@ -768,7 +776,7 @@ function typedInto_(row) {
 // sort takes it from there, and a fresh bar is drawn for the week regardless.
 function rescueBanner_(sheet, row, values) {
   sheet.getRange(row, COL.ROW_ID).clearContent();
-  if (typeof values[0] === 'string' && BAR_LABEL.test(values[0])) sheet.getRange(row, 1).clearContent();
+  if (String(values[0]) === bannerLabel_(values)) sheet.getRange(row, 1).clearContent();
   sheet
     .getRange(row, 1, 1, COL.WIDTH)
     .setBackground(null)
@@ -793,6 +801,9 @@ function insertBanner_(sheet, bar) {
   // row above it, none of which belong on a bar.
   const row = sheet.getRange(bar.row, 1, 1, sheet.getLastColumn());
   row.clear();
+  // Belt and braces: a bar showing the Doc Detail and VolSoc Calendar
+  // checkboxes of the row it was inserted above invites someone to tick one.
+  row.clearDataValidations();
   row.setBackground(bar.style.fill);
   // The label sits in the first column and runs across the empty ones.
   sheet
@@ -804,7 +815,7 @@ function insertBanner_(sheet, bar) {
     .setVerticalAlignment('middle')
     .setHorizontalAlignment('left')
     .setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
-  sheet.getRange(bar.row, COL.ROW_ID).setValue(bar.style.id);
+  sheet.getRange(bar.row, COL.ROW_ID).setValue(`${bar.style.id}|${bar.label}`);
   sheet.setRowHeight(bar.row, bar.style.height);
 }
 
