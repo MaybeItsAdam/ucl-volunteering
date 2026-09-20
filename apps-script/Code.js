@@ -918,6 +918,14 @@ function refreshCommitteeColumns_(sheet) {
     );
     range.setHorizontalAlignment('center').setVerticalAlignment('middle');
     sheet.setColumnWidths(committeeBlock_(block), COMMITTEE_COLUMNS, COMMITTEE_COLUMN_WIDTH);
+
+    // Both blocks carry the same five names, so the note saying which event
+    // this one is about is kept up to date even after a column is renamed.
+    const header = sheet.getRange(1, committeeBlock_(block), 1, COMMITTEE_COLUMNS);
+    const note = committeeNote_(block);
+    if (header.getNotes()[0].some((current) => current !== note)) {
+      header.setNotes([new Array(COMMITTEE_COLUMNS).fill(note)]);
+    }
   });
 }
 
@@ -1577,10 +1585,19 @@ function removeDuplicateRows() {
 // How much of a row is worth keeping: a doc or a calendar event outrank
 // anything typed, and a row the feed filled in on its own counts for nothing.
 function rowWeight_(sheet, row, rowNumber) {
-  const volsoc = [COL.VOLSOC_EVENT, COL.VOLSOC_START, COL.VOLSOC_END, COL.LEAD, COL.WHATSON, COL.SOCIAL_POST]
+  const filled = [COL.VOLSOC_EVENT, COL.VOLSOC_START, COL.VOLSOC_END, COL.LEAD, COL.WHATSON, COL.SOCIAL_POST]
     .filter(Boolean)
     .filter((c) => row[c - 1] !== '').length;
-  return (docUrl_(sheet, rowNumber) ? 8 : 0) + (String(row[COL.CALENDAR_EVENT_ID - 1]) ? 4 : 0) + volsoc;
+  // An answer from the committee is somebody's work like any other.
+  const answers = COMMITTEE_BLOCKS.filter((block) => committeeBlock_(block)).reduce(
+    (count, block) =>
+      count +
+      Array.from({ length: COMMITTEE_COLUMNS }, (_, i) => row[committeeBlock_(block) - 1 + i]).filter(
+        (value) => value !== ''
+      ).length,
+    0
+  );
+  return (docUrl_(sheet, rowNumber) ? 8 : 0) + (String(row[COL.CALENDAR_EVENT_ID - 1]) ? 4 : 0) + filled + answers;
 }
 
 // What the script can see, for when the sheet does something unexpected.
