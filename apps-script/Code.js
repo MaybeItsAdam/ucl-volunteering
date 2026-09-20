@@ -821,9 +821,14 @@ function termBlock_(iso) {
   }
   const before = TERMS.filter((t) => t.end < iso).pop();
   const after = TERMS.find((t) => t.start > iso);
-  const label =
-    before && after
+  // Naming both ends of the year rather than calling each one "out of term",
+  // so two of these in one sheet can be told apart at a glance.
+  const label = before
+    ? after
       ? `Vacation · ${shortDate_(shiftDays_(before.end, 1))} – ${shortDate_(shiftDays_(after.start, -1))}`
+      : `After ${before.name} · from ${shortDate_(shiftDays_(before.end, 1))}`
+    : after
+      ? `Before ${after.name} · until ${shortDate_(shiftDays_(after.start, -1))}`
       : 'Out of term';
   return { key: `gap:${before ? before.end : 'start'}`, start: null, label: label.toUpperCase() };
 }
@@ -1550,6 +1555,9 @@ function removeDuplicateRows() {
 
   carry.forEach((key, row) => sheet.getRange(row, COL.EVENT_KEY).setValue(key));
   doomed.sort((a, b) => b - a).forEach((row) => sheet.deleteRow(row));
+  // The copies were appended at the bottom rather than merged in, so the rows
+  // left behind are out of order until this runs.
+  sortByDate_(sheet);
   refreshDocButtons_(sheet);
   refreshBanners_(sheet);
   ui.alert(`Deleted ${doomed.length} row(s), and moved ${carry.size} event key(s) onto the copy that was kept.`);
