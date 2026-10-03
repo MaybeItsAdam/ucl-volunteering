@@ -1,0 +1,240 @@
+/* ==========================================================================
+   AVAILABILITY (/portal/availability)
+
+   Your week (an editable grid of half-hours) and the committee's combined.
+   Built on globals.css's tokens and classes; everything here is .avail-*.
+   At phone width (768px, as the shell) the editor shows one day with day tabs, and the combined grid
+   gives way to a list per day.
+   ========================================================================== */
+
+.avail { display: grid; gap: 16px; }
+/* clip, not hidden: hidden would make the panel a scroller and stop the
+   sticky day headers sticking to the page. */
+.panel.flush.avail-editor, .panel.flush.avail-committee { overflow: clip; }
+.avail-toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.avail-panel-head { flex-wrap: wrap; align-items: flex-start; }
+.avail-panel-head h2 { margin: 0; }
+.avail-help { margin: 4px 0 0; }
+.avail-help-coarse { display: none; }
+@media (pointer: coarse) {
+  .avail-help-fine { display: none; }
+  .avail-help-coarse { display: inline; }
+}
+
+.avail-save { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.avail-inline-notice { margin: 12px 16px 0; }
+.avail-hidden-note { margin: 10px 16px 0; }
+
+/* ── The grid (both views) ─────────────────────────────────────────────── */
+
+.avail-grid {
+  --avail-template: 52px repeat(var(--avail-days, 5), minmax(0, 1fr));
+  --avail-cell-h: 22px;
+  padding: 0 16px 12px 0;
+}
+.avail-row { display: grid; grid-template-columns: var(--avail-template); }
+.avail-row-head {
+  position: sticky; top: calc(56px + var(--safe-top)); z-index: 2;
+  background: var(--raised); border-bottom: 1px solid var(--line);
+}
+.avail-dayhead { padding: 10px 6px 8px; text-align: center; }
+.avail-day-long { display: none; }
+.avail-time {
+  position: relative; top: -7px;
+  padding-right: 8px; text-align: right;
+  font-family: var(--font-mono); font-size: 11px; line-height: 1; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.avail-row-head + .avail-row .avail-time { top: 2px; }
+
+.avail-cell {
+  position: relative; display: flex; align-items: center; gap: 4px;
+  min-width: 0; height: var(--avail-cell-h); padding: 0 6px; margin: 0;
+  border: 0; border-left: 1px solid var(--line-muted); border-top: 1px dashed var(--line-muted);
+  border-radius: 0; background: transparent; color: var(--ink);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.avail-row:last-child .avail-cell { border-bottom: 1px solid var(--line-muted); }
+.avail-row > .avail-cell:last-child { border-right: 1px solid var(--line-muted); }
+.avail-row.is-hour .avail-cell { border-top: 1px solid var(--line); }
+.avail-cell:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; z-index: 1; }
+
+/* ── Your week ─────────────────────────────────────────────────────────── */
+
+.avail-editor { --hue: var(--purple); }
+.avail-grid-edit {
+  padding-top: 0;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+@media (hover: hover) {
+  .avail-grid-edit .avail-cell:hover:not([data-on]) { background: var(--hover); }
+}
+
+/* A marked run reads as one block: tinted fill, hairline of its hue, 3px rule. */
+.avail-cell[data-on]::after {
+  content: ""; position: absolute; z-index: 0;
+  left: 3px; right: 3px; top: -1px; bottom: 0;
+  background: color-mix(in srgb, var(--hue) 18%, var(--raised));
+  border: 1px solid color-mix(in srgb, var(--hue) 40%, transparent);
+  border-width: 0 1px; border-left: 3px solid var(--hue);
+}
+.avail-cell[data-run-start]::after {
+  top: 2px; border-top-width: 1px;
+  border-top-left-radius: var(--radius-control); border-top-right-radius: var(--radius-control);
+}
+.avail-cell[data-run-end]::after {
+  bottom: 2px; border-bottom-width: 1px;
+  border-bottom-left-radius: var(--radius-control); border-bottom-right-radius: var(--radius-control);
+}
+.avail-cell[data-preview="paint"]::after {
+  background: color-mix(in srgb, var(--hue) 30%, var(--raised));
+  border-style: dashed; border-left-style: solid;
+}
+.avail-cell[data-preview="erase"] { background: var(--well); }
+.avail-cell-note {
+  position: relative; z-index: 1;
+  overflow: hidden; padding-left: 4px;
+  font-size: 11px; font-weight: 700; line-height: 1; white-space: nowrap; text-overflow: ellipsis;
+}
+
+.avail-daytabs { display: none; padding: 0 16px; }
+
+.avail-blocks { padding: 12px 16px 16px; border-top: 1px solid var(--line); }
+.avail-blocks > .micro-label { margin-bottom: 6px; }
+.avail-blocks > p { margin: 0; }
+.avail-block-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.avail-block-list li {
+  display: grid; grid-template-columns: max-content minmax(0, 1fr) auto; align-items: center; gap: 12px;
+  padding: 4px 0;
+}
+.avail-block-list li + li { border-top: 1px solid var(--line-muted); }
+.avail-block-time { font-size: 13px; font-variant-numeric: tabular-nums; }
+.avail-block-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+
+.avail-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
+.avail-suggestion { cursor: pointer; font-family: var(--font-serif); }
+.avail-suggestion[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  color: var(--info-text);
+}
+
+/* ── Committee ─────────────────────────────────────────────────────────── */
+
+.avail-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.avail-filter {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 30px; padding: 0 10px;
+  border: 1px solid var(--line-input); border-radius: var(--radius-control);
+  background: var(--raised); color: var(--ink);
+  font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.avail-filter:hover { background: var(--hover); }
+.avail-filter[aria-pressed="false"] { border-color: var(--line); background: transparent; color: var(--dim); text-decoration: line-through; }
+.avail-filter[aria-pressed="false"] .swatch { background: transparent; border: 1px solid var(--hue); }
+
+.avail-committee-body {
+  display: grid; grid-template-columns: minmax(0, 1fr) 280px; align-items: start;
+}
+.avail-committee-main { min-width: 0; padding-top: 0; }
+.avail-side {
+  position: sticky; top: calc(56px + var(--safe-top) + 12px);
+  display: grid; gap: 0; border-left: 1px solid var(--line); align-self: stretch;
+}
+.avail-side > * { padding: 14px 16px; }
+.avail-side > * + * { border-top: 1px solid var(--line); }
+
+/* Heat by how many are out: one hue (the ink), deeper with each person. */
+.avail-heat { cursor: default; background: color-mix(in srgb, var(--ink) calc(var(--heat, 0) * 32%), transparent); }
+.avail-heat[data-free] { background: color-mix(in srgb, var(--success) 13%, transparent); }
+@media (hover: hover) {
+  .avail-heat:hover { outline: 1px solid var(--line-input); outline-offset: -1px; }
+}
+.avail-heat[aria-selected="true"] { outline: 2px solid var(--primary); outline-offset: -2px; z-index: 1; }
+.avail-count { font-size: 10px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.avail-dots { display: flex; gap: 2px; margin-left: auto; min-width: 0; overflow: hidden; }
+.avail-dots .swatch { width: 6px; height: 6px; }
+
+.avail-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 0 16px 14px 68px; }
+.avail-legend-heat, .avail-legend-free {
+  display: inline-block; width: 14px; height: 10px; border: 1px solid var(--line); border-radius: 2px;
+}
+.avail-legend-heat { background: color-mix(in srgb, var(--ink) 32%, transparent); }
+.avail-legend-free { margin-left: 8px; background: color-mix(in srgb, var(--success) 13%, transparent); border-color: color-mix(in srgb, var(--success) 40%, transparent); }
+
+.avail-inspector { min-height: 120px; }
+.avail-inspector > .micro-label { margin-bottom: 8px; }
+.avail-inspector p { margin: 8px 0 0; }
+.avail-people { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; }
+.avail-people li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.avail-allfree { color: var(--success-text); font-weight: 700; }
+
+.avail-best > .micro-label { margin-bottom: 8px; }
+.avail-best > p { margin: 0; }
+.avail-best-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.avail-best-list li {
+  display: grid; gap: 2px; padding: 6px 10px;
+  border: 1px solid var(--line); border-left: 3px solid var(--line-input); border-radius: var(--radius-control);
+}
+.avail-best-list li[data-all-free] {
+  background: color-mix(in srgb, var(--success) 10%, var(--raised));
+  border-color: color-mix(in srgb, var(--success) 40%, transparent); border-left-color: var(--success);
+}
+.avail-best-time { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.avail-best-who { font-size: 13px; color: var(--muted); }
+.avail-best-list li[data-all-free] .avail-best-who { color: var(--success-text); font-weight: 700; }
+
+/* The phone's per-day list (hidden on wider screens). */
+.avail-daylist { display: none; }
+.avail-day > .micro-label { margin-bottom: 6px; }
+.avail-spans { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-card); overflow: hidden; }
+.avail-spans li {
+  display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 10px; align-items: baseline;
+  padding: 8px 12px; font-size: 14px;
+}
+.avail-spans li + li { border-top: 1px solid var(--line-muted); }
+.avail-spans li[data-free] { background: color-mix(in srgb, var(--success) 10%, var(--raised)); }
+.avail-span-time { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.avail-span-who { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.avail-span-person { display: inline-flex; align-items: center; gap: 5px; }
+.avail-span-person .swatch { width: 8px; height: 8px; }
+.avail-span-free { color: var(--success-text); font-weight: 700; }
+
+@media (min-width: 1100px) {
+  .avail-day-short { display: none; }
+  .avail-day-long { display: inline; }
+}
+
+/* ── Touch ─────────────────────────────────────────────────────────────── */
+
+@media (pointer: coarse) {
+  .avail-grid-edit { --avail-cell-h: 44px; }
+  .avail-grid-edit .avail-time { top: -6px; }
+  .avail-cell-note { font-size: 12px; }
+}
+
+/* ── Phone ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .avail-daytabs {
+    display: flex; position: sticky; top: calc(44px + var(--safe-top)); z-index: 2;
+    background: var(--raised);
+  }
+  .avail-grid-edit { --avail-template: 52px minmax(0, 1fr); padding-top: 4px; }
+  .avail-grid-edit .avail-offday { display: none; }
+  .avail-grid-edit .avail-row-head { display: none; }
+  .avail-grid-edit .avail-row-head + .avail-row .avail-time,
+  .avail-grid-edit .avail-row:nth-child(2) .avail-time { top: 2px; }
+  .avail-save { width: 100%; justify-content: flex-start; }
+
+  .avail-committee-body { display: block; }
+  .avail-committee-main, .avail-side { display: none; }
+  .avail-daylist { display: grid; gap: 16px; padding: 14px 16px 16px; }
+  .avail-daylist .avail-best { padding-bottom: 4px; }
+
+  .avail-block-list li { grid-template-columns: minmax(0, 1fr) auto; }
+  .avail-block-time { grid-column: 1; }
+  .avail-block-note { grid-column: 1; grid-row: 2; }
+  .avail-block-list li .button { grid-column: 2; grid-row: 1 / span 2; }
+}
