@@ -20,7 +20,7 @@ Next 16 differs from training data (e.g. `src/proxy.ts`, not middleware).
   Env var `CALENDAR_ORGANISER_ID` (defaults to that id). `TOOLBOX_ORGANISER_ID` is VolSoc's own organiser, used only for roles.
 - Doppler: project `volsoc-webapp`, config `prd`. CLI wrapper `doppler-volsoc`
   if on PATH, else `doppler` (`scripts/doppler.sh`, as hiking).
-- App URL placeholder: `https://ucl-volunteering.vercel.app`.
+- App URL placeholder: `https://ucl-volunteering-delta.vercel.app`.
 
 ## Access model (simpler than hiking — no membership tiers, no walk leaders)
 
