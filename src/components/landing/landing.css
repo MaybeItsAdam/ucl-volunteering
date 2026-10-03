@@ -1,0 +1,422 @@
+/*
+ * Public landing page (/). Imported from Landing.tsx.
+ *
+ * Next keeps global stylesheets loaded after client-side navigation, so every
+ * rule here is scoped under `.uvs` and every custom property is `--uvs-*`:
+ * nothing may reach the portal, which is styled by globals.css.
+ *
+ * The landing keeps its own palette (linen / prussian / cyan) — it is the
+ * society's poster, not part of the app.
+ */
+
+@property --uvs-theme-mix {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --uvs-sky-top {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #3c7ed6;
+}
+
+@property --uvs-sky-bot {
+  syntax: "<color>";
+  inherits: true;
+  initial-value: #a8d0f0;
+}
+
+.uvs {
+  --uvs-strong-cyan: #10c4c0;
+  --uvs-prussian-blue: #061c33;
+  --uvs-linen: #feefe5;
+  --uvs-golden-pollen: #ffd23f;
+
+  /* paper/ink swap as theme-mix goes 0 → 1 (day → night); set inline by Landing */
+  --uvs-paper: color-mix(
+    in srgb,
+    var(--uvs-linen),
+    var(--uvs-prussian-blue) calc(var(--uvs-theme-mix) * 100%)
+  );
+  --uvs-ink: color-mix(
+    in srgb,
+    var(--uvs-prussian-blue),
+    var(--uvs-linen) calc(var(--uvs-theme-mix) * 100%)
+  );
+
+  --uvs-radius-md: 14px;
+
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--uvs-paper);
+  color: var(--uvs-ink);
+  font-family: "Cal Sans", "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+
+.uvs *,
+.uvs *::before,
+.uvs *::after {
+  box-sizing: border-box;
+}
+
+.uvs h1 {
+  font-family: "Cal Sans", "Inter", system-ui, sans-serif;
+  font-size: clamp(2.4rem, 5.5vw, 4.5rem);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.05;
+  margin: 0;
+}
+
+/* ---------- hero ---------- */
+
+.uvs-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: clamp(1rem, 4vw, 4rem);
+  padding: clamp(2rem, 6vw, 5rem) clamp(1rem, 4vw, 3rem);
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  transition: --uvs-sky-top 1.2s ease, --uvs-sky-bot 1.2s ease;
+}
+
+.uvs-hero-copy {
+  grid-column: 2;
+  position: relative;
+  z-index: 2;
+  max-width: 38rem;
+  display: grid;
+  gap: 1.2rem;
+  justify-self: center;
+  justify-items: center;
+  text-align: center;
+  padding: 2rem 2.5rem;
+}
+
+.uvs-hero-logo {
+  width: clamp(5.5rem, 10vw, 9rem);
+  height: auto;
+  color: var(--uvs-ink);
+  margin-bottom: 0.2rem;
+}
+
+.uvs-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+
+.uvs-cta {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.8rem 1.3rem;
+  border-radius: 999px;
+  font-weight: 600;
+  text-decoration: none;
+  border: 2px solid transparent;
+  transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.uvs-cta-primary {
+  background: var(--uvs-strong-cyan);
+  color: var(--uvs-prussian-blue);
+}
+
+.uvs-cta-primary:hover {
+  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--uvs-strong-cyan) 88%, var(--uvs-prussian-blue));
+}
+
+.uvs-cta:focus-visible {
+  outline: 2px solid var(--uvs-ink);
+  outline-offset: 3px;
+}
+
+.uvs-hero-flag {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.uvs-flag-sky {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, var(--uvs-sky-top), var(--uvs-sky-bot));
+  pointer-events: none;
+  z-index: 0;
+}
+
+.uvs-hero-flag canvas {
+  position: relative;
+  z-index: 1;
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  background: transparent;
+}
+
+/* ---------- debug time panel ---------- */
+
+.uvs-debug-time {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--uvs-radius-md);
+  background: color-mix(in srgb, var(--uvs-prussian-blue) 92%, transparent);
+  color: var(--uvs-linen);
+  border: 1px solid color-mix(in srgb, var(--uvs-linen) 18%, transparent);
+  font-size: 0.78rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  max-width: min(20rem, calc(100vw - 2rem));
+}
+
+.uvs-debug-time-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.uvs-debug-time-eyebrow {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--uvs-strong-cyan);
+  font-size: 0.62rem;
+}
+
+.uvs-debug-time-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.uvs-debug-time input[type="range"],
+.uvs-flag-controls input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--uvs-linen) 25%, transparent);
+  outline: none;
+  cursor: pointer;
+}
+
+.uvs-debug-time input[type="range"] {
+  min-width: 8rem;
+}
+
+.uvs-debug-time input[type="range"]::-webkit-slider-thumb,
+.uvs-flag-controls input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--uvs-strong-cyan);
+  border: 2px solid var(--uvs-prussian-blue);
+  cursor: pointer;
+}
+
+.uvs-debug-time input[type="range"]::-moz-range-thumb,
+.uvs-flag-controls input[type="range"]::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--uvs-strong-cyan);
+  border: 2px solid var(--uvs-prussian-blue);
+  cursor: pointer;
+}
+
+.uvs-flag-controls input[type="range"]::-webkit-slider-thumb {
+  width: 13px;
+  height: 13px;
+}
+
+.uvs-flag-controls input[type="range"]::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+}
+
+.uvs-debug-time-reset {
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--uvs-linen) 35%, transparent);
+  background: transparent;
+  color: var(--uvs-linen);
+  font: inherit;
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.uvs-debug-time-reset:hover:not(:disabled) {
+  background: var(--uvs-strong-cyan);
+  color: var(--uvs-prussian-blue);
+  border-color: var(--uvs-strong-cyan);
+}
+
+.uvs-debug-time-reset:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ---------- flag entity + wind controls ---------- */
+
+.uvs-flag-controls {
+  position: fixed;
+  bottom: 1rem;
+  left: 1rem;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: 3.2rem 1fr 3.4rem 1.2rem;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--uvs-radius-md);
+  background: color-mix(in srgb, var(--uvs-prussian-blue) 92%, transparent);
+  color: var(--uvs-linen);
+  border: 1px solid color-mix(in srgb, var(--uvs-linen) 18%, transparent);
+  font-size: 0.78rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  max-width: min(22rem, calc(100vw - 2rem));
+}
+
+.uvs-flag-controls .uvs-debug-time-head {
+  grid-column: 1 / -1;
+}
+
+.uvs-ctrl-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--uvs-linen) 55%, transparent);
+  white-space: nowrap;
+}
+
+.uvs-ctrl-reset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  padding: 0;
+  border: none;
+  border-radius: 3px;
+  background: transparent;
+  color: color-mix(in srgb, var(--uvs-linen) 40%, transparent);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+  line-height: 1;
+}
+
+.uvs-ctrl-reset:hover {
+  color: var(--uvs-strong-cyan);
+  background: color-mix(in srgb, var(--uvs-strong-cyan) 15%, transparent);
+}
+
+.uvs-ctrl-divider {
+  grid-column: 1 / -1;
+  height: 1px;
+  background: color-mix(in srgb, var(--uvs-linen) 12%, transparent);
+  margin: 0.2rem 0;
+}
+
+.uvs-wind-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-bottom: 0.1rem;
+}
+
+.uvs-wind-mode {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  padding: 0.15rem 0.4rem;
+  border-radius: 3px;
+}
+
+.uvs-wind-mode--live {
+  background: color-mix(in srgb, var(--uvs-strong-cyan) 22%, transparent);
+  color: var(--uvs-strong-cyan);
+}
+
+.uvs-wind-mode--sim {
+  background: color-mix(in srgb, var(--uvs-golden-pollen) 18%, transparent);
+  color: color-mix(in srgb, var(--uvs-golden-pollen) 85%, transparent);
+}
+
+.uvs-wind-state {
+  font-size: 0.62rem;
+  color: color-mix(in srgb, var(--uvs-linen) 50%, transparent);
+  margin-left: auto;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 860px) {
+  /* Keep the hero 2-column on mobile so the flag stays on the left and the
+     copy is pushed in from the right edge. */
+  .uvs-hero {
+    grid-template-columns: 1fr minmax(0, 60%);
+    align-items: center;
+    gap: clamp(0.5rem, 2vw, 1.5rem);
+    padding: clamp(1rem, 4vw, 2rem) clamp(0.75rem, 3vw, 1.25rem);
+  }
+
+  .uvs-hero-copy {
+    grid-column: 2;
+    justify-self: end;
+    justify-items: end;
+    text-align: right;
+    max-width: 100%;
+    padding: 1rem 0.5rem;
+    gap: 0.8rem;
+  }
+
+  .uvs-hero-copy h1 {
+    font-size: clamp(1.4rem, 5vw, 2rem);
+  }
+
+  .uvs-hero-logo {
+    width: clamp(3.5rem, 12vw, 6rem);
+    margin-left: auto;
+    margin-right: 0;
+  }
+
+  .uvs-cta-row {
+    justify-content: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uvs-hero,
+  .uvs-cta,
+  .uvs-debug-time-reset,
+  .uvs-ctrl-reset {
+    transition-duration: 1ms;
+  }
+}

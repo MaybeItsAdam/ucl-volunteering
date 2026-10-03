@@ -1,33 +1,43 @@
 {
   "name": "ucl-volunteering",
+  "version": "0.1.0",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "scripts/doppler.sh run -p volsoc-webapp -c prd -- next dev --webpack",
+    "dev:no-doppler": "next dev --webpack",
+    "build": "node scripts/deploy-migrate.mjs && next build --webpack",
+    "db:migrate": "node scripts/deploy-migrate.mjs",
+    "start": "next start",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "env:check": "node scripts/check-env.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.0",
-    "leaflet": "^1.9.4",
+    "@supabase/supabase-js": "^2.115.0",
+    "@types/pg": "^8.23.1",
+    "jose": "^6.1.0",
+    "lucide-react": "^0.544.0",
     "motion": "^12.38.0",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
+    "next": "^16.0.1",
+    "pg": "^8.23.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "suncalc": "^1.9.0",
     "three": "^0.184.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.4",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.1",
-    "eslint": "^9.39.4",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "eslint-plugin-react-refresh": "^0.5.2",
-    "globals": "^17.4.0",
-    "vite": "^8.0.4"
+    "@eslint/eslintrc": "^3.3.1",
+    "@types/node": "^24.7.2",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@types/suncalc": "^1.9.2",
+    "@types/three": "^0.184.0",
+    "eslint": "^9.37.0",
+    "eslint-config-next": "^16.0.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   }
 }
