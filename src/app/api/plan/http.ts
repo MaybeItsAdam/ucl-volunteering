@@ -6,7 +6,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 
 /** 503 when there is no database to plan in, else null. */
 export function needsDatabase(): NextResponse | null {
-  return isSupabaseConfigured() ? null : NextResponse.json({ error: "The plan needs the database." }, { status: 503 });
+  return isSupabaseConfigured() ? null : NextResponse.json({ error: "The plan needs the database" }, { status: 503 });
 }
 
 /** The request body as JSON, or the 400 to send instead. */
@@ -14,7 +14,7 @@ export async function readJson(request: Request): Promise<{ body: unknown; error
   try {
     return { body: await request.json() };
   } catch {
-    return { error: NextResponse.json({ error: "Send the body as JSON." }, { status: 400 }) };
+    return { error: NextResponse.json({ error: "Send the body as JSON" }, { status: 400 }) };
   }
 }
 
@@ -25,5 +25,5 @@ export function errorResponse(error: unknown): NextResponse {
     return NextResponse.json({ error: error.message }, { status: error.status });
   }
   console.error("[plan]", error);
-  return NextResponse.json({ error: "Something went wrong." }, { status: 500 });
+  return NextResponse.json({ error: "Something went wrong" }, { status: 500 });
 }

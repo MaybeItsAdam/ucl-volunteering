@@ -1,16 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Arvo, Geist_Mono } from "next/font/google";
+import { League_Spartan, Work_Sans } from "next/font/google";
 import { themeScript } from "@/lib/theme";
 import "./globals.css";
 
-// The slab serif is the brand and the body face; the mono is for times, tickers
-// and control-bar labels. Exposed as CSS variables for globals.css.
-const arvo = Arvo({ weight: ["400", "700"], style: ["normal", "italic"], subsets: ["latin"], variable: "--font-arvo" });
-const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
+// The VolSoc brand faces: League Spartan for headlines and titles, Work Sans
+// (medium by default) for everything else. Exposed as CSS variables for the CSS.
+const leagueSpartan = League_Spartan({ weight: ["600", "700"], subsets: ["latin"], variable: "--font-league-spartan" });
+const workSans = Work_Sans({ weight: ["400", "500", "600", "700"], subsets: ["latin"], variable: "--font-work-sans" });
 
 export const metadata: Metadata = {
   title: { default: "UCL Volunteering Society", template: "%s | VolSoc" },
-  description: "UCL Volunteering Society: volunteering, socials and the committee's plan.",
+  description: "UCL Volunteering Society: Volunteering, socials and the committee's plan",
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://uclvolunteering.org"),
 };
 
@@ -25,7 +25,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en-GB" className={`${arvo.variable} ${geistMono.variable}`} suppressHydrationWarning>
+    <html lang="en-GB" className={`${leagueSpartan.variable} ${workSans.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

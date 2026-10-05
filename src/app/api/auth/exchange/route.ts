@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   if (!isSessionSecretConfigured()) {
     console.error("[auth/exchange] SESSION_SECRET is missing or shorter than 32 characters; cannot sign anyone in");
     return NextResponse.json(
-      { error: "Sign-in isn't configured correctly on the site right now. Tell the committee." },
+      { error: "Sign-in isn't configured correctly on the site right now — tell the committee" },
       { status: 503 },
     );
   }

@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { HandHeart } from "lucide-react";
 import { AccountButton } from "@/components/AccountButton";
 import { AppNavProvider, AppTabs } from "@/components/AppNav";
 import { AppTitleBar } from "@/components/AppTitleBar";
 import { TabSwipe } from "@/components/TabSwipe";
+import { VolSocHand } from "@/components/landing/VolSocHand";
 import { profileOf } from "@/lib/access";
 import { availablePages } from "@/lib/app-pages";
 import { getCurrentMember } from "@/lib/session";
@@ -23,7 +23,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
       <div className={`app-shell${pages.length > 1 ? " has-tabs" : ""}`}>
         <header className="app-bar">
           <Link className="app-brand" href="/" aria-label="UCL Volunteering Society home">
-            <span className="app-brand-mark"><HandHeart size={18} aria-hidden="true" /></span>
+            <VolSocHand className="app-brand-mark" title="" />
             <span>VolSoc</span>
           </Link>
           <AppTabs />

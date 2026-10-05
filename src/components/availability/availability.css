@@ -43,7 +43,7 @@
 .avail-time {
   position: relative; top: -7px;
   padding-right: 8px; text-align: right;
-  font-family: var(--font-mono); font-size: 11px; line-height: 1; color: var(--muted);
+  font-variant-numeric: tabular-nums; font-size: 11px; line-height: 1; color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 .avail-row-head + .avail-row .avail-time { top: 2px; }
@@ -62,7 +62,7 @@
 
 /* ── Your week ─────────────────────────────────────────────────────────── */
 
-.avail-editor { --hue: var(--purple); }
+.avail-editor { --hue: var(--strong-cyan); }
 .avail-grid-edit {
   padding-top: 0;
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
@@ -113,7 +113,7 @@
 .avail-block-note { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 
 .avail-suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; }
-.avail-suggestion { cursor: pointer; font-family: var(--font-serif); }
+.avail-suggestion { cursor: pointer; font-family: var(--font-body); }
 .avail-suggestion[aria-pressed="true"] {
   background: color-mix(in srgb, var(--primary) 10%, transparent);
   border-color: color-mix(in srgb, var(--primary) 40%, transparent);

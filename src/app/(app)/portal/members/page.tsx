@@ -35,22 +35,22 @@ export default async function MembersPage() {
         <h1>Members</h1>
       </header>
       <p className="mem-intro muted small">
-        Principals and admins come from the Toolbox organiser, UCL Volunteering Society&apos;s committee settings.
-        Committee seats granted here are locked, so a Toolbox sign-in won&apos;t reset them; &ldquo;Return to
-        sync&rdquo; hands a seat back.
+        Principals and admins come from the Toolbox organiser, UCL Volunteering Society&apos;s committee settings —
+        committee seats granted here are locked, so a Toolbox sign-in won&apos;t reset them; &ldquo;Return to
+        sync&rdquo; hands a seat back
       </p>
       {!configured ? (
         <div className="panel mem-state">
           <span className="micro-label">Database not configured</span>
           <p className="muted">
-            No Supabase project is connected, so there is no one to list yet. Set the Supabase URL and service role key
-            and the members who have signed in appear here.
+            No Supabase project is connected, so there is no one to list yet — set the Supabase URL and service role key
+            and the members who have signed in appear here
           </p>
         </div>
       ) : members === null ? (
         <div className="notice bad" role="alert">
-          <strong>Couldn&apos;t load the members.</strong>
-          <p>Reload the page to try again.</p>
+          <strong>Couldn&apos;t load the members</strong>
+          <p>Reload the page to try again</p>
         </div>
       ) : (
         <MembersAdmin initialMembers={members} viewer={{ id: viewer.id, governanceRole: viewer.governance_role }} />

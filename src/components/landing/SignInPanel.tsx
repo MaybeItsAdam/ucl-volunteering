@@ -24,7 +24,7 @@ export function SignInPanel({ onBack }: { onBack?: () => void }) {
     <section className="uvs-signin" aria-labelledby="signin-title">
       <VolSocHand className="uvs-signin-logo" />
       <h1 id="signin-title">Committee sign in</h1>
-      <p>The committee&apos;s event plan, availability and members.</p>
+      <p>The committee&apos;s event plan, availability and members</p>
 
       <a
         className="uvs-cta uvs-cta-primary"
@@ -36,8 +36,8 @@ export function SignInPanel({ onBack }: { onBack?: () => void }) {
       </a>
 
       <p className="uvs-signin-note">
-        Your usual UCL login, through Adam&apos;s Campus Toolbox; we never see your password.
-        Anyone can sign in, and a principal adds you to the committee.
+        Your usual UCL login, through Adam&apos;s Campus Toolbox, so we never see your password —
+        anyone can sign in, and a principal adds you to the committee
       </p>
 
       {process.env.NODE_ENV === "development" && (

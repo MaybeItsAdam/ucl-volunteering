@@ -33,10 +33,13 @@ export type EventCategory = (typeof EVENT_CATEGORIES)[number];
 export type EventStatus = (typeof EVENT_STATUSES)[number];
 export type ResponseKind = (typeof RESPONSE_KINDS)[number];
 
+// The brand's four event types. The keys are stored in the database and
+// predate the brand: VolSoc-run Volunteering is "Student led", and what UCL
+// Student Social Impact runs is "Group led".
 export const CATEGORY_LABELS: Record<EventCategory, string> = {
-  social: "Social",
-  volunteering: "Volunteering",
-  ucl_affiliated: "UCL affiliated",
+  social: "Socials",
+  volunteering: "Student led",
+  ucl_affiliated: "Group led",
   external: "External",
 };
 
