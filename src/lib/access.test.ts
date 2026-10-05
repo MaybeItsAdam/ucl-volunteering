@@ -35,8 +35,8 @@ describe("tabs", () => {
   });
 
   it("puts the calendar first for the committee, and members only for principals", () => {
-    expect(availablePages(as("committee"))).toEqual(["calendar", "settings"]);
-    expect(availablePages(as("principal"))).toEqual(["calendar", "members", "settings"]);
+    expect(availablePages(as("committee"))).toEqual(["calendar", "planner", "settings"]);
+    expect(availablePages(as("principal"))).toEqual(["calendar", "planner", "members", "settings"]);
   });
 });
 
