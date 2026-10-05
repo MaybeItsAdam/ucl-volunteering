@@ -8,6 +8,7 @@ import { isDayKey, londonDayKey, londonTime, londonWeek, shiftDayKey, termWeek }
 import { requireCapability } from "@/lib/session";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { getTimetableStatus, refreshIfStale, timetableBlocksForWeek, type TimetableStatus } from "@/lib/timetable";
+import { volsocFeedUrl } from "@/lib/calendarFeed";
 import { lastOrganiserSync, organiserFeedUrl } from "@/lib/toolboxEvents";
 import { CATEGORY_LABELS, EVENT_CATEGORIES, type AvailabilityBlock, type CommitteeMember, type PlanEvent } from "@/lib/types";
 import { dayLabel, googleAddUrl, weekRange } from "@/components/plan/format";
@@ -89,14 +90,14 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
   const chip = dbReady ? syncChip(sync, today) : { label: "Not synced", tone: "neutral" as const, title: undefined };
   const canEdit = dbReady && can(profile, "edit_plan");
   const socialImpactFeed = organiserFeedUrl();
-  const googleCalendarId = process.env.VOLSOC_GOOGLE_CALENDAR_ID?.trim();
+  const volsocFeed = volsocFeedUrl(process.env.NEXT_PUBLIC_APP_URL || "https://uclvolunteering.org");
   const feeds: CalendarFeedLink[] = [
-    ...(googleCalendarId
+    ...(volsocFeed
       ? [{
-          name: "VolSoc shared calendar",
-          about: "The society's Google Calendar, shared with the committee",
-          url: googleAddUrl(googleCalendarId),
-          googleUrl: googleAddUrl(googleCalendarId),
+          name: "VolSoc calendar",
+          about: "VolSoc's own events, kept up to date from this app. The link is for the committee only, so don't post it publicly",
+          url: volsocFeed,
+          googleUrl: googleAddUrl(volsocFeed),
         }]
       : []),
     {
