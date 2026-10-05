@@ -52,6 +52,7 @@ without printing any value.
 | `CALENDAR_ORGANISER_ID` | no | Whose public iCal feed fills the plan; defaults to `org_uni_juev5rp0v` (UCL Student Social Impact) |
 | `ADMIN_EMAILS` | no | Comma-separated; these people sign in as admin |
 | `TOOLBOX_API_TOKEN` | no | Only if the Toolbox feed ever needs authenticating |
+| `TIMETABLE_FEED_KEY` | no | Encrypts saved UCL timetable links: `openssl rand -base64 32`. Unset, nobody can link one. Never rotate it casually: every saved link becomes unreadable and has to be pasted again |
 
 If Vercel's Supabase integration is installed it owns the `SUPABASE_*` and
 `POSTGRES_*` names; keep those out of Doppler.
@@ -97,6 +98,20 @@ VolSoc plans around what UCL Student Social Impact runs: USSI's public iCal
 feed (`CALENDAR_ORGANISER_ID`, default `org_uni_juev5rp0v`) is synced into the
 plan daily at 06:30 UTC by Vercel Cron (`/api/sync/organiser-events`). USSI's
 events are read-only context; VolSoc's own events sit alongside them.
+
+## UCL timetables
+
+On the Availability page a committee member can paste their UCL timetable
+Subscribe link (`webcal://www.ucl.ac.uk/timetable/ics/…`). Their lectures then
+show as busy time on the plan's "Unavailable" overlay and in the committee
+view (as this week's). Only they see the titles and rooms; everyone else sees
+"UCL timetable".
+
+The link is a bearer secret, so it is stored encrypted (`TIMETABLE_FEED_KEY`)
+and never sent back to a browser. Only UCL's timetable hosts are fetched, each
+redirect is re-checked, and private addresses are refused. Sessions are
+refreshed daily at 05:00 UTC (`/api/sync/timetables`) and whenever their owner
+opens the plan with a copy over six hours old.
 
 ## Scripts
 

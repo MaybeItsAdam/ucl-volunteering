@@ -28,7 +28,7 @@ const REQUIRED = {
 };
 
 /** Present in some configs, never required: noted so a typo'd name stands out. */
-const OPTIONAL = ["ADMIN_EMAILS", "TOOLBOX_ORGANISER_ID", "CALENDAR_ORGANISER_ID", "TOOLBOX_API_TOKEN"];
+const OPTIONAL = ["ADMIN_EMAILS", "TOOLBOX_ORGANISER_ID", "CALENDAR_ORGANISER_ID", "TOOLBOX_API_TOKEN", "TIMETABLE_FEED_KEY"];
 
 /** Shape checks for the ones that break quietly when pasted wrong. */
 const SHAPE = {
@@ -40,6 +40,8 @@ const SHAPE = {
   TOOLBOX_URL: (v) => /^https?:\/\/[^/]+\/?$/.test(v) || "must be the Toolbox origin, e.g. https://www.adamscampustoolbox.org.uk",
   TOOLBOX_ORGANISER_ID: (v) => /^org_[a-z0-9_]+$/.test(v) || "must look like org_uni_juev5rp0v",
   CALENDAR_ORGANISER_ID: (v) => /^org_[a-z0-9_]+$/.test(v) || "must look like org_uni_juev5rp0v",
+  TIMETABLE_FEED_KEY: (v) =>
+    Buffer.from(v, "base64").length >= 32 || "must be at least 32 bytes of base64 (openssl rand -base64 32)",
   ADMIN_EMAILS: (v) => v.split(",").every((e) => e.trim().includes("@")) || "must be comma-separated email addresses",
 };
 
