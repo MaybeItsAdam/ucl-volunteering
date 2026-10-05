@@ -50,6 +50,7 @@ without printing any value.
 | `TOOLBOX_URL` | yes | `https://www.adamscampustoolbox.org.uk` |
 | `TOOLBOX_ORGANISER_ID` | no | VolSoc's own Toolbox organiser; its principals and committee get those roles here. Unset, seats are granted on the Members page. Its feed is synced either way (default `org_soc_vol_fix`) |
 | `CALENDAR_ORGANISER_ID` | no | Whose public iCal feed fills the plan; defaults to `org_uni_juev5rp0v` (UCL Student Social Impact) |
+| `VOLSOC_GOOGLE_CALENDAR_ID` | no | The society's shared Google Calendar (Settings and sharing → Integrate calendar → Calendar ID); offered under Subscribe on the calendar |
 | `ADMIN_EMAILS` | no | Comma-separated; these people sign in as admin |
 | `TOOLBOX_API_TOKEN` | no | Only if the Toolbox feed ever needs authenticating |
 | `TIMETABLE_FEED_KEY` | no | Encrypts saved UCL timetable links: `openssl rand -base64 32`. Unset, nobody can link one. Never rotate it casually: every saved link becomes unreadable and has to be pasted again |

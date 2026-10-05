@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { PAGE_META, useAppNav } from "@/components/AppNav";
+import { ThemeToggle } from "@/components/ThemeSetting";
 
 /**
  * The phone header: a large page title that scrolls away, and a compact bar
@@ -36,6 +37,7 @@ export function AppTitleBar() {
       </div>
       <div className="app-page-head">
         <h1>{title}</h1>
+        <ThemeToggle />
       </div>
       <div ref={sentinel} className="app-title-sentinel" aria-hidden="true" />
     </>

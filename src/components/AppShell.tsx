@@ -4,6 +4,7 @@ import { AccountButton } from "@/components/AccountButton";
 import { AppNavProvider, AppTabs } from "@/components/AppNav";
 import { AppTitleBar } from "@/components/AppTitleBar";
 import { TabSwipe } from "@/components/TabSwipe";
+import { ThemeToggle } from "@/components/ThemeSetting";
 import { VolSocHand } from "@/components/landing/VolSocHand";
 import { profileOf } from "@/lib/access";
 import { availablePages } from "@/lib/app-pages";
@@ -28,6 +29,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
           </Link>
           <AppTabs />
           <div className="app-bar-account">
+            <ThemeToggle />
             <AccountButton member={member} />
           </div>
         </header>

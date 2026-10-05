@@ -31,23 +31,52 @@ function readChoice(): ThemeChoice {
   }
 }
 
-export function ThemeSetting() {
-  // The server can't see localStorage, so it renders "system" and hydration then
-  // switches to the saved choice without a mismatch.
-  const choice = useSyncExternalStore(subscribe, readChoice, () => "system" as ThemeChoice);
-
-  function choose(next: ThemeChoice) {
-    const root = document.documentElement;
-    if (next === "system") root.removeAttribute("data-theme");
-    else root.setAttribute("data-theme", next);
-    try {
-      if (next === "system") localStorage.removeItem(THEME_STORAGE_KEY);
-      else localStorage.setItem(THEME_STORAGE_KEY, next);
-    } catch {
-      // Storage blocked: the choice still applies until the app is closed.
-    }
-    listeners.forEach((listener) => listener());
+function choose(next: ThemeChoice) {
+  const root = document.documentElement;
+  if (next === "system") root.removeAttribute("data-theme");
+  else root.setAttribute("data-theme", next);
+  try {
+    if (next === "system") localStorage.removeItem(THEME_STORAGE_KEY);
+    else localStorage.setItem(THEME_STORAGE_KEY, next);
+  } catch {
+    // Storage blocked: the choice still applies until the app is closed.
   }
+  listeners.forEach((listener) => listener());
+}
+
+// The server can't see localStorage, so it renders "system" and hydration then
+// switches to the saved choice without a mismatch.
+const useThemeChoice = () => useSyncExternalStore(subscribe, readChoice, () => "system" as ThemeChoice);
+
+/**
+ * One tap between light and dark, in the top bar. From "system" it flips
+ * whatever the system is showing now; the three-way choice stays in Settings.
+ */
+export function ThemeToggle({ className }: { className?: string }) {
+  const choice = useThemeChoice();
+  function toggle() {
+    const showing =
+      choice === "system" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : choice;
+    choose(showing === "dark" ? "light" : "dark");
+  }
+  // Both icons render; CSS shows the one for the theme on screen, so a system
+  // dark mode is right before hydration too.
+  return (
+    <button
+      type="button"
+      className={`icon-button theme-toggle${className ? ` ${className}` : ""}`}
+      onClick={toggle}
+      aria-label="Switch between light and dark mode"
+      title="Light or dark"
+    >
+      <Moon size={18} aria-hidden="true" className="theme-toggle-moon" />
+      <Sun size={18} aria-hidden="true" className="theme-toggle-sun" />
+    </button>
+  );
+}
+
+export function ThemeSetting() {
+  const choice = useThemeChoice();
 
   return (
     <div className="theme-setting" role="radiogroup" aria-label="Appearance">
