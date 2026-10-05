@@ -108,3 +108,38 @@ export interface CommitteeMember {
   name: string;
   colour: MemberColour | null;
 }
+
+// ── Planner ──
+
+export const TASK_STATUSES = ["todo", "doing", "done"] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
+  todo: "To do",
+  doing: "Doing",
+  done: "Done",
+};
+
+/** The event a task is part of, as much of it as the planner shows. */
+export interface TaskEvent {
+  id: string;
+  title: string;
+  startsAt: string;
+  status: EventStatus;
+}
+
+/** One row of `public.tasks`, as the UI sees it. `dueOn` is a London day (YYYY-MM-DD), not an instant. */
+export interface Task {
+  id: string;
+  title: string;
+  notes: string | null;
+  status: TaskStatus;
+  assigneeId: string | null;
+  dueOn: string | null;
+  eventId: string | null;
+  event: TaskEvent | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+}

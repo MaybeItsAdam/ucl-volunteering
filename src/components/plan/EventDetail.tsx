@@ -3,7 +3,7 @@
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { Sheet } from "@/components/Sheet";
 import { formatMinute, londonDateAt, londonDayKey, londonMinuteOfDay, MINUTES_PER_DAY, shiftDayKey } from "@/lib/planTime";
 import {
@@ -158,6 +158,7 @@ export function EventDetail({
   myId,
   canEdit,
   backHref,
+  tasks,
 }: {
   event: PlanEvent;
   committee: CommitteeMember[];
@@ -166,6 +167,8 @@ export function EventDetail({
   myId: string;
   canEdit: boolean;
   backHref: string;
+  /** The event's Tasks panel (planner), shown above the edit form. */
+  tasks?: ReactNode;
 }) {
   const router = useRouter();
   const formId = useId();
@@ -403,6 +406,8 @@ export function EventDetail({
           <p className="empty">No one is on the committee yet</p>
         )}
       </div>
+
+      {tasks}
 
       {/* Edit */}
       {canEdit && (
