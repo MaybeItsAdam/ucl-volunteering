@@ -33,7 +33,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Send the body as JSON." }, { status: 400 });
+    return NextResponse.json({ error: "Send the body as JSON" }, { status: 400 });
   }
   const patch = parseMemberPatch(body);
   if (!patch) return NextResponse.json({ error: "Unrecognised change" }, { status: 400 });

@@ -61,13 +61,13 @@ export default async function AvailabilityPage() {
       {problem === "no-database" && (
         <div className="notice warn">
           <strong>No database</strong>
-          <p>The grid works, but saving and everyone else&rsquo;s times need the database configured.</p>
+          <p>The grid works, but saving and everyone else&rsquo;s times need the database configured</p>
         </div>
       )}
       {problem === "failed" && (
         <div className="notice bad" role="alert">
           <strong>Couldn&rsquo;t load availability</strong>
-          <p>Reload to try again. Anything you mark now can&rsquo;t be saved until it loads.</p>
+          <p>Reload to try again — anything you mark now can&rsquo;t be saved until it loads</p>
         </div>
       )}
 

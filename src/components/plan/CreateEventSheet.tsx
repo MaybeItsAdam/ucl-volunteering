@@ -32,11 +32,11 @@ export function CreateEventSheet({ draft, onClose }: { draft: CreateDraft; onClo
     event.preventDefault();
     const s = parseTime(start);
     let e = parseTime(end);
-    if (!title.trim()) return setError("Give it a title.");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || s === null || e === null) return setError("Pick a day and a start and end time.");
+    if (!title.trim()) return setError("Give it a title");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || s === null || e === null) return setError("Pick a day and a start and end time");
     // An end of 00:00 means midnight at the end of the day.
     if (e === 0) e = MINUTES_PER_DAY;
-    if (e <= s) return setError("It has to end after it starts.");
+    if (e <= s) return setError("It has to end after it starts");
     setSaving(true);
     setError(null);
     try {
@@ -51,7 +51,7 @@ export function CreateEventSheet({ draft, onClose }: { draft: CreateDraft; onClo
       onClose();
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't create the event.");
+      setError(err instanceof Error ? err.message : "Couldn't create the event");
       setSaving(false);
     }
   }
@@ -59,7 +59,7 @@ export function CreateEventSheet({ draft, onClose }: { draft: CreateDraft; onClo
   return (
     <Sheet onClose={onClose} labelledBy={headingId}>
       <h3 id={headingId}>New VolSoc event</h3>
-      <p>Times are London time. You can add the lead, links and notes once it&apos;s made.</p>
+      <p>Times are London time — you can add the lead, links and notes once it&apos;s made</p>
       <form onSubmit={submit} noValidate>
         <div className="field">
           <label htmlFor={`${headingId}-title`}>Title</label>

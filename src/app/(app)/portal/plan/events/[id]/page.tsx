@@ -37,7 +37,7 @@ export default async function PlanEventPage({ params }: { params: Params }) {
         <PlanSubnav active="week" />
         <div className="notice warn">
           <strong>Database not configured</strong>
-          <p>Events live in the database; set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to see them.</p>
+          <p>Events live in the database; set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to see them</p>
         </div>
       </section>
     );
@@ -61,7 +61,7 @@ export default async function PlanEventPage({ params }: { params: Params }) {
         <PlanSubnav active="week" />
         <div className="notice bad" role="alert">
           <strong>The event couldn&apos;t be loaded</strong>
-          <p>{error instanceof Error ? error.message : "Something went wrong."}</p>
+          <p>{error instanceof Error ? error.message : "Something went wrong"}</p>
         </div>
       </section>
     );

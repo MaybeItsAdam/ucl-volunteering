@@ -16,7 +16,7 @@ export default function AuthCallback() {
     async function completeSignIn() {
       const token = new URLSearchParams(window.location.hash.slice(1)).get("token");
       history.replaceState(null, "", window.location.pathname);
-      if (!token) throw new Error("The sign-in response did not include a token. Please try again.");
+      if (!token) throw new Error("The sign-in response did not include a token — please try again");
 
       const response = await fetch("/api/auth/exchange", {
         method: "POST",
@@ -27,7 +27,7 @@ export default function AuthCallback() {
       // the person sees something real rather than a JSON parse error.
       const body = (await response.json().catch(() => null)) as { error?: string; redirectTo?: string } | null;
       if (!response.ok || !body) {
-        throw new Error(body?.error || `Sign-in hit a problem on our side (error ${response.status}). Try again in a few minutes.`);
+        throw new Error(body?.error || `Sign-in hit a problem on our side (error ${response.status}) — try again in a few minutes`);
       }
       window.location.replace(body.redirectTo || "/portal");
     }

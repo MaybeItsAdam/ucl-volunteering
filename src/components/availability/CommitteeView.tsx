@@ -107,7 +107,7 @@ export function CommitteeView({
       </header>
 
       {total === 0 ? (
-        <p className="empty">Pick someone above to see when they&rsquo;re out.</p>
+        <p className="empty">Pick someone above to see when they&rsquo;re out</p>
       ) : (
         <div className="avail-committee-body">
           <div className="avail-committee-main">
@@ -175,7 +175,7 @@ export function CommitteeView({
             </div>
             <p className="small muted avail-legend">
               <span className="avail-legend-heat" aria-hidden /> Darker: more people out.{" "}
-              <span className="avail-legend-free" aria-hidden /> Everyone free for an hour or more.
+              <span className="avail-legend-free" aria-hidden /> Everyone free for an hour or more
             </p>
           </div>
 
@@ -184,7 +184,7 @@ export function CommitteeView({
               {inspected ? (
                 <Inspector cellKeyValue={inspected} absent={cells.get(inspected) ?? []} shown={shown} byId={byId} />
               ) : (
-                <p className="small muted">Hover or tap a time to see who&rsquo;s out and why.</p>
+                <p className="small muted">Hover or tap a time to see who&rsquo;s out and why</p>
               )}
             </div>
             <BestTimes best={best} byId={byId} />
@@ -235,7 +235,7 @@ function Inspector({
           })}
         </ul>
       ) : (
-        <p className="small avail-allfree">Everyone free.</p>
+        <p className="small avail-allfree">Everyone free</p>
       )}
       {absent.length > 0 && freeMembers.length > 0 && (
         <p className="small muted">Free: {joinNames(freeMembers.map((m) => m.name))}</p>
@@ -260,7 +260,7 @@ function BestTimes({ best, byId }: { best: MeetingSlot[]; byId: Map<string, Show
           ))}
         </ol>
       ) : (
-        <p className="small muted">No hour in the week has anyone free. Try fewer people, or the wider hours.</p>
+        <p className="small muted">No hour in the week has anyone free — try fewer people, or the wider hours</p>
       )}
     </div>
   );

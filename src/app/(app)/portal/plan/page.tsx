@@ -65,7 +65,7 @@ export default async function PlanPage({ searchParams }: { searchParams: SearchP
         lastOrganiserSync(),
       ]);
     } catch (error) {
-      loadError = error instanceof Error ? error.message : "The plan couldn't be loaded.";
+      loadError = error instanceof Error ? error.message : "The plan couldn't be loaded";
     }
     // Linked UCL timetables join the "Unavailable" overlay for this week. A
     // failure here only loses the lectures, never the plan.
@@ -114,7 +114,7 @@ export default async function PlanPage({ searchParams }: { searchParams: SearchP
       {!dbReady && (
         <div className="notice warn">
           <strong>Database not configured</strong>
-          <p>Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to load the plan. The week below is empty until then.</p>
+          <p>Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to load the plan — the week below is empty until then</p>
         </div>
       )}
       {loadError && (

@@ -5,8 +5,9 @@
  * rule here is scoped under `.uvs` and every custom property is `--uvs-*`:
  * nothing may reach the portal, which is styled by globals.css.
  *
- * The landing keeps its own palette (linen / prussian / cyan) — it is the
- * society's poster, not part of the app.
+ * Same VolSoc brand as the portal (linen / prussian / cyan, League Spartan and
+ * Work Sans), but the landing swaps paper and ink with the real sun, so it
+ * keeps its own copies of the colours rather than following the app theme.
  */
 
 @property --uvs-theme-mix {
@@ -53,7 +54,8 @@
   flex-direction: column;
   background: var(--uvs-paper);
   color: var(--uvs-ink);
-  font-family: "Cal Sans", "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
+  font-weight: 500;
   -webkit-font-smoothing: antialiased;
   line-height: 1.5;
 }
@@ -65,7 +67,7 @@
 }
 
 .uvs h1 {
-  font-family: "Cal Sans", "Inter", system-ui, sans-serif;
+  font-family: var(--font-display);
   font-size: clamp(2.4rem, 5.5vw, 4.5rem);
   font-weight: 700;
   letter-spacing: -0.01em;
@@ -121,9 +123,11 @@
   min-height: 44px;
   padding: 0.8rem 1.3rem;
   border-radius: 999px;
-  font-weight: 600;
   text-decoration: none;
   border: 2px solid transparent;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
   transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
@@ -229,6 +233,12 @@
 }
 
 .uvs-signin-back {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
   font-size: 0.85rem;
   opacity: 0.7;
 }

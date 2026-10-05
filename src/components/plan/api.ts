@@ -11,7 +11,7 @@ async function call<T>(url: string, init: RequestInit): Promise<T> {
       credentials: "same-origin",
     });
   } catch {
-    throw new Error("Couldn't reach the server. Check your connection.");
+    throw new Error("Couldn't reach the server — check your connection");
   }
   const data = (await response.json().catch(() => ({}))) as { error?: string } & T;
   if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
