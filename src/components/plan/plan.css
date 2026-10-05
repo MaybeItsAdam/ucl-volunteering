@@ -58,6 +58,7 @@
   border-color: color-mix(in srgb, var(--hue, var(--muted)) 40%, transparent);
 }
 .plan-member-toggle[aria-pressed="false"] .swatch { opacity: .45; }
+.plan-availability-edit { gap: 6px; }
 
 .plan-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
 .plan-controls > .plan-overlay-legend { flex: 1 1 auto; }

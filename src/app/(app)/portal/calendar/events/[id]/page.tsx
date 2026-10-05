@@ -80,7 +80,7 @@ export default async function PlanEventPage({ params }: { params: Params }) {
   return (
     <section className="page narrow plan-page">
       <PlanSubnav active="week" week={week} />
-      <Link href={`/portal/plan?week=${week}`} className="plan-back">
+      <Link href={`/portal/calendar?week=${week}`} className="plan-back">
         <ChevronLeft size={16} aria-hidden="true" />
         Back to the week
       </Link>
@@ -91,7 +91,7 @@ export default async function PlanEventPage({ params }: { params: Params }) {
         linkOptions={options}
         myId={member.id}
         canEdit={can(profileOf(member), "edit_plan")}
-        backHref={`/portal/plan?week=${week}`}
+        backHref={`/portal/calendar?week=${week}`}
       />
     </section>
   );

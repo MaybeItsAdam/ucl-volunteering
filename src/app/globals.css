@@ -475,6 +475,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); widt
   padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-card);
   background: var(--raised);
 }
+.modal-card--wide { max-width: 960px; }
 .modal-card:focus { outline: none; }
 .modal-card h3 { margin: 0 0 6px; font-size: 18px; }
 .modal-card > p { margin: 0 0 16px; color: var(--muted); font-size: 14px; }

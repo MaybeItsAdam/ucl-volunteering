@@ -294,7 +294,7 @@ export function EventDetail({
             <>
               <dt>Linked</dt>
               <dd>
-                <Link href={`/portal/plan/events/${linked.id}`}>{optionLabel(linked)}</Link>
+                <Link href={`/portal/calendar/events/${linked.id}`}>{optionLabel(linked)}</Link>
               </dd>
             </>
           )}
