@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { HandHeart } from "lucide-react";
+import { VolSocHand } from "@/components/landing/VolSocHand";
 
 /**
  * The Toolbox sends people back here with `#token=` in the fragment, which never
@@ -38,19 +38,16 @@ export default function AuthCallback() {
   }, []);
 
   return (
-    <main className="auth-page">
-      <section className="auth-card">
-        <span className="auth-mark"><HandHeart size={26} aria-hidden="true" /></span>
-        <span className="micro-label">VolSoc committee</span>
-        <h1>{failed ? "Not quite there" : "Signing you in"}</h1>
-        <p role={failed ? "alert" : "status"}>{message}</p>
-        {failed ? (
-          <Link className="button primary" href="/auth/signin">Try UCL sign-in again</Link>
-        ) : (
-          <span className="loading-dots" aria-hidden="true"><i /><i /><i /></span>
-        )}
-        <Link className="auth-home" href="/">Back to the homepage</Link>
-      </section>
-    </main>
+    <section className="uvs-signin" aria-labelledby="signin-title">
+      <VolSocHand className="uvs-signin-logo" />
+      <h1 id="signin-title">{failed ? "Not quite there" : "Signing you in"}</h1>
+      <p role={failed ? "alert" : "status"}>{message}</p>
+      {failed ? (
+        <Link className="uvs-cta uvs-cta-primary" href="/auth/signin">Try UCL sign-in again</Link>
+      ) : (
+        <span className="uvs-signin-dots" aria-hidden="true"><i /><i /><i /></span>
+      )}
+      <Link className="uvs-signin-back" href="/">Back to the homepage</Link>
+    </section>
   );
 }

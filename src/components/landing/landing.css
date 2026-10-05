@@ -166,6 +166,94 @@
   background: transparent;
 }
 
+/* ---------- sign-in panel (/auth/signin, /auth/callback) ---------- */
+
+.uvs-signin {
+  display: grid;
+  gap: 0.9rem;
+  justify-items: center;
+  width: 100%;
+  max-width: 26rem;
+  padding: 2rem 1.75rem 1.5rem;
+  border-radius: var(--uvs-radius-md);
+  background: var(--uvs-paper);
+  border: 1px solid color-mix(in srgb, var(--uvs-ink) 14%, transparent);
+  text-align: center;
+}
+
+.uvs-signin h1 {
+  font-size: clamp(1.7rem, 3vw, 2.2rem);
+}
+
+.uvs-signin p {
+  margin: 0;
+}
+
+.uvs-signin-logo {
+  width: 4.5rem;
+  height: auto;
+  color: var(--uvs-ink);
+}
+
+.uvs-signin .uvs-cta {
+  justify-content: center;
+  width: 100%;
+  margin-top: 0.3rem;
+}
+
+.uvs-signin-note {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  opacity: 0.7;
+}
+
+.uvs-signin-dev {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem 0.8rem;
+  padding-top: 0.8rem;
+  border-top: 1px dashed color-mix(in srgb, var(--uvs-ink) 25%, transparent);
+  font-size: 0.8rem;
+}
+
+.uvs-signin-dev span {
+  width: 100%;
+  opacity: 0.6;
+}
+
+.uvs-signin-dev a,
+.uvs-signin-back {
+  color: inherit;
+  text-underline-offset: 3px;
+}
+
+.uvs-signin-back {
+  font-size: 0.85rem;
+  opacity: 0.7;
+}
+
+.uvs-signin-dots {
+  display: flex;
+  gap: 6px;
+  padding: 0.4rem 0;
+}
+
+.uvs-signin-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--uvs-strong-cyan);
+  animation: uvs-dots 1s infinite alternate;
+}
+
+.uvs-signin-dots i:nth-child(2) { animation-delay: 0.2s; }
+.uvs-signin-dots i:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes uvs-dots {
+  to { opacity: 0.25; }
+}
+
 /* ---------- debug time panel ---------- */
 
 .uvs-debug-time {
@@ -410,9 +498,23 @@
   .uvs-cta-row {
     justify-content: flex-end;
   }
+
+  /* The sign-in panel is too much for the narrow column: give it the width,
+     with the flag behind it. */
+  .uvs-hero-copy:has(.uvs-signin) {
+    grid-column: 1 / -1;
+    min-width: 0;
+    justify-self: stretch;
+    justify-items: center;
+    text-align: center;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .uvs-signin-dots i {
+    animation-duration: 1ms;
+  }
+
   .uvs-hero,
   .uvs-cta,
   .uvs-debug-time-reset,
