@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useState, type CSSProperties } from "react";
-import Link from "next/link";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { DebugTimePanel } from "./DebugTimePanel";
 import { FlagCanvas } from "./FlagCanvas";
 import { skyColors, useSunState } from "./sun";
 import { useWindController } from "./useWindController";
-import { VolSocHand } from "./VolSocHand";
 import "./landing.css";
 
 const D2R = Math.PI / 180;
@@ -110,9 +108,11 @@ const times = (v: number) => `${v.toFixed(2)}×`;
 
 /**
  * The public front page: the society's flag flying over a sky that follows
- * the real sun and wind over Bloomsbury, and a way in for the committee.
+ * the real sun and wind over Bloomsbury. `children` fills the copy column: the
+ * society's name on `/`, the sign-in panel on `/auth/*`. It is the `(landing)`
+ * layout, so moving between those keeps the flag flying.
  */
-export function Landing() {
+export function Landing({ children }: { children: ReactNode }) {
   const sun = useSunState();
   const { top, bot } = skyColors(sun.elevation);
   const isNight = sun.elevation < -0.05;
@@ -159,15 +159,7 @@ export function Landing() {
             isDark={isNight}
           />
         </div>
-        <div className="uvs-hero-copy">
-          <VolSocHand className="uvs-hero-logo" />
-          <h1>UCL Volunteering Society</h1>
-          <div className="uvs-cta-row">
-            <Link className="uvs-cta uvs-cta-primary" href="/portal">
-              Committee sign in
-            </Link>
-          </div>
-        </div>
+        <div className="uvs-hero-copy">{children}</div>
       </section>
 
       {debugUnlocked && <DebugTimePanel />}
