@@ -135,7 +135,7 @@
 .plan-line { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line); }
 .plan-line--half { border-top: 1px dashed var(--line-muted); }
 
-/* Now */
+/* Now: above every card, however deep a stack goes */
 .plan-now {
   position: absolute; left: 0; right: 0; height: 2px; margin-top: -1px;
   background: var(--danger); z-index: 4; pointer-events: none;
@@ -169,8 +169,11 @@
   color: var(--ink); font-size: 12px; line-height: 1.25; text-decoration: none;
   -webkit-touch-callout: none; user-select: none; -webkit-user-select: none;
 }
-.plan-event:hover { background: color-mix(in srgb, var(--cat) 18%, var(--raised)); z-index: 3; }
-.plan-event:focus-visible { z-index: 3; outline-offset: 1px; }
+/* A card over another gets a ring of the page colour, so the edge reads. The
+   hovered or focused card comes to the front (above any stack's inline z). */
+.plan-event[data-stacked] { outline: 1px solid var(--raised); }
+.plan-event:hover { background: color-mix(in srgb, var(--cat) 18%, var(--raised)); z-index: 100 !important; }
+.plan-event:focus-visible { z-index: 100 !important; outline-offset: 1px; }
 .plan-event[data-draggable] { cursor: grab; }
 .plan-event[data-dragging] { opacity: .35; }
 .plan-planner[data-dragging] .plan-event, .plan-planner[data-dragging] .plan-col { cursor: grabbing; }
@@ -225,7 +228,7 @@
 
 /* Ghost while dragging / selecting */
 .plan-ghost {
-  position: absolute; left: 2px; right: 2px; z-index: 5; pointer-events: none;
+  position: absolute; left: 2px; right: 2px; z-index: 201; pointer-events: none;
   border: 1.5px dashed var(--primary); border-radius: var(--radius-control);
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   padding: 2px 5px;

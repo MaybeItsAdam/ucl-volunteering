@@ -6,7 +6,8 @@ import {
   dragStartMinute,
   eventDaySpan,
   layoutWeek,
-  packColumns,
+  cascadeLayout,
+  NEST_INDENT,
   resizeEndMinute,
   selectionRange,
   WINDOW_END,
@@ -44,66 +45,58 @@ function event(id: string, day: string, start: number, end: number, extra: Parti
   };
 }
 
-describe("packColumns", () => {
+describe("cascadeLayout", () => {
+  const byId = (placed: ReturnType<typeof cascadeLayout>) => Object.fromEntries(placed.map((p) => [p.id, p]));
+
   it("gives a lone item the whole width", () => {
-    expect(packColumns([iv("a", 60, 120)])).toEqual([{ id: "a", column: 0, columns: 1, span: 1 }]);
+    expect(cascadeLayout([iv("a", 60, 120)])).toEqual([{ id: "a", left: 0, width: 1, z: 0, stacked: false }]);
   });
 
-  it("puts two overlapping items side by side", () => {
-    expect(packColumns([iv("a", 60, 120), iv("b", 90, 150)])).toEqual([
-      { id: "a", column: 0, columns: 2, span: 1 },
-      { id: "b", column: 1, columns: 2, span: 1 },
-    ]);
+  it("puts items starting together side by side, each spreading over the next", () => {
+    const p = byId(cascadeLayout([iv("a", 60, 120), iv("b", 70, 150)]));
+    expect(p.a).toMatchObject({ left: 0, z: 0, stacked: false });
+    expect(p.a.width).toBeCloseTo(0.85);
+    expect(p.b).toMatchObject({ left: 0.5, width: 0.5, z: 1, stacked: true });
+  });
+
+  it("nests an item that starts well inside another, indented and on top", () => {
+    const p = byId(cascadeLayout([iv("a", 60, 240), iv("b", 120, 180)]));
+    expect(p.a).toMatchObject({ left: 0, width: 1 });
+    expect(p.b).toMatchObject({ left: NEST_INDENT, width: 1 - NEST_INDENT, z: 1, stacked: true });
+  });
+
+  it("nests over the topmost item, deeper each time", () => {
+    const p = byId(cascadeLayout([iv("a", 0, 300), iv("b", 60, 300), iv("c", 120, 300)]));
+    expect(p.b.left).toBeCloseTo(NEST_INDENT);
+    expect(p.c.left).toBeCloseTo(2 * NEST_INDENT);
+  });
+
+  it("joins a narrow card's row rather than nesting into a sliver", () => {
+    // a and b start together (halves); c starts an hour in, over b at the right.
+    const p = byId(cascadeLayout([iv("a", 0, 180), iv("b", 10, 180), iv("c", 60, 120)]));
+    expect(p.c.left).toBeCloseTo(2 / 3);
+    expect(p.b.left).toBeCloseTo(1 / 3);
+  });
+
+  it("splits a nested row when two start together inside an earlier one", () => {
+    const p = byId(cascadeLayout([iv("a", 0, 300), iv("b", 60, 120), iv("c", 70, 120)]));
+    expect(p.b.left).toBeCloseTo(NEST_INDENT);
+    expect(p.c.left).toBeCloseTo(NEST_INDENT + (1 - NEST_INDENT) / 2);
+    expect(p.c.left + p.c.width).toBeCloseTo(1);
   });
 
   it("doesn't treat touching items as overlapping", () => {
-    const placed = packColumns([iv("a", 60, 120), iv("b", 120, 180)]);
-    expect(placed.map((p) => p.columns)).toEqual([1, 1]);
+    const placed = cascadeLayout([iv("a", 60, 120), iv("b", 120, 180)]);
+    expect(placed.map((p) => [p.left, p.width, p.stacked])).toEqual([[0, 1, false], [0, 1, false]]);
   });
 
-  it("reuses a column freed earlier in the cluster", () => {
-    // a long; b then c one after the other beside it.
-    const placed = packColumns([iv("a", 0, 300), iv("b", 0, 100), iv("c", 150, 250)]);
-    expect(placed).toEqual([
-      { id: "a", column: 0, columns: 2, span: 1 },
-      { id: "b", column: 1, columns: 2, span: 1 },
-      { id: "c", column: 1, columns: 2, span: 1 },
-    ]);
-  });
-
-  it("doesn't stretch an item over a column still in use", () => {
-    // a, b and c all overlap at 30–50: three columns. d comes after a and c have ended.
-    const placed = packColumns([iv("a", 0, 60), iv("b", 30, 120), iv("c", 30, 50), iv("d", 90, 150)]);
-    const byId = Object.fromEntries(placed.map((p) => [p.id, p]));
-    expect(byId.b.columns).toBe(3);
-    // d takes column 0, a's, and can't stretch: b is still running in column 1.
-    expect(byId.d.column).toBe(0);
-    expect(byId.d.span).toBe(1);
-    // c sits in column 2 and nothing is to its right.
-    expect(byId.c).toMatchObject({ column: 2, span: 1 });
-  });
-
-  it("lets the last column stretch when there's room", () => {
-    const placed = packColumns([iv("a", 0, 120), iv("b", 0, 60), iv("c", 0, 30), iv("x", 60, 120)]);
-    const byId = Object.fromEntries(placed.map((p) => [p.id, p]));
-    expect(byId.a).toMatchObject({ column: 0, columns: 3 });
-    // x starts at 60 in column 1 (b's), and column 2 (c's) is free by then.
-    expect(byId.x).toMatchObject({ column: 1, span: 2 });
-  });
-
-  it("starts a fresh cluster once everything has ended", () => {
-    const placed = packColumns([iv("a", 0, 60), iv("b", 0, 60), iv("c", 60, 90)]);
-    expect(placed.map((p) => p.columns)).toEqual([2, 2, 1]);
+  it("paints a later start over an earlier one", () => {
+    const p = byId(cascadeLayout([iv("late", 100, 200), iv("early", 0, 150)]));
+    expect(p.late.z).toBeGreaterThan(p.early.z);
   });
 
   it("returns items in the order given", () => {
-    const placed = packColumns([iv("late", 500, 600), iv("early", 0, 10)]);
-    expect(placed.map((p) => p.id)).toEqual(["late", "early"]);
-  });
-
-  it("puts the longer of two same-start items first", () => {
-    const placed = packColumns([iv("short", 0, 30), iv("long", 0, 120)]);
-    expect(placed.find((p) => p.id === "long")!.column).toBe(0);
+    expect(cascadeLayout([iv("late", 500, 600), iv("early", 0, 10)]).map((p) => p.id)).toEqual(["late", "early"]);
   });
 });
 
@@ -143,7 +136,7 @@ describe("layoutWeek", () => {
   it("places a timed event on its London day in London minutes", () => {
     const layout = layoutWeek([event("a", "2026-09-30", 18 * 60, 20 * 60)], week.days);
     const [seg] = layout.days["2026-09-30"];
-    expect(seg).toMatchObject({ start: 1080, end: 1200, top: 1080, bottom: 1200, column: 0, columns: 1 });
+    expect(seg).toMatchObject({ start: 1080, end: 1200, top: 1080, bottom: 1200, left: 0, width: 1 });
     expect(layout.counts["2026-09-30"]).toBe(1);
     expect(layout.counts["2026-09-29"]).toBe(0);
   });
@@ -189,16 +182,16 @@ describe("layoutWeek", () => {
     expect(Object.values(layout.days).flat()).toHaveLength(0);
   });
 
-  it("packs overlapping events into columns per day", () => {
+  it("cascades overlapping events per day", () => {
     const layout = layoutWeek(
       [event("a", "2026-09-30", 600, 720), event("b", "2026-09-30", 660, 780), event("c", "2026-10-01", 660, 780)],
       week.days,
     );
-    expect(layout.days["2026-09-30"].map((s) => [s.event.id, s.column, s.columns])).toEqual([
-      ["a", 0, 2],
-      ["b", 1, 2],
+    expect(layout.days["2026-09-30"].map((s) => [s.event.id, s.left, s.stacked])).toEqual([
+      ["a", 0, false],
+      ["b", NEST_INDENT, true],
     ]);
-    expect(layout.days["2026-10-01"][0].columns).toBe(1);
+    expect(layout.days["2026-10-01"][0]).toMatchObject({ left: 0, width: 1 });
   });
 
   it("keeps London clock time across the October change", () => {
