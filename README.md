@@ -44,7 +44,7 @@ without printing any value.
 | `NEXT_PUBLIC_SUPABASE_URL` | yes | `https://<ref>.supabase.co` |
 | `SUPABASE_SERVICE_ROLE_KEY` | yes | Server-only; the only key that can reach the tables |
 | `MIGRATE_DATABASE_URL` | yes | Postgres URL (session pooler, port 5432) for `deploy-migrate` |
-| `NEXT_PUBLIC_APP_URL` | yes | `https://ucl-volunteering-delta.vercel.app` |
+| `NEXT_PUBLIC_APP_URL` | yes | `https://uclvolunteering.org` |
 | `SESSION_SECRET` | yes | ≥ 32 chars: `openssl rand -base64 48` |
 | `CRON_SECRET` | yes | Bearer for Vercel Cron: `openssl rand -hex 32` |
 | `TOOLBOX_URL` | yes | `https://www.adamscampustoolbox.org.uk` |
@@ -87,7 +87,7 @@ Capabilities live in `src/lib/access.ts`; the tabs in `src/lib/app-pages.ts`.
 
 ## Toolbox
 
-Register the site's origin (`https://ucl-volunteering-delta.vercel.app`, plus
+Register the site's origin (`https://uclvolunteering.org`, plus
 `http://localhost:3000` for dev) as an external site under the **UCL
 Volunteering Society** organiser in the Toolbox Dev Portal, so the sign-in
 handoff is allowed to return here. That organiser's principals and committee
