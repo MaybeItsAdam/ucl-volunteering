@@ -40,6 +40,8 @@ jobs:
     # Forks get no secrets; their PRs stop at the test job.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
+    # A blocked deployment leaves the CLI waiting until the 6-hour job limit.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - name: Deploy
