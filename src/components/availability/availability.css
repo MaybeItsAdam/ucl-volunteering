@@ -1,5 +1,5 @@
 /* ==========================================================================
-   AVAILABILITY (/portal/availability)
+   AVAILABILITY (the sheet opened from the calendar)
 
    Your week (an editable grid of half-hours) and the committee's combined.
    Built on globals.css's tokens and classes; everything here is .avail-*.
@@ -7,7 +7,14 @@
    gives way to a list per day.
    ========================================================================== */
 
+.avail-sheet { display: grid; gap: 14px; }
+.avail-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.modal-card .avail-sheet-head h3 { margin: 0; }
+.avail-sheet .notice { margin: 0; }
 .avail { display: grid; gap: 16px; }
+.avail[hidden] { display: none; }
+/* Sticky headers stick to the sheet, which is what scrolls here, not the page. */
+.avail-sheet .avail-row-head { top: 0; }
 /* clip, not hidden: hidden would make the panel a scroller and stop the
    sticky day headers sticking to the page. */
 .panel.flush.avail-editor, .panel.flush.avail-committee { overflow: clip; }
@@ -221,6 +228,8 @@
     display: flex; position: sticky; top: calc(44px + var(--safe-top)); z-index: 2;
     background: var(--raised);
   }
+  /* Under the sheet's grab handle. */
+  .avail-sheet .avail-daytabs { top: 26px; }
   .avail-grid-edit { --avail-template: 52px minmax(0, 1fr); padding-top: 4px; }
   .avail-grid-edit .avail-offday { display: none; }
   .avail-grid-edit .avail-row-head { display: none; }

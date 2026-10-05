@@ -9,7 +9,7 @@ import { dayLabel, myResponse, responseCounts, SOURCE_LABELS, STATUS_TAG, timeRa
 import { PlanSubnav } from "@/components/plan/PlanSubnav";
 import "@/components/plan/plan.css";
 
-export const metadata: Metadata = { title: "Plan list" };
+export const metadata: Metadata = { title: "Calendar list" };
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
@@ -74,10 +74,10 @@ export default async function PlanListPage({ searchParams }: { searchParams: Sea
         <h1>All events</h1>
         <div className="page-actions">
           <div className="segmented" role="group" aria-label="Which events">
-            <Link href="/portal/plan/list" aria-pressed={!showPast} className={!showPast ? "active" : undefined}>
+            <Link href="/portal/calendar/list" aria-pressed={!showPast} className={!showPast ? "active" : undefined}>
               Upcoming
             </Link>
-            <Link href="/portal/plan/list?past=1" aria-pressed={showPast} className={showPast ? "active" : undefined}>
+            <Link href="/portal/calendar/list?past=1" aria-pressed={showPast} className={showPast ? "active" : undefined}>
               Show past
             </Link>
           </div>
@@ -111,7 +111,7 @@ export default async function PlanListPage({ searchParams }: { searchParams: Sea
           {term.weeks.map((week) => (
             <div key={week.monday} className="panel flush plan-agenda-week">
               <div className="panel-head">
-                <Link href={`/portal/plan?week=${week.monday}`} className="plan-agenda-weeklabel">
+                <Link href={`/portal/calendar?week=${week.monday}`} className="plan-agenda-weeklabel">
                   {week.label}
                 </Link>
                 <span className="micro-label">
@@ -137,7 +137,7 @@ export default async function PlanListPage({ searchParams }: { searchParams: Sea
                         <span className="mono plan-agenda-time">{timeRange(event)}</span>
                       </span>
                       <span className="plan-agenda-main">
-                        <Link href={`/portal/plan/events/${event.id}`} className="plan-agenda-title">
+                        <Link href={`/portal/calendar/events/${event.id}`} className="plan-agenda-title">
                           {event.title}
                         </Link>
                         <span className="plan-agenda-meta">

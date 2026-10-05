@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { CalendarOff, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -31,6 +31,8 @@ import {
   type CommitteeMember,
   type PlanEvent,
 } from "@/lib/types";
+import type { TimetableStatus } from "@/lib/timetable";
+import { AvailabilitySheet } from "@/components/availability/AvailabilitySheet";
 import { patchEvent } from "./api";
 import { CreateEventSheet, type CreateDraft } from "./CreateEventSheet";
 import { dayLabel, hourLabel, myResponse, SOURCE_LABELS, timeRange, WEEKDAYS_SHORT } from "./format";
@@ -104,8 +106,16 @@ export interface WeekPlannerProps {
   serverNow: number;
   myId: string;
   canEdit: boolean;
+  me: CommitteeMember;
   members: CommitteeMember[];
+  /** Everyone's weekly unavailability. */
   blocks: AvailabilityBlock[];
+  /** This week's lectures from linked UCL timetables. */
+  timetableBlocks: AvailabilityBlock[];
+  timetableStatus: TimetableStatus | null;
+  canSaveAvailability: boolean;
+  /** Open with your availability up to edit (/portal/availability lands here). */
+  editAvailability: boolean;
   prevWeek: string;
   nextWeek: string;
   /** Mobile: the day to open on (0 Monday … 6 Sunday). */
@@ -118,8 +128,13 @@ export function WeekPlanner({
   serverNow,
   myId,
   canEdit,
+  me,
   members,
   blocks,
+  timetableBlocks,
+  timetableStatus,
+  canSaveAvailability,
+  editAvailability,
   prevWeek,
   nextWeek,
   initialDay,
@@ -148,6 +163,7 @@ export function WeekPlanner({
   const [draft, setDraft] = useState<CreateDraft | null>(null);
   const [mobileDay, setMobileDay] = useState(initialDay);
   const [overlay, setOverlay] = useState<string[]>([]);
+  const [availabilityOpen, setAvailabilityOpen] = useState(editAvailability);
 
   const bodyRef = useRef<HTMLDivElement>(null);
   const colRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -355,9 +371,19 @@ export function WeekPlanner({
 
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
   const overlayBlocks = useMemo(
-    () => blocks.filter((b) => overlay.includes(b.memberId)),
-    [blocks, overlay],
+    () => [...blocks, ...timetableBlocks].filter((b) => overlay.includes(b.memberId)),
+    [blocks, timetableBlocks, overlay],
   );
+
+  function closeAvailability() {
+    setAvailabilityOpen(false);
+    // Drop ?availability=edit, so a reload doesn't open it again.
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("availability")) {
+      url.searchParams.delete("availability");
+      window.history.replaceState(null, "", url);
+    }
+  }
 
   function newEvent() {
     const dayIndex = days.includes(today) ? days.indexOf(today) : mobileDay;
@@ -371,35 +397,38 @@ export function WeekPlanner({
   return (
     <div className="plan-planner" data-dragging={preview ? "" : undefined}>
       <div className="plan-controls">
-        {/* Availability overlay toggles */}
-        {members.length > 0 && (
-          <div className="plan-overlay-legend" role="group" aria-label="Show when committee members are unavailable">
-            <span className="micro-label">Unavailable</span>
-            <div className="plan-overlay-members">
-              {members.map((m) => {
-                const on = overlay.includes(m.id);
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    className="plan-member-toggle hit"
-                    data-colour={m.colour ?? undefined}
-                    aria-pressed={on}
-                    onClick={() => setOverlay((o) => (on ? o.filter((id) => id !== m.id) : [...o, m.id]))}
-                  >
-                    <span className="swatch" data-colour={m.colour ?? undefined} aria-hidden="true" />
-                    {m.name}
-                  </button>
-                );
-              })}
-              {overlay.length > 0 && (
-                <button type="button" className="button ghost small" onClick={() => setOverlay([])}>
-                  Clear
+        {/* Availability: whose unavailable times to lay over the week, and your own to edit */}
+        <div className="plan-overlay-legend" role="group" aria-label="Availability">
+          <span className="micro-label">Availability</span>
+          <div className="plan-overlay-members" role="group" aria-label="Show when committee members are unavailable">
+            {members.map((m) => {
+              const on = overlay.includes(m.id);
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  className="plan-member-toggle hit"
+                  data-colour={m.colour ?? undefined}
+                  aria-pressed={on}
+                  title={`Show when ${m.name} is unavailable`}
+                  onClick={() => setOverlay((o) => (on ? o.filter((id) => id !== m.id) : [...o, m.id]))}
+                >
+                  <span className="swatch" data-colour={m.colour ?? undefined} aria-hidden="true" />
+                  {m.name}
                 </button>
-              )}
-            </div>
+              );
+            })}
+            {overlay.length > 0 && (
+              <button type="button" className="button ghost small" onClick={() => setOverlay([])}>
+                Clear
+              </button>
+            )}
           </div>
-        )}
+          <button type="button" className="button small plan-availability-edit" onClick={() => setAvailabilityOpen(true)}>
+            <CalendarOff size={14} aria-hidden="true" />
+            Edit my availability
+          </button>
+        </div>
 
         <div className="plan-toolbar">
           <div className="plan-daytabs" role="tablist" aria-label="Day">
@@ -424,7 +453,7 @@ export function WeekPlanner({
                 <ChevronLeft size={18} aria-hidden="true" />
               </button>
             ) : (
-              <Link className="icon-button" aria-label="Previous week" href={`/portal/plan?week=${prevWeek}&day=6`}>
+              <Link className="icon-button" aria-label="Previous week" href={`/portal/calendar?week=${prevWeek}&day=6`}>
                 <ChevronLeft size={18} aria-hidden="true" />
               </Link>
             )}
@@ -434,7 +463,7 @@ export function WeekPlanner({
                 <ChevronRight size={18} aria-hidden="true" />
               </button>
             ) : (
-              <Link className="icon-button" aria-label="Next week" href={`/portal/plan?week=${nextWeek}&day=0`}>
+              <Link className="icon-button" aria-label="Next week" href={`/portal/calendar?week=${nextWeek}&day=0`}>
                 <ChevronRight size={18} aria-hidden="true" />
               </Link>
             )}
@@ -595,6 +624,17 @@ export function WeekPlanner({
       </div>
 
       {draft && <CreateEventSheet key={`${draft.day}-${draft.start}`} draft={draft} onClose={() => setDraft(null)} />}
+      {availabilityOpen && (
+        <AvailabilitySheet
+          me={me}
+          members={members}
+          blocks={blocks}
+          timetableBlocks={timetableBlocks}
+          timetableStatus={timetableStatus}
+          canSave={canSaveAvailability}
+          onClose={closeAvailability}
+        />
+      )}
     </div>
   );
 }
@@ -671,7 +711,7 @@ function EventCard({
   };
   return (
     <Link
-      href={`/portal/plan/events/${event.id}`}
+      href={`/portal/calendar/events/${event.id}`}
       className="plan-event category-block"
       data-category={event.category}
       data-status={event.status}
@@ -733,7 +773,7 @@ function EventCard({
 function EventChip({ event, myId, style }: { event: PlanEvent; myId: string; style?: CSSProperties }) {
   return (
     <Link
-      href={`/portal/plan/events/${event.id}`}
+      href={`/portal/calendar/events/${event.id}`}
       className="plan-chip category-block"
       data-category={event.category}
       data-status={event.status}

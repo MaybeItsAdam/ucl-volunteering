@@ -8,6 +8,8 @@ const DISMISS_VELOCITY = 0.6; // px per ms
 
 let lockCount = 0;
 let lockedScrollY = 0;
+/** Open sheets, innermost last: Escape closes only the one on top. */
+const openSheets: object[] = [];
 
 /**
  * Stop the page behind the sheet from scrolling. `overflow: hidden` alone is
@@ -43,27 +45,39 @@ function unlockPage() {
 export function Sheet({
   onClose,
   labelledBy,
+  wide = false,
   children,
 }: {
   onClose: () => void;
   /** id of the heading inside `children`, so the dialog is named for screen readers. */
   labelledBy?: string;
+  /** A wider dialog on desktop, for a whole week's grid. A phone's sheet is full width either way. */
+  wide?: boolean;
   children: ReactNode;
 }) {
   const card = useRef<HTMLDivElement>(null);
   const drag = useRef<{ y: number; t: number; dragging: boolean } | null>(null);
+  // The latest onClose, so a parent passing a fresh function each render
+  // doesn't reopen the sheet's place on the stack.
+  const close = useRef(onClose);
+  useEffect(() => {
+    close.current = onClose;
+  });
 
   useEffect(() => {
+    const self = {};
+    openSheets.push(self);
     lockPage();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape" && openSheets.at(-1) === self) close.current();
     };
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
+      openSheets.splice(openSheets.indexOf(self), 1);
       unlockPage();
     };
-  }, [onClose]);
+  }, []);
 
   // Focus the sheet itself so the keyboard and screen reader follow it in, and
   // so Escape works before anything inside has been touched.
@@ -79,6 +93,8 @@ export function Sheet({
   }
 
   function onTouchStart(event: TouchEvent<HTMLDivElement>) {
+    // A sheet opened from inside another keeps its drags to itself.
+    event.stopPropagation();
     const el = card.current;
     if (!el || event.touches.length > 1) {
       drag.current = null;
@@ -98,6 +114,7 @@ export function Sheet({
   }
 
   function onTouchMove(event: TouchEvent<HTMLDivElement>) {
+    event.stopPropagation();
     const d = drag.current;
     if (!d) return;
     const dy = event.touches[0].clientY - d.y;
@@ -110,6 +127,7 @@ export function Sheet({
   }
 
   function onTouchEnd(event: TouchEvent<HTMLDivElement>) {
+    event.stopPropagation();
     const d = drag.current;
     drag.current = null;
     if (!d?.dragging) return;
@@ -131,7 +149,7 @@ export function Sheet({
     >
       <div
         ref={card}
-        className="modal-card"
+        className={wide ? "modal-card modal-card--wide" : "modal-card"}
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
