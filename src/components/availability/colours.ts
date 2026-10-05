@@ -1,5 +1,8 @@
 /**
- * Member identity hues: the categorical extras plus azure and emerald.
+ * Member identity hues, all brand colours. The keys are what the database
+ * stores and predate the brand, so each now names a brand colour: purple is
+ * lavender, orange is tomato, azure is strong cyan, emerald is lime moss and
+ * amber is golden pollen.
  *
  * Shared by anything that draws a member's dot, avatar or overlay (the
  * availability page, the planner's availability overlay). Prefer the CSS route
@@ -11,22 +14,22 @@
 import { MEMBER_COLOURS, type MemberColour } from "@/lib/access";
 
 export const MEMBER_HUES: Record<MemberColour, string> = {
-  purple: "#7a4de8",
-  pink: "#ff88dc",
-  orange: "#ff6b2b",
-  azure: "#007fff",
-  emerald: "#4cc38e",
-  amber: "#ffbf00",
+  purple: "#9b5de5",
+  pink: "#ff99c8",
+  orange: "#f26640",
+  azure: "#10c4c0",
+  emerald: "#8fb339",
+  amber: "#ffd23f",
 };
 
 /** The CSS custom property of each hue, defined in globals.css's palette layer. */
 export const MEMBER_HUE_VARS: Record<MemberColour, string> = {
-  purple: "var(--purple)",
-  pink: "var(--pink)",
-  orange: "var(--orange)",
-  azure: "var(--azure)",
-  emerald: "var(--emerald)",
-  amber: "var(--amber)",
+  purple: "var(--lavender-purple)",
+  pink: "var(--baby-pink)",
+  orange: "var(--tomato)",
+  azure: "var(--strong-cyan)",
+  emerald: "var(--lime-moss)",
+  amber: "var(--golden-pollen)",
 };
 
 /**

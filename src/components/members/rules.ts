@@ -67,16 +67,16 @@ export function judgeMemberPatch(
   target: RoleTarget & { governanceRoleLocked: boolean },
   patch: MemberPatch,
 ): string | null {
-  if (!can(actor, "manage_members")) return "Only a principal or admin can manage members.";
+  if (!can(actor, "manage_members")) return "Only a principal or admin can manage members";
   switch (patch.kind) {
     case "colour":
       return null;
     case "role":
     case "unlock":
-      if (actor.id === target.id) return "You can't change your own committee seat.";
-      if (patch.kind === "unlock") return target.governanceRoleLocked ? null : "This seat already follows the Toolbox.";
+      if (actor.id === target.id) return "You can't change your own committee seat";
+      if (patch.kind === "unlock") return target.governanceRoleLocked ? null : "This seat already follows the Toolbox";
       if (!canChangeCommittee(actor, target)) {
-        return "Principals and admins come from the Toolbox and can't be changed here.";
+        return "Principals and admins come from the Toolbox and can't be changed here";
       }
       return null;
   }

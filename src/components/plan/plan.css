@@ -4,7 +4,7 @@
    Built on the shared tokens and classes in globals.css (.panel, .tag,
    .category-block, [data-category] → --cat, [data-colour] → --hue, ...).
    Everything here is prefixed plan-. Flat: hairlines, no shadows, 8px panels,
-   6px controls, Geist Mono for times.
+   6px controls, tabular figures for times.
    ========================================================================== */
 
 .plan-page { --plan-gutter: 64px; }
@@ -24,7 +24,7 @@
 /* ── Header strip ───────────────────────────────────────────────────────── */
 
 .plan-sync { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
-.plan-sync .tag { font-family: var(--font-mono); font-weight: 500; }
+.plan-sync .tag { font-variant-numeric: tabular-nums; font-weight: 500; }
 .plan-spin { animation: plan-spin .9s linear infinite; }
 @keyframes plan-spin { to { transform: rotate(360deg); } }
 
@@ -88,7 +88,7 @@
 .plan-dayhead-date { grid-column: 1; font-weight: 700; font-size: 15px; white-space: nowrap; }
 .plan-dayhead-count {
   grid-column: 2; grid-row: 1 / span 2; align-self: center;
-  font-family: var(--font-mono); font-size: 11px; color: var(--muted);
+  font-variant-numeric: tabular-nums; font-size: 11px; color: var(--muted);
   min-width: 18px; text-align: center;
 }
 .plan-dayhead-count:not(:empty) { padding: 0 5px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--well); }
@@ -120,7 +120,7 @@
   display: grid; justify-items: end; line-height: 1.15;
 }
 .plan-hour-12 { font-size: 11px; font-weight: 700; color: var(--muted); white-space: nowrap; }
-.plan-hour-24 { font-family: var(--font-mono); font-size: 10px; color: var(--dim); }
+.plan-hour-24 { font-variant-numeric: tabular-nums; font-size: 10px; color: var(--dim); }
 
 .plan-columns {
   position: relative; height: var(--plan-grid-height);
@@ -184,7 +184,7 @@
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .plan-event-title { font-weight: 700; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
-.plan-event-time { display: flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10.5px; color: var(--muted); white-space: nowrap; }
+.plan-event-time { display: flex; align-items: center; gap: 5px; font-variant-numeric: tabular-nums; font-size: 10.5px; color: var(--muted); white-space: nowrap; }
 .plan-event-loc { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plan-event-source {
   align-self: flex-start; margin-top: auto;
@@ -199,7 +199,7 @@
 .plan-event[data-size="xs"] .plan-event-title { -webkit-line-clamp: 1; flex: 1; min-width: 0; }
 
 /* Clamped at the window edge */
-.plan-clip { font-family: var(--font-mono); font-size: 9.5px; color: var(--muted); white-space: nowrap; }
+.plan-clip { font-variant-numeric: tabular-nums; font-size: 9.5px; color: var(--muted); white-space: nowrap; }
 .plan-event[data-clip-start] { border-top: 1px dashed color-mix(in srgb, var(--cat) 70%, transparent); border-top-left-radius: 0; border-top-right-radius: 0; }
 .plan-event[data-clip-end] { border-bottom: 1px dashed color-mix(in srgb, var(--cat) 70%, transparent); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
 .plan-event[data-size="xs"] .plan-clip { display: none; }
@@ -232,7 +232,7 @@
 .plan-ghost-time {
   display: inline-block; padding: 0 4px; border-radius: 4px;
   background: var(--primary); color: var(--on-primary);
-  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 700;
 }
 .plan-ghost-title { display: block; margin-top: 2px; font-size: 12px; font-weight: 700; color: var(--info-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -263,7 +263,7 @@
   .plan-daytab[aria-selected="true"] { background: var(--raised); border-color: var(--line); color: var(--ink); }
   .plan-daytab[data-today] .plan-daytab-date { color: var(--info-text); }
   .plan-daytab-name { font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
-  .plan-daytab-date { font-family: var(--font-mono); font-size: 13px; font-weight: 700; }
+  .plan-daytab-date { font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; }
   .plan-daystep { display: flex; align-items: center; gap: 4px; }
   .plan-daystep .icon-button { border-color: var(--line); }
   .plan-daystep-label { min-width: 92px; text-align: center; font-weight: 700; }

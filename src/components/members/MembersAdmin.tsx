@@ -94,7 +94,7 @@ export function MembersAdmin({
         .json()
         .catch(() => ({}));
       if (!res.ok || !data.member)
-        throw new Error(data.error || "Couldn't save that change.");
+        throw new Error(data.error || "Couldn't save that change");
       const updated = data.member;
       setMembers((current) =>
         current.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)),
@@ -104,7 +104,7 @@ export function MembersAdmin({
       setStatus({
         tone: "bad",
         text:
-          error instanceof Error ? error.message : "Couldn't save that change.",
+          error instanceof Error ? error.message : "Couldn't save that change",
       });
     } finally {
       setBusyId(null);
@@ -168,7 +168,7 @@ export function MembersAdmin({
       </p>
 
       {members.length === 0 ? (
-        <div className="panel empty">Nobody has signed in yet.</div>
+        <div className="panel empty">Nobody has signed in yet</div>
       ) : visible.length === 0 ? (
         <div className="panel empty">
           No members match.{" "}
@@ -218,7 +218,7 @@ export function MembersAdmin({
             await send(
               colouring,
               { kind: "colour", colour },
-              `${firstName(colouring.name)} is now ${COLOUR_LABELS[colour].toLowerCase()}.`,
+              `${firstName(colouring.name)} is now ${COLOUR_LABELS[colour].toLowerCase()}`,
             );
             setColouring(null);
           }}
@@ -324,7 +324,7 @@ function MemberTableRow({
               onSend(
                 member,
                 { kind: "unlock" },
-                `${name}'s seat follows the Toolbox again.`,
+                `${name}'s seat follows the Toolbox again`,
               )
             }
           >
@@ -341,8 +341,8 @@ function MemberTableRow({
                 member,
                 seatChange,
                 onCommittee
-                  ? `${name} has been removed from the committee.`
-                  : `${name} is now on the committee.`,
+                  ? `${name} has been removed from the committee`
+                  : `${name} is now on the committee`,
               )
             }
           >
@@ -368,7 +368,7 @@ function ColourSheet({
   return (
     <Sheet onClose={onClose} labelledBy="mem-colour-title">
       <h3 id="mem-colour-title">{member.name}&apos;s colour</h3>
-      <p>Marks them on the availability overlay and around the planner.</p>
+      <p>Marks them on the availability overlay and around the planner</p>
       <div
         className="mem-swatches"
         role="radiogroup"

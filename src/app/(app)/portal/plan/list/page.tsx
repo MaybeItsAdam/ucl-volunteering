@@ -61,7 +61,7 @@ export default async function PlanListPage({ searchParams }: { searchParams: Sea
     try {
       [events, committee] = await Promise.all([listEvents(from, to), listCommittee()]);
     } catch (error) {
-      loadError = error instanceof Error ? error.message : "The plan couldn't be loaded.";
+      loadError = error instanceof Error ? error.message : "The plan couldn't be loaded";
     }
   }
   const names = new Map(committee.map((m) => [m.id, m.name]));
@@ -89,7 +89,7 @@ export default async function PlanListPage({ searchParams }: { searchParams: Sea
       {!dbReady && (
         <div className="notice warn">
           <strong>Database not configured</strong>
-          <p>Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to load the plan.</p>
+          <p>Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to load the plan</p>
         </div>
       )}
       {loadError && (
@@ -101,7 +101,7 @@ export default async function PlanListPage({ searchParams }: { searchParams: Sea
 
       {dbReady && !loadError && groups.length === 0 && (
         <div className="panel">
-          <p className="empty">{showPast ? "No events yet." : "Nothing coming up."}</p>
+          <p className="empty">{showPast ? "No events yet" : "Nothing coming up"}</p>
         </div>
       )}
 

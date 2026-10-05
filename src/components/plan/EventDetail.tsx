@@ -400,7 +400,7 @@ export function EventDetail({
             })}
           </ul>
         ) : (
-          <p className="empty">No one is on the committee yet.</p>
+          <p className="empty">No one is on the committee yet</p>
         )}
       </div>
 
@@ -410,7 +410,7 @@ export function EventDetail({
           <h2 className="micro-label">Edit</h2>
           {!isVolsoc && (
             <p className="muted small">
-              The title, time and place come from the Social Impact calendar. Here you can set what the committee is doing about it.
+              The title, time and place come from the Social Impact calendar — here you can set what the committee is doing about it
             </p>
           )}
 
@@ -506,7 +506,7 @@ export function EventDetail({
               ))}
             </select>
             <span className="hint">
-              {isVolsoc ? "The Social Impact event this runs alongside." : "The VolSoc event run alongside this."} Events within three weeks are listed.
+              {isVolsoc ? "The Social Impact event this runs alongside" : "The VolSoc event run alongside this"} — events within three weeks are listed
             </span>
           </div>
 
@@ -571,7 +571,7 @@ export function EventDetail({
       {confirmDelete && (
         <Sheet onClose={() => setConfirmDelete(false)} labelledBy={`${formId}-del`}>
           <h3 id={`${formId}-del`}>Delete “{event.title}”?</h3>
-          <p>It goes from the plan along with everyone&apos;s answers. This can&apos;t be undone; to keep a record, set it to Cancelled instead.</p>
+          <p>It goes from the plan along with everyone&apos;s answers — this can&apos;t be undone; to keep a record, set it to Cancelled instead</p>
           {deleteError && (
             <p className="plan-inline-error" role="alert">
               {deleteError}

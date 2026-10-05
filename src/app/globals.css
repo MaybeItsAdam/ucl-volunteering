@@ -1,10 +1,11 @@
 /* ==========================================================================
-   VolSoc house style
+   UCL Volunteering Society brand
 
-   Flat, bordered, editorial: paper-white surfaces, a bruised-purple ink,
-   hairlines instead of depth, and a few saturated accents kept for meaning.
-   No shadows, no gradients on chrome, one radius scale (8px panels, 6px
-   controls, round only for genuinely round things).
+   Strong cyan is the signature colour; prussian blue replaces black and linen
+   replaces white. Tomato and lime moss are for guidance (problems and good
+   news). The four project colours mark how the society runs an event. Flat
+   and bordered: hairlines rather than depth, no shadows, one radius scale
+   (8px panels, 6px controls, round only for genuinely round things).
 
    Components use the role tokens (--paper, --ink, --line, --primary, ...),
    never the palette hex directly, so everything flips with the theme.
@@ -18,62 +19,65 @@
   --safe-left: env(safe-area-inset-left, 0px);
 }
 
-/* Palette layer: literal hex, defined once. */
+/* Palette layer: the brand's hex, defined once. */
 :root {
-  --chalk: #faf8f4;
-  --white: #ffffff;
-  --grape: #444054;
-  --azure: #007fff;
-  --emerald: #4cc38e;
-  --raspberry: #d62246;
-  --amber: #ffbf00;
-  --purple: #7a4de8;
-  --pink: #ff88dc;
-  --orange: #ff6b2b;
+  --strong-cyan: #10c4c0;
+  --prussian-blue: #061c33;
+  --linen: #feefe5;
+  --tomato: #f26640;
+  --lime-moss: #8fb339;
+  /* How the society runs an event. */
+  --baby-pink: #ff99c8;      /* socials */
+  --lavender-purple: #9b5de5; /* student led projects */
+  --golden-pollen: #ffd23f;  /* group led projects */
+  --brick-red: #ad2e24;      /* external led projects */
 }
 
-/* Role tokens, light. Neutrals run warm at the paper end, cool at the ink end. */
+/* Role tokens, light. Linen is the page; every neutral is prussian mixed into
+   it, so greys and borders keep the brand's blue. */
 :root {
-  --paper: var(--chalk);
-  --raised: var(--white);
-  --alt: #f5f3f1;
-  --hover: #f1eff1;
-  --well: #edebef;
-  --line: #e6e4ea;
-  --line-muted: #efedf2;
-  --line-input: #d8d5dd;
-  --ink: var(--grape);
-  --muted: #6e6b7c;
-  --dim: #b6b3bf;
+  --paper: var(--linen);
+  --raised: color-mix(in srgb, var(--linen) 45%, #fffaf6);
+  --alt: color-mix(in srgb, var(--prussian-blue) 3%, var(--linen));
+  --hover: color-mix(in srgb, var(--prussian-blue) 5%, var(--linen));
+  --well: color-mix(in srgb, var(--prussian-blue) 7%, var(--linen));
+  --line: color-mix(in srgb, var(--prussian-blue) 13%, var(--linen));
+  --line-muted: color-mix(in srgb, var(--prussian-blue) 8%, var(--linen));
+  --line-input: color-mix(in srgb, var(--prussian-blue) 24%, var(--linen));
+  --ink: var(--prussian-blue);
+  --muted: color-mix(in srgb, var(--prussian-blue) 68%, var(--linen));
+  --dim: color-mix(in srgb, var(--prussian-blue) 36%, var(--linen));
 
-  --primary: var(--azure);
-  --on-primary: #ffffff;
-  --success: var(--emerald);
-  --danger: var(--raspberry);
-  --warning: var(--amber);
-  /* Text in a status hue: amber and emerald are too light for text on chalk. */
-  --success-text: #23855a;
-  --danger-text: var(--raspberry);
-  --warning-text: #8a6500;
-  --info-text: #0062c4;
+  /* Cyan is too light for text on linen: it fills buttons and marks, with
+     prussian on top, and never colours running text. */
+  --primary: var(--strong-cyan);
+  --on-primary: var(--prussian-blue);
+  --success: var(--lime-moss);
+  --danger: var(--tomato);
+  --warning: var(--golden-pollen);
+  /* Text in a status hue, darkened until it reads on linen. */
+  --success-text: color-mix(in srgb, var(--lime-moss) 55%, var(--prussian-blue));
+  --danger-text: color-mix(in srgb, var(--tomato) 65%, var(--prussian-blue));
+  --warning-text: color-mix(in srgb, var(--golden-pollen) 35%, var(--prussian-blue));
+  --info-text: color-mix(in srgb, var(--strong-cyan) 45%, var(--prussian-blue));
 
-  /* Categories (plan) and member identity: extras only, never chrome. */
-  --cat-social: var(--pink);
-  --cat-volunteering: var(--amber);
-  --cat-ucl_affiliated: var(--purple);
-  --cat-external: var(--orange);
+  /* Categories (plan): the brand's four project colours. */
+  --cat-social: var(--baby-pink);
+  --cat-volunteering: var(--lavender-purple);
+  --cat-ucl_affiliated: var(--golden-pollen);
+  --cat-external: var(--brick-red);
 
   /* Scrim and text over media: theme-invariant on purpose. */
-  --scrim: rgba(0, 0, 0, .55);
-  --on-scrim: #ffffff;
+  --scrim: color-mix(in srgb, var(--prussian-blue) 60%, transparent);
+  --on-scrim: var(--linen);
 
   --radius-card: 8px;
   --radius-control: 6px;
   --radius-shell: 20px;
 
-  --font-serif: var(--font-arvo), "Arvo", "Rockwell", Georgia, serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* League Spartan for headlines and titles, Work Sans (medium) for the rest. */
+  --font-display: var(--font-league-spartan), "League Spartan", system-ui, sans-serif;
+  --font-body: var(--font-work-sans), "Work Sans", system-ui, sans-serif;
 
   color-scheme: light;
 }
@@ -89,61 +93,59 @@
   --line-strong: var(--line-input);
   --link: var(--info-text);
   --foreground: var(--ink);
-  --ok-bg: color-mix(in srgb, var(--success) 10%, var(--raised));
-  --ok-line: color-mix(in srgb, var(--success) 40%, transparent);
+  --ok-bg: color-mix(in srgb, var(--success) 12%, var(--raised));
+  --ok-line: color-mix(in srgb, var(--success) 45%, transparent);
   --ok-fg: var(--success-text);
-  --bad-bg: color-mix(in srgb, var(--danger) 10%, var(--raised));
-  --bad-line: color-mix(in srgb, var(--danger) 40%, transparent);
+  --bad-bg: color-mix(in srgb, var(--danger) 12%, var(--raised));
+  --bad-line: color-mix(in srgb, var(--danger) 45%, transparent);
   --bad-fg: var(--danger-text);
-  --warn-bg: color-mix(in srgb, var(--warning) 10%, var(--raised));
-  --warn-line: color-mix(in srgb, var(--warning) 40%, transparent);
+  --warn-bg: color-mix(in srgb, var(--warning) 14%, var(--raised));
+  --warn-line: color-mix(in srgb, var(--warning) 55%, transparent);
   --warn-fg: var(--warning-text);
-  --info-bg: color-mix(in srgb, var(--primary) 10%, var(--raised));
-  --info-line: color-mix(in srgb, var(--primary) 40%, transparent);
+  --info-bg: color-mix(in srgb, var(--primary) 12%, var(--raised));
+  --info-line: color-mix(in srgb, var(--primary) 45%, transparent);
   --info-fg: var(--info-text);
-  --font-display: var(--font-serif);
-  --font-body: var(--font-serif);
 }
 
-/* Dark: the same grape hue pulled down, never neutral grey. Accents keep
-   their hex and are used at low alpha for fills. The choice is stored as
-   data-theme on <html> (ThemeSetting); with none, the system setting applies. */
+/* Dark: prussian is the page and linen the text; the accents keep their hex
+   and are used at low alpha for fills. The choice is stored as data-theme on
+   <html> (ThemeSetting); with none, the system setting applies. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --paper: #1c1a23;
-    --raised: #25232f;
-    --alt: #221f2b;
-    --hover: #2d2b38;
-    --well: #2d2b38;
-    --line: #34313f;
-    --line-muted: #2d2b38;
-    --line-input: #423e50;
-    --ink: #f5f4f7;
-    --muted: #b6b3bf;
-    --dim: #6e6b7c;
-    --success-text: var(--emerald);
-    --danger-text: #ff6b88;
-    --warning-text: var(--amber);
-    --info-text: #5aaeff;
+    --paper: var(--prussian-blue);
+    --raised: color-mix(in srgb, var(--linen) 5%, var(--prussian-blue));
+    --alt: color-mix(in srgb, var(--linen) 3%, var(--prussian-blue));
+    --hover: color-mix(in srgb, var(--linen) 9%, var(--prussian-blue));
+    --well: color-mix(in srgb, var(--linen) 9%, var(--prussian-blue));
+    --line: color-mix(in srgb, var(--linen) 15%, var(--prussian-blue));
+    --line-muted: color-mix(in srgb, var(--linen) 9%, var(--prussian-blue));
+    --line-input: color-mix(in srgb, var(--linen) 24%, var(--prussian-blue));
+    --ink: var(--linen);
+    --muted: color-mix(in srgb, var(--linen) 72%, var(--prussian-blue));
+    --dim: color-mix(in srgb, var(--linen) 42%, var(--prussian-blue));
+    --success-text: var(--lime-moss);
+    --danger-text: var(--tomato);
+    --warning-text: var(--golden-pollen);
+    --info-text: var(--strong-cyan);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --paper: #1c1a23;
-  --raised: #25232f;
-  --alt: #221f2b;
-  --hover: #2d2b38;
-  --well: #2d2b38;
-  --line: #34313f;
-  --line-muted: #2d2b38;
-  --line-input: #423e50;
-  --ink: #f5f4f7;
-  --muted: #b6b3bf;
-  --dim: #6e6b7c;
-  --success-text: var(--emerald);
-  --danger-text: #ff6b88;
-  --warning-text: var(--amber);
-  --info-text: #5aaeff;
+  --paper: var(--prussian-blue);
+  --raised: color-mix(in srgb, var(--linen) 5%, var(--prussian-blue));
+  --alt: color-mix(in srgb, var(--linen) 3%, var(--prussian-blue));
+  --hover: color-mix(in srgb, var(--linen) 9%, var(--prussian-blue));
+  --well: color-mix(in srgb, var(--linen) 9%, var(--prussian-blue));
+  --line: color-mix(in srgb, var(--linen) 15%, var(--prussian-blue));
+  --line-muted: color-mix(in srgb, var(--linen) 9%, var(--prussian-blue));
+  --line-input: color-mix(in srgb, var(--linen) 24%, var(--prussian-blue));
+  --ink: var(--linen);
+  --muted: color-mix(in srgb, var(--linen) 72%, var(--prussian-blue));
+  --dim: color-mix(in srgb, var(--linen) 42%, var(--prussian-blue));
+  --success-text: var(--lime-moss);
+  --danger-text: var(--tomato);
+  --warning-text: var(--golden-pollen);
+  --info-text: var(--strong-cyan);
   color-scheme: dark;
 }
 
@@ -158,14 +160,16 @@ body {
   margin: 0;
   color: var(--ink);
   background: var(--paper);
-  font-family: var(--font-serif);
+  font-family: var(--font-body);
+  font-weight: 500;
   font-size: 15px;
   line-height: 1.55;
 }
 a { color: inherit; }
 button, input, select, textarea { font: inherit; color: inherit; }
-h1, h2, h3 { font-family: var(--font-serif); font-weight: 700; line-height: 1.2; margin: 0; }
-code, kbd, .mono { font-family: var(--font-mono); }
+h1, h2, h3 { font-family: var(--font-display); font-weight: 700; line-height: 1.15; margin: 0; }
+/* Times and counts line up without a monospace face. */
+code, kbd, .mono { font-family: var(--font-body); font-variant-numeric: tabular-nums; }
 :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
 .sr-only {
@@ -173,7 +177,7 @@ code, kbd, .mono { font-family: var(--font-mono); }
   overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
 }
 
-/* Running-text links: azure is too light for body copy, so ink plus an underline. */
+/* Running-text links: cyan is too light for body copy, so ink plus an underline. */
 .prose a, p a { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--dim); }
 .prose a:hover, p a:hover { text-decoration-color: var(--primary); }
 
@@ -218,7 +222,7 @@ a, button, [role="button"], label, summary { touch-action: manipulation; }
 /* The micro-label: section eyebrows, column headers, chip captions, tab strips. */
 .micro-label {
   display: block;
-  font-family: var(--font-serif);
+  font-family: var(--font-body);
   font-size: 10px;
   font-weight: 700;
   line-height: 1.3;
@@ -291,7 +295,7 @@ a, button, [role="button"], label, summary { touch-action: manipulation; }
   border-radius: var(--radius-control);
   background: var(--raised);
   color: var(--ink);
-  font-family: var(--font-serif); font-size: 14px; font-weight: 700;
+  font-family: var(--font-body); font-size: 14px; font-weight: 600;
   text-decoration: none; white-space: nowrap;
   cursor: pointer;
   transition: background-color .12s ease, border-color .12s ease, color .12s ease, transform .12s ease;
@@ -299,7 +303,7 @@ a, button, [role="button"], label, summary { touch-action: manipulation; }
 .button:hover { background: var(--hover); }
 .button:disabled, .button[aria-disabled="true"] { opacity: .5; cursor: default; }
 .button.primary { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
-.button.primary:hover { background: color-mix(in srgb, var(--primary) 88%, black); }
+.button.primary:hover { background: color-mix(in srgb, var(--primary) 85%, var(--prussian-blue)); }
 .button.danger { background: transparent; border-color: color-mix(in srgb, var(--danger) 40%, transparent); color: var(--danger-text); }
 .button.danger:hover { background: color-mix(in srgb, var(--danger) 10%, transparent); }
 .button.ghost { border-color: transparent; background: transparent; }
@@ -358,12 +362,13 @@ a, button, [role="button"], label, summary { touch-action: manipulation; }
 
 /* Identity: avatars and dots take a member's colour (data-colour). */
 .avatar, .swatch { --hue: var(--muted); }
-[data-colour="purple"] { --hue: var(--purple); }
-[data-colour="pink"] { --hue: var(--pink); }
-[data-colour="orange"] { --hue: var(--orange); }
-[data-colour="azure"] { --hue: var(--azure); }
-[data-colour="emerald"] { --hue: var(--emerald); }
-[data-colour="amber"] { --hue: var(--amber); }
+/* The stored keys predate the brand; each now names a brand colour. */
+[data-colour="purple"] { --hue: var(--lavender-purple); }
+[data-colour="pink"] { --hue: var(--baby-pink); }
+[data-colour="orange"] { --hue: var(--tomato); }
+[data-colour="azure"] { --hue: var(--strong-cyan); }
+[data-colour="emerald"] { --hue: var(--lime-moss); }
+[data-colour="amber"] { --hue: var(--golden-pollen); }
 .avatar {
   display: inline-grid; place-items: center; flex: none;
   width: 28px; height: 28px; border-radius: 9999px;
@@ -404,7 +409,7 @@ a, button, [role="button"], label, summary { touch-action: manipulation; }
 .input:focus, .field input:focus, .field select:focus, .field textarea:focus { outline: none; border-color: var(--primary); }
 select {
   appearance: none; -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236e6b7c' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23586473' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 10px center; background-size: 13px;
   padding-right: 30px !important; cursor: pointer;
 }
@@ -427,7 +432,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); widt
 .table td { padding: 10px 12px; border-bottom: 1px solid var(--line-muted); vertical-align: middle; }
 .table tr:last-child td { border-bottom: 0; }
 .table tbody tr:hover td { background: var(--hover); }
-.table .num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.table .num { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* Tab strip inside a page (Week / List, etc.). */
 .subnav { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
@@ -464,7 +469,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); widt
    </Sheet>
    ========================================================================== */
 
-.modal-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: rgba(28, 26, 35, .45); }
+.modal-overlay { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; background: var(--scrim); }
 .modal-card {
   width: 100%; max-width: 520px; max-height: 88dvh; overflow-y: auto;
   padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-card);
@@ -515,12 +520,8 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); widt
   padding: var(--safe-top) max(24px, var(--safe-right)) 0 max(24px, var(--safe-left));
   background: var(--raised); border-bottom: 1px solid var(--line);
 }
-.app-brand { display: inline-flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; text-decoration: none; white-space: nowrap; }
-.app-brand-mark {
-  display: grid; place-items: center; width: 30px; height: 30px;
-  border: 1px solid var(--line); border-radius: var(--radius-control);
-  background: var(--paper); color: var(--primary);
-}
+.app-brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 18px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.app-brand-mark { width: 34px; height: auto; color: var(--ink); }
 .app-tabs { display: flex; align-self: stretch; gap: 2px; }
 .app-tabs a {
   display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; margin-bottom: -1px;
@@ -580,7 +581,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); widt
     pointer-events: none;
     transition: border-color .2s ease, background-color .2s ease;
   }
-  .app-titlebar-title { font-size: 15px; font-weight: 700; opacity: 0; transform: translateY(6px); transition: opacity .18s ease, transform .18s ease; }
+  .app-titlebar-title { font-family: var(--font-display); font-size: 16px; font-weight: 700; opacity: 0; transform: translateY(6px); transition: opacity .18s ease, transform .18s ease; }
   .app-titlebar.is-condensed { background: var(--raised); border-bottom-color: var(--line); pointer-events: auto; }
   .app-titlebar.is-condensed .app-titlebar-title { opacity: 1; transform: none; }
 

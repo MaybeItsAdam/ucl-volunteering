@@ -21,7 +21,7 @@ export default async function AccountPage() {
       {member.governance_role === null ? (
         <div className="notice info" role="status">
           <strong>You&apos;re not on the VolSoc committee yet</strong>
-          <p>Ask a principal to add you. Once they have, the plan and availability appear here.</p>
+          <p>Ask a principal to add you — once they have, the plan and availability appear here</p>
         </div>
       ) : null}
 
@@ -42,15 +42,15 @@ export default async function AccountPage() {
           </dd>
         </dl>
         <p className="muted small">
-          Your name and email come from your UCL sign-in. Principals come from the Toolbox; the committee is set by a
-          principal on the Members page.
+          Your name and email come from your UCL sign-in; principals come from the Toolbox and the committee is set by a
+          principal on the Members page
         </p>
       </section>
 
       <section className="panel" aria-labelledby="appearance">
         <h2 id="appearance" className="micro-label">Appearance</h2>
         <ThemeSetting />
-        <p className="muted small">System follows your phone or computer&apos;s light or dark setting.</p>
+        <p className="muted small">System follows your phone or computer&apos;s light or dark setting</p>
       </section>
 
       <form action="/api/auth/logout" method="post">

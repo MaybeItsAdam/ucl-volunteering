@@ -127,14 +127,21 @@ export interface AvailabilityBlock { id; memberId; weekday: number; startMinute:
 
 ## Design
 
-Follow the house style in the user's global CLAUDE.md (paper `#faf8f4`, raised `#fff`,
-grape ink `#444054`, azure primary, hairline borders, no shadows, 8px/6px radii,
-Arvo + Geist Mono, micro-labels). Hiking's `globals.css` already implements these
-tokens — reuse them. Category colours (categorical extras only):
-`social` → pink `#ff88dc`, `volunteering` → amber `#ffbf00`,
-`ucl_affiliated` → purple `#7a4de8`, `external` → orange `#ff6b2b`; render as tinted
-fill (`/10`) + `/40` border + 3px left rule of the hue, not solid blocks.
-Member identity hues from the same extras set + azure/emerald.
+VolSoc's own brand, everywhere. Strong cyan `#10c4c0` is the signature colour,
+prussian blue `#061c33` replaces black and linen `#feefe5` replaces white (dark mode
+swaps them). Tomato `#f26640` marks problems and lime moss `#8fb339` good news.
+League Spartan for headlines and titles, Work Sans (medium) for the rest. Cyan is
+too light for text on linen, so it fills buttons and marks with prussian on top.
+Layout stays flat: hairline borders, no shadows, 8px/6px radii, micro-labels.
+Tokens live in `src/app/globals.css`; components only use the role tokens.
+
+Copy: no full stops, capital V for Volunteering, clear, direct and kind.
+
+Category colours, the brand's project colours: `social` → Socials, baby pink
+`#ff99c8`; `volunteering` → Student led, lavender `#9b5de5`; `ucl_affiliated` →
+Group led, golden pollen `#ffd23f`; `external` → External, brick red `#ad2e24`.
+Render as tinted fill (`/10`) + `/40` border + 3px left rule of the hue, not solid
+blocks. Member identity hues come from the brand colours too.
 
 ## Ownership (do not edit another agent's files; report needed changes instead)
 

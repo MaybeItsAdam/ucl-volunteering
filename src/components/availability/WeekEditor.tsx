@@ -246,14 +246,14 @@ export function WeekEditor({
       });
       const body = (await res.json().catch(() => null)) as { blocks?: AvailabilityBlock[]; error?: string } | null;
       if (!res.ok || !body?.blocks) {
-        setSave({ kind: "error", message: body?.error ?? `Saving failed (${res.status}).` });
+        setSave({ kind: "error", message: body?.error ?? `Saving failed (${res.status})` });
         return;
       }
       setSavedBlocks(body.blocks);
       setSave({ kind: "saved" });
       onSaved(body.blocks);
     } catch {
-      setSave({ kind: "error", message: "Could not reach the server. Check your connection and try again." });
+      setSave({ kind: "error", message: "Could not reach the server — check your connection and try again" });
     }
   }
 
@@ -273,8 +273,8 @@ export function WeekEditor({
         <div>
           <h2 id="avail-editor-title" className="micro-label">Your week</h2>
           <p className="small muted avail-help">
-            <span className="avail-help-fine">Drag across the times you can&rsquo;t make. Start on a marked cell to clear.</span>
-            <span className="avail-help-coarse">Tap a time to mark it. Hold, then drag, to mark several.</span>
+            <span className="avail-help-fine">Drag across the times you can&rsquo;t make — start on a marked cell to clear</span>
+            <span className="avail-help-coarse">Tap a time to mark it — hold, then drag, to mark several</span>
           </p>
         </div>
         <div className="avail-save">
@@ -315,7 +315,7 @@ export function WeekEditor({
       )}
       {hidden && (
         <p className="small muted avail-hidden-note">
-          Some of your marked times are outside the hours or days shown. They are kept; widen the view to see them.
+          Some of your marked times are outside the hours or days shown — they are kept, widen the view to see them
         </p>
       )}
 
@@ -416,7 +416,7 @@ export function WeekEditor({
             ))}
           </ul>
         ) : (
-          <p className="small muted">Nothing marked: you&rsquo;re free all week.</p>
+          <p className="small muted">Nothing marked: you&rsquo;re free all week</p>
         )}
       </div>
 
@@ -457,7 +457,7 @@ function NoteSheet({
         <span className="sheet-handle" />
       </div>
       <h3 id="avail-note-title">{weekdayLong(block.weekday)} <span className="mono">{formatMinute(block.startMinute)}–{formatMinute(block.endMinute)}</span></h3>
-      <p>A word on why, if you like. The committee sees it.</p>
+      <p>A word on why, if you like — the committee sees it</p>
       <form
         onSubmit={(event) => {
           event.preventDefault();
