@@ -121,9 +121,11 @@
   min-height: 44px;
   padding: 0.8rem 1.3rem;
   border-radius: 999px;
-  font-weight: 600;
   text-decoration: none;
   border: 2px solid transparent;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
   transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
 
@@ -229,6 +231,12 @@
 }
 
 .uvs-signin-back {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
   font-size: 0.85rem;
   opacity: 0.7;
 }
