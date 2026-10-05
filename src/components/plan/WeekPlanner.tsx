@@ -665,8 +665,9 @@ function EventCard({
   const style: CSSProperties = {
     top: (segment.top - WINDOW_START) * PX_PER_MINUTE,
     height,
-    left: `calc(${(segment.column / segment.columns) * 100}% + 2px)`,
-    width: `calc(${(segment.span / segment.columns) * 100}% - 4px)`,
+    left: `calc(${segment.left * 100}% + 2px)`,
+    width: `calc(${segment.width * 100}% - 4px)`,
+    zIndex: 2 + segment.z,
   };
   return (
     <Link
@@ -680,6 +681,7 @@ function EventCard({
       data-dragging={dragging ? "" : undefined}
       data-clip-start={segment.clippedStart ? "" : undefined}
       data-clip-end={segment.clippedEnd ? "" : undefined}
+      data-stacked={segment.stacked ? "" : undefined}
       style={style}
       draggable={false}
       aria-label={eventLabel(event)}
