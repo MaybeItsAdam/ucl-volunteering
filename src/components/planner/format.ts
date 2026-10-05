@@ -5,7 +5,7 @@ import { dayLabel } from "@/components/plan/format";
 /** Display helpers for the planner. Pure; safe on server and client. */
 
 /** An event's page in the plan; one place to change if the plan's routes move. */
-export const eventHref = (id: string) => `/portal/plan/events/${id}`;
+export const eventHref = (id: string) => `/portal/calendar/events/${id}`;
 
 /** The planner, with the add-a-task sheet open for an event. */
 export const addTaskHref = (eventId: string) => `/portal/planner?event=${eventId}&new=1`;

@@ -7,7 +7,7 @@ import { listAvailability, listEvents } from "@/lib/plan";
 import { isDayKey, londonDayKey, londonTime, londonWeek, shiftDayKey, termWeek } from "@/lib/planTime";
 import { requireCapability } from "@/lib/session";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { refreshIfStale, timetableBlocksForWeek } from "@/lib/timetable";
+import { getTimetableStatus, refreshIfStale, timetableBlocksForWeek, type TimetableStatus } from "@/lib/timetable";
 import { lastOrganiserSync } from "@/lib/toolboxEvents";
 import { CATEGORY_LABELS, EVENT_CATEGORIES, type AvailabilityBlock, type CommitteeMember, type PlanEvent } from "@/lib/types";
 import { dayLabel, weekRange } from "@/components/plan/format";
@@ -15,7 +15,7 @@ import { PlanSubnav } from "@/components/plan/PlanSubnav";
 import { SyncStatus } from "@/components/plan/SyncStatus";
 import { WeekPlanner } from "@/components/plan/WeekPlanner";
 
-export const metadata: Metadata = { title: "Plan" };
+export const metadata: Metadata = { title: "Calendar" };
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
@@ -32,7 +32,7 @@ function syncChip(last: Awaited<ReturnType<typeof lastOrganiserSync>>, today: st
   return { label: `Synced ${when}`, tone: "ok" as const, title: "Social Impact and VolSoc calendars, from the Campus Toolbox" };
 }
 
-export default async function PlanPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function CalendarPage({ searchParams }: { searchParams: SearchParams }) {
   const member = await requireCapability("view_plan");
   const profile = profileOf(member);
   const params = await searchParams;
@@ -50,11 +50,15 @@ export default async function PlanPage({ searchParams }: { searchParams: SearchP
     : week.days.includes(today)
       ? week.days.indexOf(today)
       : 0;
+  // /portal/availability lands here with ?availability=edit, opening your week to edit.
+  const editAvailability = first(params.availability) === "edit";
 
   const dbReady = isSupabaseConfigured();
   let events: PlanEvent[] = [];
   let members: CommitteeMember[] = [];
   let blocks: AvailabilityBlock[] = [];
+  let timetableBlocks: AvailabilityBlock[] = [];
+  let timetableStatus: TimetableStatus | null = null;
   let sync: Awaited<ReturnType<typeof lastOrganiserSync>> = null;
   let loadError: string | null = null;
   if (dbReady) {
@@ -67,10 +71,14 @@ export default async function PlanPage({ searchParams }: { searchParams: SearchP
     } catch (error) {
       loadError = error instanceof Error ? error.message : "The plan couldn't be loaded";
     }
-    // Linked UCL timetables join the "Unavailable" overlay for this week. A
+    // Linked UCL timetables join the availability overlay for this week. A
     // failure here only loses the lectures, never the plan.
     try {
-      blocks = [...blocks, ...(await timetableBlocksForWeek(member.id, members.map((m) => m.id), week))];
+      const ids = new Set([...members.map((m) => m.id), member.id]);
+      [timetableStatus, timetableBlocks] = await Promise.all([
+        getTimetableStatus(member.id),
+        timetableBlocksForWeek(member.id, [...ids], week),
+      ]);
     } catch (error) {
       console.error("[plan] timetables", error);
     }
@@ -94,16 +102,16 @@ export default async function PlanPage({ searchParams }: { searchParams: SearchP
       <PlanSubnav active="week" week={week.monday} />
 
       <div className="plan-weekbar">
-        {/* On a phone the shell's large title says "Plan" and hides the h1, so the week is named here. */}
+        {/* On a phone the shell's large title says "Calendar" and hides the h1, so the week is named here. */}
         <h2 className="plan-phone-title">{title}</h2>
         <nav className="plan-weeknav" aria-label="Week">
-          <Link className="icon-button" href={`/portal/plan?week=${prevWeek}`} aria-label="Previous week">
+          <Link className="icon-button" href={`/portal/calendar?week=${prevWeek}`} aria-label="Previous week">
             <ChevronLeft size={18} aria-hidden="true" />
           </Link>
-          <Link className="button small" href="/portal/plan" aria-current={week.days.includes(today) ? "true" : undefined}>
+          <Link className="button small" href="/portal/calendar" aria-current={week.days.includes(today) ? "true" : undefined}>
             Today
           </Link>
-          <Link className="icon-button" href={`/portal/plan?week=${nextWeek}`} aria-label="Next week">
+          <Link className="icon-button" href={`/portal/calendar?week=${nextWeek}`} aria-label="Next week">
             <ChevronRight size={18} aria-hidden="true" />
           </Link>
         </nav>
@@ -131,8 +139,13 @@ export default async function PlanPage({ searchParams }: { searchParams: SearchP
         serverNow={now.getTime()}
         myId={member.id}
         canEdit={canEdit}
+        me={{ id: member.id, name: member.name, colour: member.colour }}
         members={members}
         blocks={blocks}
+        timetableBlocks={timetableBlocks}
+        timetableStatus={timetableStatus}
+        canSaveAvailability={dbReady && !loadError}
+        editAvailability={editAvailability}
         prevWeek={prevWeek}
         nextWeek={nextWeek}
         initialDay={initialDay}

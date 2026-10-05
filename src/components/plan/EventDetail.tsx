@@ -1,7 +1,6 @@
 "use client";
 
 import { ExternalLink } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, type FormEvent, type ReactNode } from "react";
 import { Sheet } from "@/components/Sheet";
@@ -15,7 +14,6 @@ import {
   STATUS_LABELS,
   type CommitteeMember,
   type EventCategory,
-  type EventSource,
   type EventStatus,
   type PlanEvent,
   type ResponseKind,
@@ -25,19 +23,7 @@ import { dayLabel, initials, myResponse, parseTime, SOURCE_LABELS, STATUS_TAG, t
 import { eventDaySpan } from "./layout";
 import "./plan.css";
 
-export interface LinkOption {
-  id: string;
-  title: string;
-  startsAt: string;
-  source: EventSource;
-}
-
 const RESPONSE_TAG: Record<ResponseKind, string> = { going: "tag ok", maybe: "tag warn", no: "tag bad" };
-
-function optionLabel(o: LinkOption) {
-  const day = londonDayKey(new Date(o.startsAt));
-  return `${dayLabel(day)} · ${o.title} (${SOURCE_LABELS[o.source]})`;
-}
 
 // ── Form state ──
 
@@ -54,7 +40,6 @@ interface FormState {
   category: EventCategory;
   status: EventStatus;
   leadMemberId: string;
-  linkedEventId: string;
   planDocUrl: string;
   instagramUrl: string;
   recapUrl: string;
@@ -81,7 +66,6 @@ function toForm(event: PlanEvent): FormState {
     category: event.category,
     status: event.status,
     leadMemberId: event.leadMemberId ?? "",
-    linkedEventId: event.linkedEventId ?? "",
     planDocUrl: event.planDocUrl ?? "",
     instagramUrl: event.instagramUrl ?? "",
     recapUrl: event.recapUrl ?? "",
@@ -109,7 +93,6 @@ function diff(event: PlanEvent, before: FormState, form: FormState): Record<stri
   set("category", form.category, before.category);
   set("status", form.status, before.status);
   set("leadMemberId", nullable(form.leadMemberId), nullable(before.leadMemberId));
-  set("linkedEventId", nullable(form.linkedEventId), nullable(before.linkedEventId));
   set("planDocUrl", nullable(form.planDocUrl), nullable(before.planDocUrl));
   set("instagramUrl", nullable(form.instagramUrl), nullable(before.instagramUrl));
   set("recapUrl", nullable(form.recapUrl), nullable(before.recapUrl));
@@ -153,8 +136,6 @@ function diff(event: PlanEvent, before: FormState, form: FormState): Record<stri
 export function EventDetail({
   event,
   committee,
-  linked,
-  linkOptions,
   myId,
   canEdit,
   backHref,
@@ -162,8 +143,6 @@ export function EventDetail({
 }: {
   event: PlanEvent;
   committee: CommitteeMember[];
-  linked: LinkOption | null;
-  linkOptions: LinkOption[];
   myId: string;
   canEdit: boolean;
   backHref: string;
@@ -293,14 +272,6 @@ export function EventDetail({
           )}
           <dt>Lead</dt>
           <dd>{lead ? lead.name : <span className="muted">No lead yet</span>}</dd>
-          {linked && (
-            <>
-              <dt>Linked</dt>
-              <dd>
-                <Link href={`/portal/plan/events/${linked.id}`}>{optionLabel(linked)}</Link>
-              </dd>
-            </>
-          )}
           {(event.targetVolunteers !== null || event.actualAttendance !== null) && (
             <>
               <dt>Numbers</dt>
@@ -498,21 +469,6 @@ export function EventDetail({
                 ))}
               </select>
             </div>
-          </div>
-
-          <div className="field">
-            <label htmlFor={`${formId}-link`}>Linked event</label>
-            <select id={`${formId}-link`} value={form.linkedEventId} onChange={(e) => update("linkedEventId", e.target.value)}>
-              <option value="">None</option>
-              {linkOptions.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {optionLabel(o)}
-                </option>
-              ))}
-            </select>
-            <span className="hint">
-              {isVolsoc ? "The Social Impact event this runs alongside" : "The VolSoc event run alongside this"} — events within three weeks are listed
-            </span>
           </div>
 
           <div className="field-row">

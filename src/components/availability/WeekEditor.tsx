@@ -69,6 +69,7 @@ export function WeekEditor({
   range,
   canSave,
   onSaved,
+  onDirtyChange,
 }: {
   me: CommitteeMember;
   initialBlocks: readonly BlockInput[];
@@ -77,6 +78,8 @@ export function WeekEditor({
   /** False when there is no database to save to: the grid still works, Save does not. */
   canSave: boolean;
   onSaved: (blocks: AvailabilityBlock[]) => void;
+  /** Told whenever there start or stop being unsaved changes, so closing can ask first. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [cells, setCells] = useState(() => blocksToCells(initialBlocks));
   // What the server holds, as of the last load or save: "Undo changes" goes back to it.
@@ -116,11 +119,12 @@ export function WeekEditor({
 
   // Leaving with unsaved changes asks first.
   useEffect(() => {
+    onDirtyChange?.(dirty);
     if (!dirty) return;
     const onBeforeUnload = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [dirty]);
+  }, [dirty, onDirtyChange]);
 
   // A pending long-press timer must not outlive the editor.
   useEffect(
@@ -453,9 +457,6 @@ function NoteSheet({
   const [note, setNoteText] = useState(block.note ?? "");
   return (
     <Sheet onClose={onClose} labelledBy="avail-note-title">
-      <div className="sheet-grip" aria-hidden>
-        <span className="sheet-handle" />
-      </div>
       <h3 id="avail-note-title">{weekdayLong(block.weekday)} <span className="mono">{formatMinute(block.startMinute)}–{formatMinute(block.endMinute)}</span></h3>
       <p>A word on why, if you like — the committee sees it</p>
       <form
