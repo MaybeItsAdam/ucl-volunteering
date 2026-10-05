@@ -11,7 +11,7 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono"
 export const metadata: Metadata = {
   title: { default: "UCL Volunteering Society", template: "%s | VolSoc" },
   description: "UCL Volunteering Society: volunteering, socials and the committee's plan.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://ucl-volunteering-delta.vercel.app"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://uclvolunteering.org"),
 };
 
 export const viewport: Viewport = {
