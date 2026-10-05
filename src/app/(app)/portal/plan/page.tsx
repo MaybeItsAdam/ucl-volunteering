@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { after } from "next/server";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { can, profileOf } from "@/lib/access";
 import { listAvailability, listEvents } from "@/lib/plan";
 import { isDayKey, londonDayKey, londonTime, londonWeek, shiftDayKey, termWeek } from "@/lib/planTime";
 import { requireCapability } from "@/lib/session";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { refreshIfStale, timetableBlocksForWeek } from "@/lib/timetable";
 import { lastOrganiserSync } from "@/lib/toolboxEvents";
 import { CATEGORY_LABELS, EVENT_CATEGORIES, type AvailabilityBlock, type CommitteeMember, type PlanEvent } from "@/lib/types";
 import { dayLabel, weekRange } from "@/components/plan/format";
@@ -65,6 +67,14 @@ export default async function PlanPage({ searchParams }: { searchParams: SearchP
     } catch (error) {
       loadError = error instanceof Error ? error.message : "The plan couldn't be loaded.";
     }
+    // Linked UCL timetables join the "Unavailable" overlay for this week. A
+    // failure here only loses the lectures, never the plan.
+    try {
+      blocks = [...blocks, ...(await timetableBlocksForWeek(member.id, members.map((m) => m.id), week))];
+    } catch (error) {
+      console.error("[plan] timetables", error);
+    }
+    after(() => refreshIfStale(member.id));
   }
 
   const chip = dbReady ? syncChip(sync, today) : { label: "Not synced", tone: "neutral" as const, title: undefined };

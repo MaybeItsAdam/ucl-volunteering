@@ -8,6 +8,8 @@ import { DAY_RANGE, WEEKDAYS, WHOLE_WEEK, WIDE_RANGE } from "./grid";
 import { WeekEditor } from "./WeekEditor";
 import "./availability.css";
 
+const NO_BLOCKS: AvailabilityBlock[] = [];
+
 /**
  * The availability page: your own week to edit, and the committee's combined.
  * Which days and hours both show is chosen once, here. The view opens wide
@@ -17,11 +19,14 @@ export function Availability({
   me,
   members,
   blocks: initialBlocks,
+  timetableBlocks = NO_BLOCKS,
   canSave,
 }: {
   me: CommitteeMember;
   members: CommitteeMember[];
   blocks: AvailabilityBlock[];
+  /** This week's lectures from linked UCL timetables. Shown, never edited or saved. */
+  timetableBlocks?: AvailabilityBlock[];
   canSave: boolean;
 }) {
   const [blocks, setBlocks] = useState(initialBlocks);
@@ -41,6 +46,7 @@ export function Availability({
   }, [members, me]);
   const myColour = shownMembers.find((m) => m.id === me.id)?.colour ?? null;
   const mine = useMemo(() => initialBlocks.filter((b) => b.memberId === me.id), [initialBlocks, me.id]);
+  const withTimetables = useMemo(() => [...blocks, ...timetableBlocks], [blocks, timetableBlocks]);
 
   return (
     <div className="avail">
@@ -72,7 +78,13 @@ export function Availability({
         onSaved={(saved) => setBlocks((prev) => [...prev.filter((b) => b.memberId !== me.id), ...saved])}
       />
 
-      <CommitteeView members={shownMembers} blocks={blocks} days={days} range={range} />
+      <CommitteeView members={shownMembers} blocks={withTimetables} days={days} range={range} />
+      {timetableBlocks.length > 0 && (
+        <p className="avail-timetable-note">
+          <span>Lectures are this week&rsquo;s, from linked UCL timetables</span>
+          <span>Everyone else sees yours only as busy</span>
+        </p>
+      )}
     </div>
   );
 }
