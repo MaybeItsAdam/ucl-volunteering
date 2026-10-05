@@ -21,7 +21,11 @@ export async function GET(_request: Request, { params }: Params) {
   }
 }
 
-/** Partial update → `{ task }`. Moving to or from Done sets or clears `completedAt`. */
+/**
+ * Partial update → `{ task }`. Moving into or out of the board's last column
+ * (Done, Approved) sets or clears `completedAt`. The assignee can be changed
+ * but never removed.
+ */
 export async function PATCH(request: Request, { params }: Params) {
   const auth = await requireApiCapability("edit_plan");
   if (auth.error) return auth.error;
@@ -55,6 +59,7 @@ export async function DELETE(_request: Request, { params }: Params) {
   try {
     const task = await deleteTask((await params).id);
     await audit(auth.member.id, "planner.task.delete", "task", task.id, {
+      board: task.board,
       title: task.title,
       status: task.status,
       assigneeId: task.assigneeId,

@@ -2,57 +2,78 @@
 
 import { useId, useState, type FormEvent } from "react";
 import { Sheet } from "@/components/Sheet";
-import { TASK_STATUSES, TASK_STATUS_LABELS, type CommitteeMember, type Task, type TaskStatus } from "@/lib/types";
+import {
+  BOARD_STATUSES,
+  isBoardStatus,
+  TASK_BOARDS,
+  TASK_BOARD_LABELS,
+  TASK_STATUS_LABELS,
+  type CommitteeMember,
+  type Task,
+  type TaskBoard,
+  type TaskStatus,
+} from "@/lib/types";
 import { createTask, deleteTask, patchTask } from "./api";
-import { eventOptionLabel, type EventOption } from "./format";
+import { COLUMN_HINT, eventOptionLabel, type EventOption } from "./format";
 
-/** What a new task starts with: the event and assignee the board is filtered to. */
+/** What a new item starts with: the board it's added on, the event the board is filtered to, and its owner (you by default). */
 export interface TaskDraft {
+  board: TaskBoard;
   eventId: string | null;
-  assigneeId: string | null;
+  assigneeId: string;
 }
 
 interface FormState {
+  board: TaskBoard;
   title: string;
   notes: string;
   status: TaskStatus;
   assigneeId: string;
   dueOn: string;
   eventId: string;
+  docUrl: string;
 }
 
 function toForm(task: Task | null, draft: TaskDraft): FormState {
   return {
+    board: task?.board ?? draft.board,
     title: task?.title ?? "",
     notes: task?.notes ?? "",
-    status: task?.status ?? "todo",
-    assigneeId: task?.assigneeId ?? draft.assigneeId ?? "",
+    status: task?.status ?? "backlog",
+    assigneeId: task?.assigneeId ?? draft.assigneeId,
     dueOn: task?.dueOn ?? "",
     eventId: task?.eventId ?? draft.eventId ?? "",
+    docUrl: task?.docUrl ?? "",
   };
 }
 
 const nullable = (v: string) => (v.trim() ? v.trim() : null);
 
-/** The POST body, or for an existing task the PATCH body of only what changed. */
+/** The POST body, or for an existing item the PATCH body of only what changed. */
 function body(task: Task | null, before: FormState, form: FormState): Record<string, unknown> {
   if (!form.title.trim()) throw new Error("Give it a title");
+  if (!form.assigneeId) throw new Error("Pick someone on the committee to own it");
   const out: Record<string, unknown> = {};
   const set = (key: string, now: unknown, was: unknown) => {
     if (!task || now !== was) out[key] = now;
   };
+  set("board", form.board, before.board);
   set("title", form.title.trim(), before.title);
   set("notes", nullable(form.notes), nullable(before.notes));
   set("status", form.status, before.status);
-  set("assigneeId", nullable(form.assigneeId), nullable(before.assigneeId));
+  set("assigneeId", form.assigneeId, before.assigneeId);
   set("dueOn", nullable(form.dueOn), nullable(before.dueOn));
   set("eventId", nullable(form.eventId), nullable(before.eventId));
+  set("docUrl", nullable(form.docUrl), nullable(before.docUrl));
+  // A board move always carries its column, so the server never has to guess.
+  if (task && out.board !== undefined) out.status = form.status;
   return out;
 }
 
 /**
- * Add or edit one task: title, status, who, when, which event, notes. A
- * bottom sheet on a phone. Without `canEdit` it's a read-only view.
+ * Add or edit one planner item: title, board and column, who owns it, when
+ * it's due, the event it's for (or none: an action), a document link and
+ * notes. A bottom sheet on a phone. Without `canEdit` it's a read-only view.
  */
 export function TaskSheet({
   task,
@@ -64,7 +85,7 @@ export function TaskSheet({
   onSaved,
   onDeleted,
 }: {
-  /** Null to add a new task. */
+  /** Null to add a new item. */
   task: Task | null;
   draft: TaskDraft;
   committee: CommitteeMember[];
@@ -83,10 +104,16 @@ export function TaskSheet({
 
   const update = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm((f) => ({ ...f, [key]: value }));
 
-  // The task's own event stays pickable even once it's past and off the list.
+  // Switching board keeps the column if the new board has it (Backlog), else starts in Backlog.
+  const setBoard = (board: TaskBoard) =>
+    setForm((f) => ({ ...f, board, status: isBoardStatus(board, f.status) ? f.status : "backlog" }));
+
+  // The item's own event stays pickable even once it's past and off the list.
   const options = [...events];
   if (task?.event && !options.some((e) => e.id === task.event!.id)) options.unshift(task.event);
   const assigneeGone = form.assigneeId && !committee.some((m) => m.id === form.assigneeId);
+  const showDocUrl = form.board === "documents" || Boolean(initial.docUrl);
+  const noun = form.board === "documents" ? "document" : "item";
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -127,7 +154,7 @@ export function TaskSheet({
   return (
     <Sheet onClose={onClose} labelledBy={`${id}-head`}>
       <form onSubmit={save} noValidate className="planner-sheet">
-        <h3 id={`${id}-head`}>{task ? (canEdit ? "Edit task" : task.title) : "New task"}</h3>
+        <h3 id={`${id}-head`}>{task ? (canEdit ? `Edit ${noun}` : task.title) : `New ${noun}`}</h3>
         <fieldset disabled={!canEdit || busy}>
           <div className="field">
             <label htmlFor={`${id}-title`}>Title</label>
@@ -136,19 +163,19 @@ export function TaskSheet({
               value={form.title}
               onChange={(e) => update("title", e.target.value)}
               maxLength={200}
-              placeholder="Book the minibus"
+              placeholder={form.board === "documents" ? "Risk assessment" : "Book the minibus"}
               autoFocus={!task}
             />
           </div>
 
           <div className="field">
-            <span className="micro-label" id={`${id}-status`}>
-              Status
+            <span className="micro-label" id={`${id}-board`}>
+              Board
             </span>
-            <div className="segmented planner-status-switch" role="group" aria-labelledby={`${id}-status`}>
-              {TASK_STATUSES.map((s) => (
-                <button key={s} type="button" aria-pressed={form.status === s} onClick={() => update("status", s)}>
-                  {TASK_STATUS_LABELS[s]}
+            <div className="segmented planner-board-switch" role="group" aria-labelledby={`${id}-board`}>
+              {TASK_BOARDS.map((b) => (
+                <button key={b} type="button" aria-pressed={form.board === b} onClick={() => setBoard(b)}>
+                  {TASK_BOARD_LABELS[b]}
                 </button>
               ))}
             </div>
@@ -156,9 +183,30 @@ export function TaskSheet({
 
           <div className="field-row">
             <div className="field">
-              <label htmlFor={`${id}-who`}>Who</label>
-              <select id={`${id}-who`} value={form.assigneeId} onChange={(e) => update("assigneeId", e.target.value)}>
-                <option value="">No one yet</option>
+              <label htmlFor={`${id}-status`}>Column</label>
+              <select id={`${id}-status`} value={form.status} onChange={(e) => update("status", e.target.value as TaskStatus)}>
+                {BOARD_STATUSES[form.board].map((s) => (
+                  <option key={s} value={s}>
+                    {TASK_STATUS_LABELS[s]}
+                  </option>
+                ))}
+              </select>
+              {COLUMN_HINT[form.status] && <span className="hint">{COLUMN_HINT[form.status]}</span>}
+            </div>
+            <div className="field">
+              <label htmlFor={`${id}-who`}>Who owns it</label>
+              <select
+                id={`${id}-who`}
+                value={form.assigneeId}
+                onChange={(e) => update("assigneeId", e.target.value)}
+                required
+                aria-required="true"
+              >
+                {!form.assigneeId && (
+                  <option value="" disabled>
+                    Pick someone
+                  </option>
+                )}
                 {assigneeGone && <option value={form.assigneeId}>Former member</option>}
                 {committee.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -166,17 +214,14 @@ export function TaskSheet({
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="field">
-              <label htmlFor={`${id}-due`}>Due</label>
-              <input id={`${id}-due`} type="date" value={form.dueOn} onChange={(e) => update("dueOn", e.target.value)} />
+              {assigneeGone && <span className="hint">They&apos;ve left the committee, so hand this on</span>}
             </div>
           </div>
 
           <div className="field">
-            <label htmlFor={`${id}-event`}>For an event</label>
+            <label htmlFor={`${id}-event`}>Event</label>
             <select id={`${id}-event`} value={form.eventId} onChange={(e) => update("eventId", e.target.value)}>
-              <option value="">Not for an event</option>
+              <option value="">None, it&apos;s an action</option>
               {options.map((o) => (
                 <option key={o.id} value={o.id}>
                   {eventOptionLabel(o)}
@@ -187,10 +232,38 @@ export function TaskSheet({
           </div>
 
           <div className="field">
+            <label htmlFor={`${id}-due`}>Due</label>
+            <input id={`${id}-due`} type="date" value={form.dueOn} onChange={(e) => update("dueOn", e.target.value)} />
+          </div>
+
+          {showDocUrl && (
+            <div className="field">
+              <label htmlFor={`${id}-doc`}>Document link</label>
+              <input
+                id={`${id}-doc`}
+                type="url"
+                inputMode="url"
+                value={form.docUrl}
+                onChange={(e) => update("docUrl", e.target.value)}
+                placeholder="https://"
+                maxLength={2000}
+              />
+            </div>
+          )}
+
+          <div className="field">
             <label htmlFor={`${id}-notes`}>Notes</label>
             <textarea id={`${id}-notes`} value={form.notes} onChange={(e) => update("notes", e.target.value)} />
           </div>
         </fieldset>
+
+        {task?.docUrl && (
+          <p className="planner-sheet-doc">
+            <a href={task.docUrl} target="_blank" rel="noreferrer">
+              Open document
+            </a>
+          </p>
+        )}
 
         {error && (
           <p className="planner-error" role="alert">
@@ -216,7 +289,7 @@ export function TaskSheet({
           </button>
           {canEdit && (
             <button type="submit" className="button primary" disabled={busy}>
-              {busy ? "Saving…" : task ? "Save" : "Add task"}
+              {busy ? "Saving…" : task ? "Save" : `Add ${noun}`}
             </button>
           )}
         </div>

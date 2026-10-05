@@ -1,12 +1,14 @@
 /* ==========================================================================
-   PLANNER: the task board, the task sheet, and the Tasks panel on an event.
+   PLANNER: the two boards (events, documents), the item sheet, and the Tasks
+   panel on an event.
 
    Layout only, on the shared tokens and classes in globals.css (.panel, .rows,
-   .tag, .segmented, .field, .avatar). Everything here is prefixed planner-.
+   .tag, .segmented, .subnav, .field, .avatar). Everything here is prefixed planner-.
    ========================================================================== */
 
 .planner { display: grid; gap: 12px; }
 .planner-error { color: var(--danger-text); font-size: 13px; margin: 0; }
+.planner-subnav { margin-bottom: 12px; }
 
 /* ── Toolbar and quick add ──────────────────────────────────────────────── */
 
@@ -16,60 +18,76 @@
 
 .planner-quickadd { display: flex; gap: 8px; }
 .planner-quickadd .input { flex: 1; min-width: 0; min-height: 40px; }
+.planner-quickadd .planner-quick-who { flex: 0 1 200px; }
 
 /* ── Board ──────────────────────────────────────────────────────────────── */
 
 .planner-columns-switch { display: none; }
 .planner-count { margin-left: 6px; font-weight: 500; }
 
-.planner-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
-.planner-column .rows > li { align-items: flex-start; }
+/* Five columns; below their comfortable width the board scrolls sideways rather than squashing cards. */
+.planner-board {
+  display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: 12px; align-items: start;
+  overflow-x: auto;
+}
+.planner-column-hint { margin: 0; padding: 8px 16px; border-bottom: 1px solid var(--line); }
+.planner-column .rows > li.planner-task { display: grid; gap: 8px; align-items: start; }
 
-.planner-task-main { flex: 1; min-width: 0; display: grid; gap: 6px; }
 .planner-task-title {
   justify-self: start; padding: 0; border: 0; background: none; cursor: pointer;
   font-weight: 700; font-size: 14px; text-align: left; overflow-wrap: anywhere;
 }
 .planner-task-title:hover { text-decoration: underline; text-underline-offset: 3px; }
-.planner-task[data-status="done"] .planner-task-title { text-decoration: line-through; color: var(--muted); }
+.planner-task[data-finished] .planner-task-title { text-decoration: line-through; color: var(--muted); }
 .planner-task-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.planner-task-meta:empty { display: none; }
 .planner-task-event { color: var(--muted); text-decoration: none; overflow-wrap: anywhere; }
 .planner-task-event:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
-.planner-task-who { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
-.planner-task-who .avatar { width: 20px; height: 20px; font-size: 9px; }
+.planner-task-doc { display: inline-flex; align-items: center; gap: 4px; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.planner-task-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.planner-task-who { display: inline-flex; align-items: center; gap: 6px; min-width: 0; color: var(--muted); }
+.planner-task-who .avatar { width: 20px; height: 20px; font-size: 9px; flex: none; }
+.planner-task-foot .button { flex: none; }
 
 @media (max-width: 768px) {
   /* One column at a time, picked with the switch, full width. */
-  .planner-columns-switch { display: flex; }
-  .planner-columns-switch button { flex: 1; justify-content: center; min-height: 44px; }
-  .planner-board { grid-template-columns: minmax(0, 1fr); }
+  .planner-subnav a { min-height: 44px; }
+  /* Five columns don't fit one row on a phone, so the switch wraps rather than hiding some off the edge. */
+  .planner-columns-switch { display: flex; flex-wrap: wrap; }
+  .planner-columns-switch button { flex: 1 1 auto; justify-content: center; min-height: 44px; white-space: nowrap; }
+  .planner-board { grid-template-columns: minmax(0, 1fr); overflow-x: visible; }
   .planner-column:not([data-active]) { display: none; }
   .planner-column > .panel-head { display: none; }
   .planner-task-title { min-height: 24px; font-size: 15px; }
   .planner-quickadd .input, .planner-event-filter .input { min-height: 44px; }
   .planner-quickadd { flex-wrap: wrap; }
   .planner-quickadd .input { flex: 1 1 100%; }
+  .planner-quickadd .planner-quick-who { flex: 1 1 100%; }
   .planner-quickadd .button { flex: 1; min-height: 44px; }
   .planner-event-filter { flex: 1 1 100%; }
   .planner-toolbar .segmented button { min-height: 40px; }
+  .planner-task-foot .button { min-height: 36px; }
 }
 
 /* ── Sheet ──────────────────────────────────────────────────────────────── */
 
 .planner-sheet fieldset { margin: 12px 0 0; padding: 0; border: 0; min-width: 0; }
-.planner-status-switch { display: flex; }
-.planner-status-switch button { flex: 1; justify-content: center; }
+.planner-board-switch { display: flex; }
+.planner-board-switch button { flex: 1; justify-content: center; }
+.planner-sheet-doc { margin: 0 0 8px; }
+.planner-sheet-doc a { color: var(--ink); text-underline-offset: 3px; }
 .planner-sheet-spacer { flex: 1; }
 @media (max-width: 768px) {
-  .planner-status-switch button { min-height: 40px; }
+  .planner-board-switch button { min-height: 44px; }
   .modal-card .modal-actions .planner-sheet-spacer { display: none; }
 }
 
 /* ── Tasks panel on an event ────────────────────────────────────────────── */
 
 .rows > li.planner-event-task { flex-wrap: wrap; gap: 6px 10px; padding: 10px 16px; }
+.planner-event-task-board { min-width: 9ch; }
 .planner-event-task-title { flex: 1; min-width: 12ch; font-weight: 700; overflow-wrap: anywhere; }
-.planner-event-task[data-status="done"] .planner-event-task-title { text-decoration: line-through; color: var(--muted); }
+.planner-event-task[data-finished] .planner-event-task-title { text-decoration: line-through; color: var(--muted); }
 .planner-event-tasks-foot {
   display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px;
   padding: 10px 16px; border-top: 1px solid var(--line); background: var(--alt);

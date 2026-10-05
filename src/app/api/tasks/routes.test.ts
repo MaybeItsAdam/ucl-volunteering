@@ -34,13 +34,15 @@ const { PATCH: patch, DELETE: remove } = await import("./[id]/route");
 
 const TASK: Task = {
   id: "task-1",
+  board: "events",
   title: "Book the minibus",
   notes: null,
-  status: "todo",
-  assigneeId: null,
+  status: "backlog",
+  assigneeId: "member-1",
   dueOn: "2026-10-20",
   eventId: null,
   event: null,
+  docUrl: null,
   createdBy: "member-1",
   createdAt: "2026-10-05T09:00:00.000Z",
   updatedAt: "2026-10-05T09:00:00.000Z",
@@ -79,7 +81,7 @@ describe("/api/tasks", () => {
     expect((await list(new Request("http://test/api/tasks"))).status).toBe(503);
   });
 
-  it("lists an event's tasks in full, else recent done only", async () => {
+  it("lists an event's items in full, else recent finished only", async () => {
     tasks.listTasks.mockResolvedValue([TASK]);
     const response = await list(new Request("http://test/api/tasks?event=e1"));
     expect(await response.json()).toEqual({ tasks: [TASK] });
@@ -88,14 +90,24 @@ describe("/api/tasks", () => {
     expect(tasks.listTasks.mock.lastCall?.[0]).toHaveProperty("doneSince");
   });
 
+  it("keeps one board's items, and refuses a board that doesn't exist", async () => {
+    tasks.listTasks.mockResolvedValue([]);
+    await list(new Request("http://test/api/tasks?board=documents"));
+    expect(tasks.listTasks.mock.lastCall?.[0]).toMatchObject({ board: "documents" });
+    const response = await list(new Request("http://test/api/tasks?board=socials"));
+    expect(response.status).toBe(400);
+  });
+
   it("creates as the caller and audits it", async () => {
     tasks.createTask.mockResolvedValue(TASK);
-    const response = await create(json({ title: "Book the minibus" }));
+    const response = await create(json({ title: "Book the minibus", assigneeId: "member-1" }));
     expect(response.status).toBe(201);
-    expect(tasks.createTask).toHaveBeenCalledWith("member-1", { title: "Book the minibus" });
+    expect(tasks.createTask).toHaveBeenCalledWith("member-1", { title: "Book the minibus", assigneeId: "member-1" });
     expect(audit).toHaveBeenCalledWith("member-1", "planner.task.create", "task", "task-1", {
+      board: "events",
       title: "Book the minibus",
-      assigneeId: null,
+      status: "backlog",
+      assigneeId: "member-1",
       dueOn: "2026-10-20",
       eventId: null,
     });
@@ -125,13 +137,13 @@ describe("/api/tasks/[id]", () => {
     expect(response.status).toBe(200);
     expect(audit).toHaveBeenCalledWith("member-1", "planner.task.update", "task", "task-1", {
       title: "Book the minibus",
-      from: { status: "todo" },
+      from: { status: "backlog" },
       to: { status: "done" },
     });
   });
 
   it("404s a missing task", async () => {
-    tasks.deleteTask.mockRejectedValue(new PlanError("No such task", 404));
+    tasks.deleteTask.mockRejectedValue(new PlanError("No such item", 404));
     expect((await remove(new Request("http://test"), params("nope"))).status).toBe(404);
   });
 

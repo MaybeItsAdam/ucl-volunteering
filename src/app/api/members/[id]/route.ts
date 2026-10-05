@@ -3,6 +3,7 @@ import { isGovernanceRole } from "@/lib/access";
 import { audit } from "@/lib/audit";
 import { requireApiCapability } from "@/lib/session";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
+import { countOpenTasks } from "@/lib/tasks";
 import {
   auditAction,
   judgeMemberPatch,
@@ -19,7 +20,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  *   { governanceRole: "committee" | null }  seat set by hand, and locked
  *   { unlock: true }                        hand the seat back to Toolbox sign-in
  *   { colour: MemberColour }                identity hue
- * Rules: `judgeMemberPatch`. Answers `{ member: MemberRow }`.
+ * Rules: `judgeMemberPatch`. Answers `{ member: MemberRow, openItems }`, where
+ * `openItems` counts the unfinished planner items still theirs after being
+ * taken off the committee (0 for any other change).
  */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireApiCapability("manage_members");
@@ -75,5 +78,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         : { role: targetRole },
   );
 
-  return NextResponse.json({ member: updated as unknown as MemberRow });
+  // Members are never deleted, only taken off the committee, and their planner
+  // items stay theirs (every item needs an owner). Say how many are left to hand on.
+  let openItems = 0;
+  if (patch.kind === "role" && patch.governanceRole === null) {
+    openItems = await countOpenTasks(id).catch((countError: unknown) => {
+      console.error("[members] open planner items", countError);
+      return 0;
+    });
+  }
+
+  return NextResponse.json({ member: updated as unknown as MemberRow, openItems });
 }

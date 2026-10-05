@@ -90,16 +90,22 @@ export function MembersAdmin({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data: { member?: MemberRow; error?: string } = await res
-        .json()
-        .catch(() => ({}));
+      const data: { member?: MemberRow; openItems?: number; error?: string } =
+        await res.json().catch(() => ({}));
       if (!res.ok || !data.member)
         throw new Error(data.error || "Couldn't save that change");
       const updated = data.member;
       setMembers((current) =>
         current.map((m) => (m.id === updated.id ? { ...m, ...updated } : m)),
       );
-      setStatus({ tone: "ok", text: done });
+      // Planner items keep their owner when they leave the committee; say so, so someone hands them on.
+      const open = data.openItems ?? 0;
+      setStatus({
+        tone: "ok",
+        text: open
+          ? `${done} — they still own ${open} unfinished planner ${open === 1 ? "item" : "items"}, so hand ${open === 1 ? "it" : "them"} on in the Planner`
+          : done,
+      });
     } catch (error) {
       setStatus({
         tone: "bad",
