@@ -22,12 +22,16 @@ export const MEMBER_COLUMNS = "id,toolbox_user_id,email,name,governance_role,gov
 
 // ── Plan ──
 
-export const EVENT_SOURCES = ["volsoc", "social_impact"] as const;
+export const EVENT_SOURCES = ["volsoc", "social_impact", "volsoc_toolbox"] as const;
 export const EVENT_CATEGORIES = ["social", "volunteering", "ucl_affiliated", "external"] as const;
 export const EVENT_STATUSES = ["provisional", "confirmed", "cancelled"] as const;
 export const RESPONSE_KINDS = ["going", "maybe", "no"] as const;
 
-/** `volsoc`: the committee's own. `social_impact`: from the Toolbox organiser feed. */
+/**
+ * `volsoc`: the committee's own, typed into the app. `social_impact` and
+ * `volsoc_toolbox`: from the Social Impact and VolSoc organiser feeds on the
+ * Toolbox, which own their title, time and place.
+ */
 export type EventSource = (typeof EVENT_SOURCES)[number];
 export type EventCategory = (typeof EVENT_CATEGORIES)[number];
 export type EventStatus = (typeof EVENT_STATUSES)[number];

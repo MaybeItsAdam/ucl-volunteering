@@ -23,13 +23,13 @@ const first = (value: string | string[] | undefined) => (Array.isArray(value) ? 
 
 /** "Synced 06:30", "Synced Fri 06:30", "Sync failed", "Never synced". */
 function syncChip(last: Awaited<ReturnType<typeof lastOrganiserSync>>, today: string) {
-  if (!last) return { label: "Never synced", tone: "neutral" as const, title: "The Social Impact calendar hasn't been pulled yet" };
+  if (!last) return { label: "Never synced", tone: "neutral" as const, title: "The Social Impact and VolSoc calendars haven't been pulled yet" };
   const at = new Date(last.finishedAt ?? last.startedAt);
   const day = londonDayKey(at);
   const when = day === today ? londonTime(at) : `${dayLabel(day)} ${londonTime(at)}`;
   if (last.ok === false) return { label: `Sync failed ${when}`, tone: "bad" as const, title: last.error ?? undefined };
   if (last.ok === null) return { label: `Syncing since ${when}`, tone: "neutral" as const };
-  return { label: `Synced ${when}`, tone: "ok" as const, title: "Social Impact calendar, from the Campus Toolbox" };
+  return { label: `Synced ${when}`, tone: "ok" as const, title: "Social Impact and VolSoc calendars, from the Campus Toolbox" };
 }
 
 export default async function PlanPage({ searchParams }: { searchParams: SearchParams }) {

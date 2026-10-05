@@ -1,9 +1,11 @@
 import { parseIcal, type IcalEvent } from "@/lib/ical";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import type { EventCategory, EventSource } from "@/lib/types";
 
 /**
- * The UCL Student Social Impact calendar, pulled from its public iCal feed on
- * Adam's Campus Toolbox into `events` as `social_impact` rows.
+ * Two public iCal feeds on Adam's Campus Toolbox, pulled into `events`: UCL
+ * Student Social Impact's calendar as `social_impact` rows, and VolSoc's own
+ * organiser page as `volsoc_toolbox` rows (including events already run).
  *
  * The feed owns a row's title, time, place, description and link, and every
  * sync rewrites those. The committee owns the rest (category, status, lead,
@@ -20,6 +22,32 @@ export const ORGANISER_SYNC_KIND = "organiser_events";
 export const DEFAULT_TOOLBOX_URL = "https://www.adamscampustoolbox.org.uk";
 /** UCL Student Social Impact, whose events fill the plan. */
 export const DEFAULT_CALENDAR_ORGANISER_ID = "org_uni_juev5rp0v";
+/** UCL Volunteering Society's own organiser page on the Toolbox. */
+export const DEFAULT_VOLSOC_ORGANISER_ID = "org_soc_vol_fix";
+
+/** A Toolbox organiser feed synced into the plan. */
+export interface OrganiserFeed {
+  source: Exclude<EventSource, "volsoc">;
+  /** For messages: "the Social Impact feed returned…". */
+  name: string;
+  url: string;
+  /** New rows start in this category; the committee may change it. */
+  category: EventCategory;
+}
+
+export function organiserFeeds(env: Record<string, string | undefined> = process.env): OrganiserFeed[] {
+  const base = (env.TOOLBOX_URL || DEFAULT_TOOLBOX_URL).replace(/\/+$/, "");
+  const url = (id: string) => `${base}/api/organiser/${encodeURIComponent(id)}/ical`;
+  return [
+    { source: "social_impact", name: "Social Impact", url: organiserFeedUrl(env), category: "ucl_affiliated" },
+    {
+      source: "volsoc_toolbox",
+      name: "VolSoc",
+      url: url(env.TOOLBOX_ORGANISER_ID || DEFAULT_VOLSOC_ORGANISER_ID),
+      category: "volunteering",
+    },
+  ];
+}
 
 /** An event the feed gave no end is shown as an hour long. */
 const DEFAULT_LENGTH_MS = 60 * 60_000;
@@ -67,7 +95,7 @@ export function feedFields(event: IcalEvent): FeedFields {
   };
 }
 
-/** What the sync needs to know about a `social_impact` row already stored. */
+/** What the sync needs to know about a feed row already stored. */
 export interface ExistingFeedRow extends FeedFields {
   id: string;
   toolbox_uid: string;
@@ -113,7 +141,12 @@ function changedFields(existing: ExistingFeedRow, next: FeedFields): Record<stri
  * event are candidates for removal: the feed carries a window of dates, so an
  * event from last month that has aged out of it was not withdrawn.
  */
-export function planFeedSync(feed: IcalEvent[], existing: ExistingFeedRow[], now: Date): FeedSyncPlan {
+export function planFeedSync(
+  feed: IcalEvent[],
+  existing: ExistingFeedRow[],
+  now: Date,
+  target: Pick<OrganiserFeed, "source" | "category"> = { source: "social_impact", category: "ucl_affiliated" },
+): FeedSyncPlan {
   const byUid = new Map<string, IcalEvent>();
   const duplicates = new Set<string>();
   for (const event of feed) {
@@ -129,8 +162,8 @@ export function planFeedSync(feed: IcalEvent[], existing: ExistingFeedRow[], now
     const row = stored.get(uid);
     if (!row) {
       plan.inserts.push({
-        source: "social_impact",
-        category: "ucl_affiliated",
+        source: target.source,
+        category: target.category,
         toolbox_uid: uid,
         status: event.cancelled ? "cancelled" : "provisional",
         ...fields,
@@ -159,19 +192,19 @@ export function planFeedSync(feed: IcalEvent[], existing: ExistingFeedRow[], now
 }
 
 /** GET the feed and parse it. Throws on HTTP failure or a body that isn't a calendar. */
-export async function fetchOrganiserFeed(url: string = organiserFeedUrl()): Promise<IcalEvent[]> {
+export async function fetchOrganiserFeed(url: string = organiserFeedUrl(), name = "Social Impact"): Promise<IcalEvent[]> {
   const res = await fetch(url, {
     headers: { Accept: "text/calendar" },
     cache: "no-store",
     signal: AbortSignal.timeout(15_000),
   });
-  if (!res.ok) throw new Error(`Social Impact feed returned HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`${name} feed returned HTTP ${res.status}`);
   const body = await res.text();
-  if (!body.includes("BEGIN:VCALENDAR")) throw new Error("Social Impact feed did not return a calendar");
+  if (!body.includes("BEGIN:VCALENDAR")) throw new Error(`${name} feed did not return a calendar`);
   return parseIcal(body);
 }
 
-export interface OrganiserSyncSummary {
+export interface FeedSyncSummary {
   feedEvents: number;
   inserted: number;
   updated: number;
@@ -181,15 +214,65 @@ export interface OrganiserSyncSummary {
   duplicates: string[];
 }
 
+/** Totals across the feeds, plus each feed's own counts. */
+export interface OrganiserSyncSummary extends FeedSyncSummary {
+  feeds: Partial<Record<OrganiserFeed["source"], FeedSyncSummary>>;
+}
+
 export type OrganiserSyncResult =
   | { ok: true; runId: string | null; summary: OrganiserSyncSummary }
-  | { ok: false; runId: string | null; error: string };
+  | { ok: false; runId: string | null; error: string; summary?: OrganiserSyncSummary };
+
+/** Fetch one feed and bring its rows in line. Throws on any failure. */
+async function syncFeed(feed: OrganiserFeed, now: Date): Promise<FeedSyncSummary> {
+  const supabase = getSupabaseAdmin();
+  const events = await fetchOrganiserFeed(feed.url, feed.name);
+  if (!events.length) throw new Error(`${feed.name} feed was empty; nothing was changed`);
+
+  const { data: existing, error } = await supabase
+    .from("events")
+    .select("id, toolbox_uid, status, removed_at, " + FEED_FIELDS.join(", "))
+    .eq("source", feed.source)
+    .not("toolbox_uid", "is", null);
+  if (error) throw new Error(`Database error: ${error.message}`);
+
+  const plan = planFeedSync(events, (existing ?? []) as unknown as ExistingFeedRow[], now, feed);
+
+  if (plan.inserts.length) {
+    const { error: insertError } = await supabase.from("events").insert(plan.inserts);
+    if (insertError) throw new Error(`Database error: ${insertError.message}`);
+  }
+  for (const update of plan.updates) {
+    const { error: updateError } = await supabase.from("events").update(update.changes).eq("id", update.id);
+    if (updateError) throw new Error(`Database error on ${update.uid}: ${updateError.message}`);
+  }
+  if (plan.remove.length) {
+    const { error: removeError } = await supabase
+      .from("events")
+      .update({ removed_at: new Date().toISOString() })
+      .in("id", plan.remove);
+    if (removeError) throw new Error(`Database error: ${removeError.message}`);
+  }
+
+  return {
+    feedEvents: events.length,
+    inserted: plan.inserts.length,
+    updated: plan.updates.length,
+    removed: plan.remove.length,
+    restored: plan.updates.filter((u) => "removed_at" in u.changes).length,
+    unchanged: plan.unchanged,
+    duplicates: plan.duplicates,
+  };
+}
 
 /**
- * Fetch the feed, write the plan, and record the run in `sync_runs`.
+ * Sync every organiser feed and record the run in `sync_runs`. One feed
+ * failing doesn't stop the other; the run is ok only if both were.
  * Never throws: a failure is returned and recorded.
  */
-export async function runOrganiserSync(options: { url?: string; now?: Date } = {}): Promise<OrganiserSyncResult> {
+export async function runOrganiserSync(
+  options: { feeds?: OrganiserFeed[]; now?: Date } = {},
+): Promise<OrganiserSyncResult> {
   const supabase = getSupabaseAdmin();
   const { data: run, error: runError } = await supabase
     .from("sync_runs")
@@ -213,51 +296,34 @@ export async function runOrganiserSync(options: { url?: string; now?: Date } = {
     if (error) console.error(`[sync] could not record the end of organiser sync ${runId}: ${error.message}`);
   };
 
-  try {
-    const feed = await fetchOrganiserFeed(options.url);
-    if (!feed.length) throw new Error("Social Impact feed was empty; nothing was changed");
-
-    const { data: existing, error } = await supabase
-      .from("events")
-      .select("id, toolbox_uid, status, removed_at, " + FEED_FIELDS.join(", "))
-      .eq("source", "social_impact")
-      .not("toolbox_uid", "is", null);
-    if (error) throw new Error(`Database error: ${error.message}`);
-
-    const plan = planFeedSync(feed, (existing ?? []) as unknown as ExistingFeedRow[], options.now ?? new Date());
-
-    if (plan.inserts.length) {
-      const { error: insertError } = await supabase.from("events").insert(plan.inserts);
-      if (insertError) throw new Error(`Database error: ${insertError.message}`);
+  const now = options.now ?? new Date();
+  const summary: OrganiserSyncSummary = {
+    feedEvents: 0, inserted: 0, updated: 0, removed: 0, restored: 0, unchanged: 0, duplicates: [], feeds: {},
+  };
+  const errors: string[] = [];
+  for (const feed of options.feeds ?? organiserFeeds()) {
+    try {
+      const counts = await syncFeed(feed, now);
+      summary.feeds[feed.source] = counts;
+      summary.feedEvents += counts.feedEvents;
+      summary.inserted += counts.inserted;
+      summary.updated += counts.updated;
+      summary.removed += counts.removed;
+      summary.restored += counts.restored;
+      summary.unchanged += counts.unchanged;
+      summary.duplicates.push(...counts.duplicates);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : `${feed.name} sync failed`);
     }
-    for (const update of plan.updates) {
-      const { error: updateError } = await supabase.from("events").update(update.changes).eq("id", update.id);
-      if (updateError) throw new Error(`Database error on ${update.uid}: ${updateError.message}`);
-    }
-    if (plan.remove.length) {
-      const { error: removeError } = await supabase
-        .from("events")
-        .update({ removed_at: new Date().toISOString() })
-        .in("id", plan.remove);
-      if (removeError) throw new Error(`Database error: ${removeError.message}`);
-    }
-
-    const summary: OrganiserSyncSummary = {
-      feedEvents: feed.length,
-      inserted: plan.inserts.length,
-      updated: plan.updates.length,
-      removed: plan.remove.length,
-      restored: plan.updates.filter((u) => "removed_at" in u.changes).length,
-      unchanged: plan.unchanged,
-      duplicates: plan.duplicates,
-    };
-    await finish({ ok: true, summary });
-    return { ok: true, runId, summary };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Organiser sync failed";
-    await finish({ ok: false, error: message });
-    return { ok: false, runId, error: message };
   }
+
+  if (errors.length) {
+    const error = errors.join("; ");
+    await finish({ ok: false, summary, error });
+    return { ok: false, runId, error, summary };
+  }
+  await finish({ ok: true, summary });
+  return { ok: true, runId, summary };
 }
 
 /** The latest organiser sync run, for a "last synced" line. */

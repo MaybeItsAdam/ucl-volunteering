@@ -410,7 +410,7 @@ export function EventDetail({
           <h2 className="micro-label">Edit</h2>
           {!isVolsoc && (
             <p className="muted small">
-              The title, time and place come from the Social Impact calendar — here you can set what the committee is doing about it
+              The title, time and place come from the {event.source === "social_impact" ? "Social Impact" : "VolSoc"} calendar on the Toolbox — here you can set what the committee is doing about it
             </p>
           )}
 

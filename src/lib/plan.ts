@@ -46,7 +46,7 @@ const MAX_TEXT = 10_000;
 const MAX_SHORT = 500;
 const MAX_RANGE_DAYS = 400;
 
-/** Columns a committee member may change on a Social Impact row; the feed owns the rest. */
+/** Columns a committee member may change on a feed row; the feed owns the rest. */
 export const SOCIAL_IMPACT_EDITABLE = [
   "category",
   "status",
@@ -188,7 +188,7 @@ export function parseEventCreate(body: unknown): Parsed<Record<string, unknown>>
 }
 
 /**
- * A partial update, as columns. On a Social Impact row only
+ * A partial update, as columns. On a feed row (anything not `volsoc`) only
  * `SOCIAL_IMPACT_EDITABLE` may change. The start/end check against the stored
  * row happens in `updateEvent`, which knows the other half.
  */
@@ -197,12 +197,12 @@ export function parseEventPatch(body: unknown, source: EventSource): Parsed<Reco
   if (!parsed.ok) return parsed;
   const row = parsed.value;
   if (!Object.keys(row).length) return { ok: false, error: "Nothing to change" };
-  if (source === "social_impact") {
+  if (source !== "volsoc") {
     const locked = Object.keys(row).filter((c) => !(SOCIAL_IMPACT_EDITABLE as readonly string[]).includes(c));
     if (locked.length) {
       return {
         ok: false,
-        error: `${locked.map((c) => COLUMN_TO_FIELD[c] ?? c).join(", ")} come${locked.length === 1 ? "s" : ""} from the Social Impact calendar and can't be changed here`,
+        error: `${locked.map((c) => COLUMN_TO_FIELD[c] ?? c).join(", ")} come${locked.length === 1 ? "s" : ""} from the ${source === "social_impact" ? "Social Impact" : "VolSoc"} calendar on the Toolbox and can't be changed here`,
       };
     }
   }

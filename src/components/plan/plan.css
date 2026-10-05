@@ -192,7 +192,7 @@
   background: var(--raised); font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted);
   max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.plan-event-source[data-source="volsoc"] { border-color: var(--info-line, color-mix(in srgb, var(--primary) 40%, transparent)); color: var(--info-text); }
+.plan-event-source[data-source="volsoc"], .plan-event-source[data-source="volsoc_toolbox"] { border-color: var(--info-line, color-mix(in srgb, var(--primary) 40%, transparent)); color: var(--info-text); }
 
 .plan-event[data-size="sm"] .plan-event-title { -webkit-line-clamp: 1; }
 .plan-event[data-size="xs"] { flex-direction: row; align-items: center; gap: 6px; padding-top: 0; padding-bottom: 0; }
@@ -299,7 +299,7 @@
   background: color-mix(in srgb, var(--cat) 10%, var(--raised));
   font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; line-height: 1.8; white-space: nowrap;
 }
-.plan-source-tag[data-source="volsoc"] { background: color-mix(in srgb, var(--primary) 10%, transparent); border-color: color-mix(in srgb, var(--primary) 40%, transparent); color: var(--info-text); }
+.plan-source-tag[data-source="volsoc"], .plan-source-tag[data-source="volsoc_toolbox"] { background: color-mix(in srgb, var(--primary) 10%, transparent); border-color: color-mix(in srgb, var(--primary) 40%, transparent); color: var(--info-text); }
 
 .plan-response-head .plan-tally { font-size: 12px; color: var(--muted); }
 .plan-my-response {
