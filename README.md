@@ -48,7 +48,7 @@ without printing any value.
 | `SESSION_SECRET` | yes | ≥ 32 chars: `openssl rand -base64 48` |
 | `CRON_SECRET` | yes | Bearer for Vercel Cron: `openssl rand -hex 32` |
 | `TOOLBOX_URL` | yes | `https://www.adamscampustoolbox.org.uk` |
-| `TOOLBOX_ORGANISER_ID` | no | VolSoc's own Toolbox organiser; its principals and committee get those roles here. Unset, seats are granted on the Members page |
+| `TOOLBOX_ORGANISER_ID` | no | VolSoc's own Toolbox organiser; its principals and committee get those roles here. Unset, seats are granted on the Members page. Its feed is synced either way (default `org_soc_vol_fix`) |
 | `CALENDAR_ORGANISER_ID` | no | Whose public iCal feed fills the plan; defaults to `org_uni_juev5rp0v` (UCL Student Social Impact) |
 | `ADMIN_EMAILS` | no | Comma-separated; these people sign in as admin |
 | `TOOLBOX_API_TOKEN` | no | Only if the Toolbox feed ever needs authenticating |
@@ -94,24 +94,16 @@ Volunteering Society** organiser in the Toolbox Dev Portal, so the sign-in
 handoff is allowed to return here. That organiser's principals and committee
 get those roles here when `TOOLBOX_ORGANISER_ID` is set to its id.
 
-VolSoc plans around what UCL Student Social Impact runs: USSI's public iCal
-feed (`CALENDAR_ORGANISER_ID`, default `org_uni_juev5rp0v`) is synced into the
-plan daily at 06:30 UTC by Vercel Cron (`/api/sync/organiser-events`). USSI's
-events are read-only context; VolSoc's own events sit alongside them.
+Two public iCal feeds are synced into the plan daily at 06:30 UTC by Vercel
+Cron (`/api/sync/organiser-events`), or from the plan page's sync button:
 
-## UCL timetables
+- UCL Student Social Impact (`CALENDAR_ORGANISER_ID`, default
+  `org_uni_juev5rp0v`), as `social_impact` rows;
+- VolSoc's own Toolbox page (`TOOLBOX_ORGANISER_ID`, default
+  `org_soc_vol_fix`), as `volsoc_toolbox` rows, past events included.
 
-On the Availability page a committee member can paste their UCL timetable
-Subscribe link (`webcal://www.ucl.ac.uk/timetable/ics/…`). Their lectures then
-show as busy time on the plan's "Unavailable" overlay and in the committee
-view (as this week's). Only they see the titles and rooms; everyone else sees
-"UCL timetable".
-
-The link is a bearer secret, so it is stored encrypted (`TIMETABLE_FEED_KEY`)
-and never sent back to a browser. Only UCL's timetable hosts are fetched, each
-redirect is re-checked, and private addresses are refused. Sessions are
-refreshed daily at 05:00 UTC (`/api/sync/timetables`) and whenever their owner
-opens the plan with a copy over six hours old.
+The feed owns those rows' title, time and place; the committee owns the rest.
+Events typed into the app are `volsoc` rows and fully editable.
 
 ## Scripts
 

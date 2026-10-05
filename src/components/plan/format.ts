@@ -9,6 +9,7 @@ export const WEEKDAYS_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export const SOURCE_LABELS: Record<EventSource, string> = {
   volsoc: "VolSoc",
   social_impact: "Social Impact",
+  volsoc_toolbox: "VolSoc on the Toolbox",
 };
 
 /** "Wed 30 Sep" */

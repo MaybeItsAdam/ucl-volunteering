@@ -107,11 +107,11 @@ describe("parseEventPatch", () => {
   it("keeps the feed's fields on a Social Impact event", () => {
     expect(parseEventPatch({ startsAt: "2026-10-24T11:00:00Z", notes: "x" }, "social_impact")).toEqual({
       ok: false,
-      error: "startsAt comes from the Social Impact calendar and can't be changed here",
+      error: "startsAt comes from the Social Impact calendar on the Toolbox and can't be changed here",
     });
     expect(parseEventPatch({ title: "x", location: "y" }, "social_impact")).toEqual({
       ok: false,
-      error: "title, location come from the Social Impact calendar and can't be changed here",
+      error: "title, location come from the Social Impact calendar on the Toolbox and can't be changed here",
     });
   });
 

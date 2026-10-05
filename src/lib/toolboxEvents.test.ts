@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import type { IcalEvent } from "./ical";
 import { parseIcal } from "./ical";
-import { feedFields, organiserFeedUrl, planFeedSync, safeUrl, type ExistingFeedRow } from "./toolboxEvents";
+import { feedFields, organiserFeedUrl, organiserFeeds, planFeedSync, safeUrl, type ExistingFeedRow } from "./toolboxEvents";
 
 const feed = parseIcal(readFileSync(new URL("./__fixtures__/organiser-feed.ics", import.meta.url), "utf8"));
 const NOW = new Date("2026-10-03T12:00:00Z");
@@ -59,6 +59,24 @@ describe("feedFields", () => {
     expect(safeUrl("ftp://a.example")).toBeNull();
     expect(safeUrl("not a url")).toBeNull();
     expect(safeUrl(null)).toBeNull();
+  });
+});
+
+describe("organiser feeds", () => {
+  it("syncs Social Impact and VolSoc's own Toolbox page", () => {
+    expect(organiserFeeds({}).map((f) => [f.source, f.url, f.category])).toEqual([
+      ["social_impact", "https://www.adamscampustoolbox.org.uk/api/organiser/org_uni_juev5rp0v/ical", "ucl_affiliated"],
+      ["volsoc_toolbox", "https://www.adamscampustoolbox.org.uk/api/organiser/org_soc_vol_fix/ical", "volunteering"],
+    ]);
+  });
+
+  it("takes VolSoc's organiser from TOOLBOX_ORGANISER_ID", () => {
+    expect(organiserFeeds({ TOOLBOX_ORGANISER_ID: "org_other" })[1].url).toMatch(/\/org_other\/ical$/);
+  });
+
+  it("inserts a VolSoc feed event as a volsoc_toolbox row", () => {
+    const plan = planFeedSync([event("a", "2026-09-30T17:00:00Z")], [], NOW, { source: "volsoc_toolbox", category: "volunteering" });
+    expect(plan.inserts[0]).toMatchObject({ source: "volsoc_toolbox", category: "volunteering", toolbox_uid: "a" });
   });
 });
 

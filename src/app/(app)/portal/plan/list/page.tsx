@@ -70,7 +70,7 @@ export default async function PlanListPage({ searchParams }: { searchParams: Sea
   return (
     <section className="page plan-page">
       <header className="page-head">
-        <span className="micro-label">Social Impact calendar</span>
+        <span className="micro-label">The plan</span>
         <h1>All events</h1>
         <div className="page-actions">
           <div className="segmented" role="group" aria-label="Which events">
