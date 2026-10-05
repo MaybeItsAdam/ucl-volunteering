@@ -241,7 +241,7 @@ export async function fetchTimetableFeed(
         );
       }
       if (!response.ok) {
-        throw new TimetableFeedError(`UCL's timetable server answered ${response.status}. We'll retry later.`);
+        throw new TimetableFeedError(`UCL's timetable server answered ${response.status} — we'll try again later`);
       }
 
       const body = await readCapped(response, MAX_FEED_BYTES);
