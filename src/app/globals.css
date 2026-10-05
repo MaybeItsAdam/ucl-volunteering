@@ -317,6 +317,16 @@ a, button, [role="button"], label, summary { touch-action: manipulation; }
 }
 .icon-button:hover { background: var(--hover); border-color: var(--line); }
 
+/* The light/dark toggle shows the theme you'd switch to: a moon in light, a
+   sun in dark, following the same rules as the palette above. */
+.theme-toggle .theme-toggle-sun { display: none; }
+:root[data-theme="dark"] .theme-toggle .theme-toggle-moon { display: none; }
+:root[data-theme="dark"] .theme-toggle .theme-toggle-sun { display: block; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-toggle .theme-toggle-moon { display: none; }
+  :root:not([data-theme="light"]) .theme-toggle .theme-toggle-sun { display: block; }
+}
+
 /* Segmented control (also the theme setting). */
 .segmented, .theme-setting {
   display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px;
@@ -534,7 +544,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); widt
 .app-tabs a.active { color: var(--ink); border-bottom-color: var(--primary); }
 .app-tabs a.active .app-tab-icon { color: var(--primary); }
 .app-tab-icon { display: inline-grid; place-items: center; }
-.app-bar-account { margin-left: auto; }
+.app-bar-account { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .app-main { padding: 24px max(24px, var(--safe-right)) 48px max(24px, var(--safe-left)); }
 
 /* Account menu (top bar, wide screens). */
@@ -591,6 +601,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); widt
     padding: calc(14px + var(--safe-top)) max(16px, var(--safe-left)) 10px max(16px, var(--safe-right));
   }
   .app-page-head h1 { font-size: 28px; letter-spacing: -.01em; }
+  .app-page-head .theme-toggle { margin-left: auto; width: 40px; height: 40px; }
   .app-title-sentinel { display: block; height: 1px; margin-top: -1px; }
 
   /* The shell's large title names the page on a phone; a page's own heading

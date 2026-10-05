@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarOff, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { CalendarClock, CalendarOff, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -33,6 +33,7 @@ import {
 } from "@/lib/types";
 import type { TimetableStatus } from "@/lib/timetable";
 import { AvailabilitySheet } from "@/components/availability/AvailabilitySheet";
+import { TimetableSheet } from "@/components/availability/TimetableSheet";
 import { patchEvent } from "./api";
 import { CreateEventSheet, type CreateDraft } from "./CreateEventSheet";
 import { dayLabel, hourLabel, myResponse, SOURCE_LABELS, timeRange, WEEKDAYS_SHORT } from "./format";
@@ -164,6 +165,7 @@ export function WeekPlanner({
   const [mobileDay, setMobileDay] = useState(initialDay);
   const [overlay, setOverlay] = useState<string[]>([]);
   const [availabilityOpen, setAvailabilityOpen] = useState(editAvailability);
+  const [timetableOpen, setTimetableOpen] = useState(false);
 
   const bodyRef = useRef<HTMLDivElement>(null);
   const colRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -428,6 +430,10 @@ export function WeekPlanner({
             <CalendarOff size={14} aria-hidden="true" />
             Edit my availability
           </button>
+          <button type="button" className="button small plan-availability-edit" onClick={() => setTimetableOpen(true)}>
+            <CalendarClock size={14} aria-hidden="true" />
+            {timetableStatus?.linked ? "My UCL timetable" : "Add my UCL timetable"}
+          </button>
         </div>
 
         <div className="plan-toolbar">
@@ -635,6 +641,7 @@ export function WeekPlanner({
           onClose={closeAvailability}
         />
       )}
+      {timetableOpen && <TimetableSheet status={timetableStatus} onClose={() => setTimetableOpen(false)} />}
     </div>
   );
 }

@@ -76,3 +76,9 @@ export function parseTime(value: string): number | null {
   if (h > 23 || min > 59) return null;
   return h * 60 + min;
 }
+
+/** Google Calendar's "add this calendar" link, for a calendar id or an iCal URL. */
+export function googleAddUrl(idOrIcal: string): string {
+  const cid = idOrIcal.startsWith("https://") ? idOrIcal.replace(/^https:/, "webcal:") : idOrIcal;
+  return `https://calendar.google.com/calendar/u/0/r?cid=${encodeURIComponent(cid)}`;
+}

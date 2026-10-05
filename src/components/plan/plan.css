@@ -358,3 +358,15 @@
   .plan-agenda-lead { grid-column: 1; display: flex; gap: 6px; align-items: baseline; }
   .plan-agenda-counts { grid-column: 2; justify-self: end; }
 }
+
+/* ── Subscribe links ────────────────────────────────────────────────────── */
+
+.plan-links { display: grid; gap: 16px; }
+.plan-links-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.modal-card .plan-links-head h3 { margin: 0; }
+.plan-link { display: grid; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+.plan-link p { margin: 0; }
+.plan-link-url { width: 100%; font-size: 13px; text-overflow: ellipsis; }
+.plan-link-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.plan-link-actions .button { gap: 6px; }
+@media (max-width: 768px) { .plan-link-url { font-size: 16px; } }

@@ -8,10 +8,12 @@ import { isDayKey, londonDayKey, londonTime, londonWeek, shiftDayKey, termWeek }
 import { requireCapability } from "@/lib/session";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { getTimetableStatus, refreshIfStale, timetableBlocksForWeek, type TimetableStatus } from "@/lib/timetable";
-import { lastOrganiserSync } from "@/lib/toolboxEvents";
+import { volsocFeedUrl } from "@/lib/calendarFeed";
+import { lastOrganiserSync, organiserFeedUrl } from "@/lib/toolboxEvents";
 import { CATEGORY_LABELS, EVENT_CATEGORIES, type AvailabilityBlock, type CommitteeMember, type PlanEvent } from "@/lib/types";
-import { dayLabel, weekRange } from "@/components/plan/format";
+import { dayLabel, googleAddUrl, weekRange } from "@/components/plan/format";
 import { PlanSubnav } from "@/components/plan/PlanSubnav";
+import { CalendarLinks, type CalendarFeedLink } from "@/components/plan/CalendarLinks";
 import { SyncStatus } from "@/components/plan/SyncStatus";
 import { WeekPlanner } from "@/components/plan/WeekPlanner";
 
@@ -87,6 +89,24 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
 
   const chip = dbReady ? syncChip(sync, today) : { label: "Not synced", tone: "neutral" as const, title: undefined };
   const canEdit = dbReady && can(profile, "edit_plan");
+  const socialImpactFeed = organiserFeedUrl();
+  const volsocFeed = volsocFeedUrl(process.env.NEXT_PUBLIC_APP_URL || "https://uclvolunteering.org");
+  const feeds: CalendarFeedLink[] = [
+    ...(volsocFeed
+      ? [{
+          name: "VolSoc calendar",
+          about: "VolSoc's own events, kept up to date from this app. The link is for the committee only, so don't post it publicly",
+          url: volsocFeed,
+          googleUrl: googleAddUrl(volsocFeed),
+        }]
+      : []),
+    {
+      name: "Social Impact calendar",
+      about: "UCL Student Social Impact's events, from Adam's Campus Toolbox. Paste the link into any calendar app that subscribes by URL",
+      url: socialImpactFeed,
+      googleUrl: googleAddUrl(socialImpactFeed),
+    },
+  ];
   const title = `${term.label} · ${weekRange(week.monday)}`;
 
   return (
@@ -95,6 +115,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
         <span className="micro-label">VolSoc plan</span>
         <h1>{title}</h1>
         <div className="page-actions">
+          <CalendarLinks feeds={feeds} />
           <SyncStatus label={chip.label} tone={chip.tone} title={chip.title} canSync={dbReady && can(profile, "trigger_sync")} />
         </div>
       </header>
