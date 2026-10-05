@@ -1,0 +1,6 @@
+# `doppler setup` (or `doppler-volsoc setup`) in this directory picks these
+# without asking. Local dev runs on prd, since it reads the production
+# database anyway.
+setup:
+  - project: volsoc-webapp
+    config: prd
