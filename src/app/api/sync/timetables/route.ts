@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
+import { listDueLinks, refreshCalendarLink, type RefreshOutcome } from "@/lib/calendarLinks";
 import { cronBearerMatches } from "@/lib/cronAuth";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { listDueTimetables, refreshTimetable, type RefreshOutcome } from "@/lib/timetable";
 import { isTimetableFeedKeyConfigured } from "@/lib/timetableCrypto";
 
 /**
- * Vercel Cron: refresh every linked UCL timetable not fetched in the last
- * 20 hours, a few at a time, stopping before the function's time runs out.
- * Whatever is left goes first tomorrow (oldest first).
+ * Vercel Cron: refresh every linked calendar (UCL timetables and personal
+ * calendars alike, each on its own) not fetched in the last 20 hours, a few
+ * at a time, stopping before the function's time runs out. Whatever is left
+ * goes first tomorrow (oldest first). The path predates personal calendars.
  */
 
 export const maxDuration = 300;
@@ -26,13 +27,13 @@ export async function GET(request: Request) {
   }
 
   const started = Date.now();
-  const due = await listDueTimetables(new Date(), STALE_MS, BATCH);
+  const due = await listDueLinks(new Date(), STALE_MS, BATCH);
   const counts: Record<RefreshOutcome, number> = { updated: 0, unchanged: 0, error: 0 };
   let next = 0;
   async function worker() {
     while (next < due.length && Date.now() - started < BUDGET_MS) {
-      const memberId = due[next++];
-      counts[await refreshTimetable(memberId)] += 1;
+      const link = due[next++];
+      counts[await refreshCalendarLink(link)] += 1;
     }
   }
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));

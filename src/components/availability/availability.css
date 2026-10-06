@@ -248,7 +248,7 @@
   .avail-block-list li .button { grid-column: 2; grid-row: 1 / span 2; }
 }
 
-/* ── Your UCL timetable (TimetableLink) ───────────────────────────────── */
+/* ── My calendars (MyCalendars) ───────────────────────────────────────── */
 
 .timetable-link { display: grid; gap: 10px; }
 .timetable-link-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -261,4 +261,24 @@
 .timetable-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .timetable-actions .button { gap: 6px; }
 .timetable-note { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 12px; color: var(--muted); }
+.my-calendars-count { font-size: 12px; color: var(--muted); }
+.my-calendars-list { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.my-calendars-item { display: grid; gap: 6px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.my-calendars-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.my-calendars-name { display: grid; gap: 1px; min-width: 0; overflow-wrap: anywhere; }
+.my-calendars-name .timetable-muted { font-size: 12px; }
+.my-calendars-add { display: grid; gap: 12px; padding-top: 4px; }
+.my-calendars-add-title { margin: 0; }
+.my-calendars-add .field { margin-bottom: 0; }
+.my-calendars-howto {
+  display: grid; gap: 8px; justify-items: start;
+  padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--well);
+}
+.my-calendars-steps { display: grid; gap: 4px; margin: 0; padding-left: 20px; font-size: 14px; }
+.my-calendars-small { font-size: 12px; }
+@media (max-width: 768px) {
+  /* Four providers in two rows of two, each a full 44px target. */
+  .my-calendars-picker { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
+  .my-calendars-picker button { justify-content: center; min-height: 44px; }
+}
 .avail-timetable-note { display: grid; gap: 2px; margin: -4px 0 0; font-size: 12px; color: var(--muted); }

@@ -31,4 +31,13 @@ describe("personal timetable link encryption", () => {
   it("reports itself configured", () => {
     expect(mod.isTimetableFeedKeyConfigured()).toBe(true);
   });
+
+  it("fingerprints a link the same way every time, without revealing it", () => {
+    const url = "https://calendar.google.com/calendar/ical/sam%40gmail.com/private-0123456789abcdef/basic.ics";
+    const print = mod.feedUrlFingerprint(url);
+    expect(print).toBe(mod.feedUrlFingerprint(url));
+    expect(print).not.toBe(mod.feedUrlFingerprint(`${url}x`));
+    expect(print).toMatch(/^[A-Za-z0-9_-]{32}$/);
+    expect(print).not.toContain("sam");
+  });
 });

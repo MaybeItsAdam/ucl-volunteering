@@ -31,9 +31,9 @@ import {
   type CommitteeMember,
   type PlanEvent,
 } from "@/lib/types";
-import type { TimetableStatus } from "@/lib/timetable";
+import type { CalendarLinksState } from "@/lib/calendarLinks";
 import { AvailabilitySheet } from "@/components/availability/AvailabilitySheet";
-import { TimetableSheet } from "@/components/availability/TimetableSheet";
+import { MyCalendarsSheet } from "@/components/availability/MyCalendarsSheet";
 import { patchEvent } from "./api";
 import { CreateEventSheet, type CreateDraft } from "./CreateEventSheet";
 import { dayLabel, hourLabel, myResponse, SOURCE_LABELS, timeRange, WEEKDAYS_SHORT } from "./format";
@@ -111,9 +111,9 @@ export interface WeekPlannerProps {
   members: CommitteeMember[];
   /** Everyone's weekly unavailability. */
   blocks: AvailabilityBlock[];
-  /** This week's lectures from linked UCL timetables. */
-  timetableBlocks: AvailabilityBlock[];
-  timetableStatus: TimetableStatus | null;
+  /** This week's busy times from linked calendars (UCL timetables, personal calendars). */
+  calendarBlocks: AvailabilityBlock[];
+  calendarLinks: CalendarLinksState | null;
   canSaveAvailability: boolean;
   /** Open with your availability up to edit (/portal/availability lands here). */
   editAvailability: boolean;
@@ -132,8 +132,8 @@ export function WeekPlanner({
   me,
   members,
   blocks,
-  timetableBlocks,
-  timetableStatus,
+  calendarBlocks,
+  calendarLinks,
   canSaveAvailability,
   editAvailability,
   prevWeek,
@@ -165,7 +165,7 @@ export function WeekPlanner({
   const [mobileDay, setMobileDay] = useState(initialDay);
   const [overlay, setOverlay] = useState<string[]>([]);
   const [availabilityOpen, setAvailabilityOpen] = useState(editAvailability);
-  const [timetableOpen, setTimetableOpen] = useState(false);
+  const [calendarsOpen, setCalendarsOpen] = useState(false);
 
   const bodyRef = useRef<HTMLDivElement>(null);
   const colRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -373,8 +373,8 @@ export function WeekPlanner({
 
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
   const overlayBlocks = useMemo(
-    () => [...blocks, ...timetableBlocks].filter((b) => overlay.includes(b.memberId)),
-    [blocks, timetableBlocks, overlay],
+    () => [...blocks, ...calendarBlocks].filter((b) => overlay.includes(b.memberId)),
+    [blocks, calendarBlocks, overlay],
   );
 
   function closeAvailability() {
@@ -430,9 +430,9 @@ export function WeekPlanner({
             <CalendarOff size={14} aria-hidden="true" />
             Edit my availability
           </button>
-          <button type="button" className="button small plan-availability-edit" onClick={() => setTimetableOpen(true)}>
+          <button type="button" className="button small plan-availability-edit" onClick={() => setCalendarsOpen(true)}>
             <CalendarClock size={14} aria-hidden="true" />
-            {timetableStatus?.linked ? "My UCL timetable" : "Add my UCL timetable"}
+            My calendars
           </button>
         </div>
 
@@ -635,13 +635,13 @@ export function WeekPlanner({
           me={me}
           members={members}
           blocks={blocks}
-          timetableBlocks={timetableBlocks}
-          timetableStatus={timetableStatus}
+          calendarBlocks={calendarBlocks}
+          calendarLinks={calendarLinks}
           canSave={canSaveAvailability}
           onClose={closeAvailability}
         />
       )}
-      {timetableOpen && <TimetableSheet status={timetableStatus} onClose={() => setTimetableOpen(false)} />}
+      {calendarsOpen && <MyCalendarsSheet state={calendarLinks} onClose={() => setCalendarsOpen(false)} />}
     </div>
   );
 }

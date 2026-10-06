@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   clampWindow,
   feedToRows,
+  fetchCalendarFeed,
   fetchTimetableFeed,
   isAllowedRedirect,
   isStale,
@@ -13,6 +14,7 @@ import {
   TimetableFeedError,
   validateFeedBody,
 } from "./timetableFeed";
+import { PROVIDERS } from "./calendarProviders";
 
 /**
  * A UCL-shaped feed: Europe/London VTIMEZONE, events with TZID, one weekly
@@ -201,7 +203,7 @@ describe("fetchTimetableFeed", () => {
     const huge = async () => response(200, "x", { "content-length": String(50 * 1024 * 1024) });
     await expect(
       fetchTimetableFeed(url, {}, { fetchImpl: huge as typeof fetch, lookupImpl: publicLookup }),
-    ).rejects.toThrow(/larger than a timetable/);
+    ).rejects.toThrow(/far larger than a calendar/);
   });
 
   it("times out a server that never answers", async () => {
@@ -228,7 +230,7 @@ describe("feedToRows", () => {
   const { rows } = feedToRows(UCL_FIXTURE, NOW);
 
   it("expands the weekly lecture and keeps London wall time across the clocks going back", () => {
-    const lectures = rows.filter((r) => r.title.startsWith("COMP0002"));
+    const lectures = rows.filter((r) => r.title?.startsWith("COMP0002"));
     expect(lectures.map((r) => r.startTime.toISOString())).toEqual([
       "2026-10-12T09:00:00.000Z", // BST: 10:00 London
       "2026-10-19T09:00:00.000Z",
@@ -242,7 +244,7 @@ describe("feedToRows", () => {
   it("unescapes text, drops cancelled and all-day entries, sorts by start", () => {
     expect(rows[0].location).toBe("Cruciform Building B.304 - Lecture Theatre 1");
     expect(rows[0].description).toBe("Module: COMP0002\nLecturer: Dr A. Example, Prof B. Sample");
-    expect(rows.some((r) => /cancelled|Reading week/i.test(r.title))).toBe(false);
+    expect(rows.some((r) => /cancelled|Reading week/i.test(r.title ?? ""))).toBe(false);
     expect(rows).toHaveLength(5);
     const starts = rows.map((r) => r.startTime.getTime());
     expect([...starts].sort((a, b) => a - b)).toEqual(starts);
@@ -262,9 +264,9 @@ describe("feedToRows", () => {
 
   it("clips long text", () => {
     const long = UCL_FIXTURE.replace("SUMMARY:COMP0004 Lab", `SUMMARY:${"x".repeat(400)}`);
-    const row = feedToRows(long, NOW).rows.find((r) => r.title.startsWith("x"))!;
-    expect(row.title.length).toBeLessThanOrEqual(160);
-    expect(row.title.endsWith("…")).toBe(true);
+    const row = feedToRows(long, NOW).rows.find((r) => r.title?.startsWith("x"))!;
+    expect(row.title!.length).toBeLessThanOrEqual(160);
+    expect(row.title!.endsWith("…")).toBe(true);
   });
 });
 
@@ -289,5 +291,153 @@ describe("isStale", () => {
     expect(isStale(null, NOW)).toBe(true);
     expect(isStale(new Date(NOW.getTime() - 5 * 3_600_000), NOW)).toBe(false);
     expect(isStale(new Date(NOW.getTime() - 7 * 3_600_000), NOW)).toBe(true);
+  });
+});
+
+/**
+ * A personal calendar, as Google publishes one: a private appointment, a
+ * weekly class, an event marked "Free" (TRANSP:TRANSPARENT), an Outlook
+ * "Free" one, an all-day birthday and a cancelled meeting.
+ */
+const PERSONAL_FIXTURE = [
+  "BEGIN:VCALENDAR",
+  "VERSION:2.0",
+  "PRODID:-//Google Inc//Google Calendar 70.9054//EN",
+  "X-WR-CALNAME:Sam Student",
+  "BEGIN:VEVENT",
+  "UID:dentist-1@google.com",
+  "DTSTART:20261013T140000Z",
+  "DTEND:20261013T150000Z",
+  "SUMMARY:Dentist",
+  "LOCATION:12 Private Street",
+  "DESCRIPTION:Bring the form",
+  "TRANSP:OPAQUE",
+  "END:VEVENT",
+  "BEGIN:VEVENT",
+  "UID:climbing@google.com",
+  "DTSTART;TZID=Europe/London:20261014T180000",
+  "DTEND;TZID=Europe/London:20261014T200000",
+  "RRULE:FREQ=WEEKLY;COUNT=3",
+  "SUMMARY:Climbing",
+  "END:VEVENT",
+  "BEGIN:VEVENT",
+  "UID:reminder@google.com",
+  "DTSTART:20261015T090000Z",
+  "DTEND:20261015T093000Z",
+  "SUMMARY:Reminder to call home",
+  "TRANSP:TRANSPARENT",
+  "END:VEVENT",
+  "BEGIN:VEVENT",
+  "UID:outlook-free@example.com",
+  "DTSTART:20261015T100000Z",
+  "DTEND:20261015T110000Z",
+  "SUMMARY:Free",
+  "X-MICROSOFT-CDO-BUSYSTATUS:FREE",
+  "END:VEVENT",
+  "BEGIN:VEVENT",
+  "UID:birthday@google.com",
+  "DTSTART;VALUE=DATE:20261016",
+  "DTEND;VALUE=DATE:20261017",
+  "SUMMARY:Alex's birthday",
+  "END:VEVENT",
+  "BEGIN:VEVENT",
+  "UID:cancelled@google.com",
+  "DTSTART:20261016T120000Z",
+  "DTEND:20261016T130000Z",
+  "STATUS:CANCELLED",
+  "SUMMARY:Lunch",
+  "END:VEVENT",
+  "END:VCALENDAR",
+  "",
+].join("\r\n");
+
+describe("feedToRows for a personal calendar", () => {
+  const { rows } = feedToRows(PERSONAL_FIXTURE, NOW, "google");
+
+  it("keeps busy times and nothing about what they are", () => {
+    expect(rows.map((r) => r.startTime.toISOString())).toEqual([
+      "2026-10-13T14:00:00.000Z",
+      "2026-10-14T17:00:00.000Z",
+      "2026-10-21T17:00:00.000Z",
+      "2026-10-28T18:00:00.000Z", // GMT from 25 Oct: still 18:00 London
+    ]);
+    for (const row of rows) {
+      expect(row.title).toBeNull();
+      expect(row.location).toBeNull();
+      expect(row.description).toBeNull();
+    }
+    expect(JSON.stringify(rows)).not.toMatch(/Dentist|Private Street|Climbing|form/);
+  });
+
+  it("skips free, all-day and cancelled events", () => {
+    const starts = rows.map((r) => r.startTime.toISOString());
+    expect(starts).not.toContain("2026-10-15T09:00:00.000Z");
+    expect(starts).not.toContain("2026-10-15T10:00:00.000Z");
+    expect(starts).not.toContain("2026-10-16T12:00:00.000Z");
+  });
+
+  it("is the same for every personal provider, and the UCL timetable keeps its titles", () => {
+    expect(feedToRows(PERSONAL_FIXTURE, NOW, "outlook").rows).toEqual(rows);
+    expect(feedToRows(PERSONAL_FIXTURE, NOW, "icloud").rows).toEqual(rows);
+    expect(feedToRows(PERSONAL_FIXTURE, NOW, "ucl_timetable").rows[0].title).toBe("Dentist");
+  });
+
+  it("hashes without titles, so a renamed event changes nothing", () => {
+    const renamed = PERSONAL_FIXTURE.replace("SUMMARY:Dentist", "SUMMARY:Doctor");
+    expect(rowsHash(feedToRows(renamed, NOW, "google").rows)).toBe(rowsHash(rows));
+  });
+});
+
+describe("fetchCalendarFeed for personal calendars", () => {
+  const google =
+    "https://calendar.google.com/calendar/ical/sam%40gmail.com/private-0123456789abcdef0123456789abcdef/basic.ics";
+  const icloud = "https://p52-caldav.icloud.com/published/2/MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3OM5ZFp8";
+  const outlook =
+    "https://outlook.office365.com/owa/calendar/0f1e2d3c4b5a69788796a5b4c3d2e1f0@ucl.ac.uk/a1b2c3d4e5f60718293a4b5c6d7e8f90123456789/calendar.ics";
+
+  it("follows iCloud's hop to another partition", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(response(301, "", { location: "https://p71-caldav.icloud.com/published/2/MTIzNDU2" }))
+      .mockResolvedValueOnce(response(200, PERSONAL_FIXTURE));
+    const result = await fetchCalendarFeed(icloud, "icloud", {}, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      lookupImpl: publicLookup,
+    });
+    expect(result.kind).toBe("ok");
+  });
+
+  it.each([
+    ["google to elsewhere", google, "google" as const, "https://evil.example/basic.ics"],
+    ["google to another provider", google, "google" as const, "https://p52-caldav.icloud.com/published/2/x"],
+    ["icloud to www.icloud.com", icloud, "icloud" as const, "https://www.icloud.com/calendar"],
+    ["icloud to http", icloud, "icloud" as const, "http://p71-caldav.icloud.com/published/2/x"],
+    ["outlook to metadata", outlook, "outlook" as const, "http://169.254.169.254/latest/meta-data"],
+    ["outlook to ucl", outlook, "outlook" as const, "https://www.ucl.ac.uk/timetable/ics/abcdefgh"],
+  ])("refuses a redirect %s without following it", async (_name, start, kind, location) => {
+    const fetchImpl = vi.fn(async () => response(302, "", { location }));
+    await expect(
+      fetchCalendarFeed(start, kind, {}, { fetchImpl: fetchImpl as unknown as typeof fetch, lookupImpl: publicLookup }),
+    ).rejects.toThrow(/somewhere other than/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-checks the address of every hop", async () => {
+    const fetchImpl = vi.fn(async () => response(301, "", { location: "https://p71-caldav.icloud.com/published/2/x" }));
+    const lookupImpl = vi
+      .fn()
+      .mockResolvedValueOnce([{ address: "17.248.1.1" }])
+      .mockResolvedValueOnce([{ address: "127.0.0.1" }]);
+    await expect(
+      fetchCalendarFeed(icloud, "icloud", {}, { fetchImpl: fetchImpl as unknown as typeof fetch, lookupImpl }),
+    ).rejects.toBeInstanceOf(TimetableFeedError);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("names the right link when Google answers with a web page", async () => {
+    const html = async () => response(200, "<html>sign in</html>", { "content-type": "text/html" });
+    await expect(
+      fetchCalendarFeed(google, "google", {}, { fetchImpl: html as typeof fetch, lookupImpl: publicLookup }),
+    ).rejects.toThrow(PROVIDERS.google.pageError);
   });
 });
