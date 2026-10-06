@@ -1,0 +1,35 @@
+{
+  "societies": [
+    {
+      "id": "org_soc_ugegx4yxz",
+      "name": "Street Aid Society",
+      "type": "Society",
+      "logoUrl": "https://studentsunionucl.org/street-aid.jpg",
+      "color": "#E77201",
+      "darkColor": "#feb167",
+      "tags": ["altruism"],
+      "unionUrl": "https://studentsunionucl.org/clubs-societies/street-aid-society"
+    },
+    {
+      "id": "org_soc_zdl872hsr",
+      "name": "Cancer Charities Alliance Society",
+      "type": "Society",
+      "logoUrl": "",
+      "color": null,
+      "darkColor": null,
+      "tags": ["altruism", "health"]
+    },
+    {
+      "id": "org_soc_vol_fix",
+      "name": "Volunteering Society",
+      "type": "Society",
+      "logoUrl": "javascript:alert(1)",
+      "color": "#10c4c0",
+      "darkColor": "#10c4c0",
+      "tags": ["common-interest"]
+    },
+    { "id": "org_soc_chess", "name": "Chess Society", "type": "Society", "color": "red", "tags": ["games"] },
+    { "id": "", "name": "No id" },
+    "not a society"
+  ]
+}

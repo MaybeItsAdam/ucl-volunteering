@@ -1,0 +1,119 @@
+/* ==========================================================================
+   WHAT'S ON: the social impact societies' upcoming events.
+
+   Built on the shared tokens and classes in globals.css (.page, .panel,
+   .segmented, .tag, .micro-label). Everything here is prefixed wo-. A
+   society's own colour (--soc, --soc-dark, set inline from the Toolbox) is
+   data: it rings the avatar and fills the chip swatch, and nothing else.
+   ========================================================================== */
+
+.wo-page { max-width: 900px; }
+.wo-intro { margin: -4px 0 0; max-width: 60ch; }
+
+/* ── Filters ────────────────────────────────────────────────────────────── */
+
+.wo-filters { display: grid; gap: 10px; min-width: 0; }
+
+/* .segmented with links rather than buttons. */
+.wo-range { justify-self: start; }
+.wo-range a {
+  display: inline-flex; align-items: center; min-height: 34px; padding: 0 12px;
+  border: 1px solid transparent; border-radius: 5px;
+  color: var(--muted); font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+.wo-range a:hover { color: var(--ink); }
+.wo-range a.active { background: var(--raised); border-color: var(--line); color: var(--ink); }
+
+.wo-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.wo-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 32px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: var(--radius-control);
+  background: var(--raised); color: var(--muted);
+  font-size: 13px; font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.wo-chip:hover { background: var(--hover); color: var(--ink); }
+.wo-chip[aria-current="true"] {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--primary) 12%, var(--raised));
+  border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+}
+.wo-swatch {
+  width: 10px; height: 10px; flex: none; border-radius: 9999px;
+  background: var(--soc, var(--dim));
+}
+
+/* ── Days and events ────────────────────────────────────────────────────── */
+
+.wo-days { display: grid; gap: 20px; }
+.wo-day { display: grid; gap: 8px; }
+.wo-day-head { display: flex; align-items: baseline; gap: 10px; font-size: 18px; }
+.wo-list { list-style: none; margin: 0; }
+.wo-list > li + li { border-top: 1px solid var(--line); }
+
+.wo-event {
+  display: grid; grid-template-columns: 112px 32px minmax(0, 1fr) auto auto; align-items: center; gap: 4px 14px;
+  min-height: 56px; padding: 10px 16px;
+  color: var(--ink); text-decoration: none;
+}
+.wo-event:hover { background: var(--hover); }
+.wo-event:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.wo-time { font-size: 13px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+.wo-body { display: grid; gap: 2px; min-width: 0; }
+.wo-title { font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.wo-cancelled { text-decoration: line-through; color: var(--muted); }
+.wo-meta { display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 13px; color: var(--muted); }
+.wo-society { font-weight: 600; }
+.wo-location { display: inline-flex; align-items: center; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.wo-location svg { flex: none; }
+.wo-out { color: var(--dim); }
+.wo-event:hover .wo-out { color: var(--ink); }
+
+/* The society's avatar: initials, with its logo laid over them when it loads. */
+.wo-avatar {
+  position: relative; display: inline-grid; place-items: center;
+  width: 32px; height: 32px; overflow: hidden;
+  border: 2px solid var(--soc, var(--line)); border-radius: 9999px;
+  background: var(--well); color: var(--muted);
+  font-size: 11px; font-weight: 700; letter-spacing: .02em;
+}
+.wo-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: var(--raised); }
+
+:root[data-theme="dark"] .wo-avatar { border-color: var(--soc-dark, var(--soc, var(--line))); }
+:root[data-theme="dark"] .wo-swatch { background: var(--soc-dark, var(--soc, var(--dim))); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .wo-avatar { border-color: var(--soc-dark, var(--soc, var(--line))); }
+  :root:not([data-theme="light"]) .wo-swatch { background: var(--soc-dark, var(--soc, var(--dim))); }
+}
+
+.wo-page .empty p { margin: 6px 0 12px; }
+.wo-foot { margin: 0; }
+
+/* ── Phones ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  /* One line of chips that scrolls sideways, edge to edge. */
+  .wo-chips {
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    margin: 0 calc(-1 * max(16px, var(--safe-right))) 0 calc(-1 * max(16px, var(--safe-left)));
+    padding: 0 max(16px, var(--safe-right)) 2px max(16px, var(--safe-left));
+  }
+  .wo-chips::-webkit-scrollbar { display: none; }
+  .wo-range { justify-self: stretch; display: flex; }
+  .wo-range a { flex: 1; justify-content: center; }
+
+  .wo-event {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    grid-template-areas: "avatar time out" "avatar body body" ". tag tag";
+    align-items: start; padding: 12px 14px; gap: 2px 12px;
+  }
+  .wo-event .wo-avatar { grid-area: avatar; margin-top: 2px; }
+  .wo-event .wo-time { grid-area: time; }
+  .wo-event .wo-body { grid-area: body; }
+  .wo-event .tag { grid-area: tag; justify-self: start; margin-top: 4px; }
+  .wo-event .wo-out { grid-area: out; justify-self: end; }
+}
+
+@media (pointer: coarse) {
+  .wo-chip, .wo-range a { min-height: 44px; }
+}

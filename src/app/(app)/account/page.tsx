@@ -20,8 +20,11 @@ export default async function AccountPage() {
 
       {member.governance_role === null ? (
         <div className="notice info" role="status">
-          <strong>You&apos;re not on the VolSoc committee yet</strong>
-          <p>Ask a principal to add you — once they have, the plan and availability appear here</p>
+          <strong>You&apos;re not on the VolSoc committee</strong>
+          <p>
+            What&apos;s on shows you upcoming events from UCL&apos;s social impact societies — if you&apos;re joining the
+            committee, ask a principal to add you and the plan and availability appear here too
+          </p>
         </div>
       ) : null}
 

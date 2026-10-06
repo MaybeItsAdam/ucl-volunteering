@@ -7,7 +7,7 @@ export const GOVERNANCE_LABELS: Record<GovernanceRole, string> = {
   committee: "Committee",
 };
 
-export type Capability = "view_plan" | "edit_plan" | "manage_members" | "trigger_sync";
+export type Capability = "view_whats_on" | "view_plan" | "edit_plan" | "manage_members" | "trigger_sync";
 
 /** Everything access depends on. A role of null is signed in but not on the committee. */
 export interface AccessProfile {
@@ -19,12 +19,15 @@ export function isGovernanceRole(value: unknown): value is GovernanceRole {
 }
 
 /**
- * The committee plans together: anyone with a role can see and change the plan
- * and run a sync. Who is on the committee is the principals' call.
+ * Anyone signed in sees What's on. The committee plans together: anyone with a
+ * role can see and change the plan and run a sync. Who is on the committee is
+ * the principals' call.
  */
 export function can(profile: AccessProfile | null, capability: Capability): boolean {
   const role = profile?.governanceRole ?? null;
   switch (capability) {
+    case "view_whats_on":
+      return profile !== null;
     case "view_plan":
     case "edit_plan":
     case "trigger_sync":
