@@ -1,18 +1,17 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { listCommittee } from "@/lib/plan";
 import { londonDayKey } from "@/lib/planTime";
 import { listTasks } from "@/lib/tasks";
-import { TASK_STATUS_LABELS, type CommitteeMember, type Task } from "@/lib/types";
-import { addTaskHref, columns, DUE_TAG, dueState } from "./format";
+import { BOARD_STATUSES, TASK_BOARDS, TASK_BOARD_LABELS, TASK_STATUS_LABELS, type CommitteeMember, type Task } from "@/lib/types";
+import { addTaskHref, boardEventHref, columns, DUE_TAG, dueState, statusTag } from "./format";
 import "./planner.css";
 
-const STATUS_TAG = { todo: "tag", doing: "tag info", done: "tag ok" } as const;
-
 /**
- * The Tasks panel on an event's page: what's left to do for it, with a way
- * into the planner to add more. Server Component; a failure to load hides
- * nothing else on the page.
+ * The Tasks panel on an event's page: its items from both planner boards,
+ * each tagged with its board and column, unfinished first, with ways into
+ * each board to add more. Server Component; a failure to load hides nothing
+ * else on the page.
  */
 export async function EventTasks({ eventId, canEdit }: { eventId: string; canEdit: boolean }) {
   let tasks: Task[] = [];
@@ -26,17 +25,22 @@ export async function EventTasks({ eventId, canEdit }: { eventId: string; canEdi
   }
   const names = new Map(committee.map((m) => [m.id, m.name]));
   const today = londonDayKey(new Date());
-  const board = columns(tasks);
-  const ordered = [...board.doing, ...board.todo, ...board.done];
-  const open = board.todo.length + board.doing.length;
+  // Furthest along first within each board, events board before documents, finished items last.
+  const open: Task[] = [];
+  const finished: Task[] = [];
+  for (const board of TASK_BOARDS) {
+    const cols = columns(board, tasks);
+    for (const status of [...BOARD_STATUSES[board]].reverse()) {
+      for (const task of cols[status]) (task.completedAt ? finished : open).push(task);
+    }
+  }
+  const ordered = [...open, ...finished];
 
   return (
     <div className="panel flush">
       <div className="panel-head">
         <span className="micro-label">Tasks</span>
-        <span className="micro-label mono">
-          {tasks.length ? `${open} open · ${board.done.length} done` : ""}
-        </span>
+        <span className="micro-label mono">{tasks.length ? `${open.length} open · ${finished.length} done` : ""}</span>
       </div>
       {loadError ? (
         <p className="empty">The tasks couldn&apos;t be loaded</p>
@@ -45,29 +49,43 @@ export async function EventTasks({ eventId, canEdit }: { eventId: string; canEdi
           {ordered.map((task) => {
             const due = dueState(task, today);
             return (
-              <li key={task.id} className="planner-event-task" data-status={task.status}>
-                <span className={STATUS_TAG[task.status]}>{TASK_STATUS_LABELS[task.status]}</span>
+              <li key={task.id} className="planner-event-task" data-finished={task.completedAt ? "" : undefined}>
+                <span className="micro-label planner-event-task-board">{TASK_BOARD_LABELS[task.board]}</span>
+                <span className={statusTag(task.board, task.status)}>{TASK_STATUS_LABELS[task.status]}</span>
                 <span className="planner-event-task-title">{task.title}</span>
                 {due && <span className={DUE_TAG[due.tone]}>{due.label}</span>}
-                <span className="muted small">
-                  {task.assigneeId ? (names.get(task.assigneeId) ?? "Former member") : "No one yet"}
-                </span>
+                {task.docUrl && (
+                  <a href={task.docUrl} target="_blank" rel="noreferrer" className="planner-task-doc small">
+                    <FileText size={14} aria-hidden="true" />
+                    Open document
+                  </a>
+                )}
+                <span className="muted small">{names.get(task.assigneeId) ?? "Former member"}</span>
               </li>
             );
           })}
         </ul>
       ) : (
-        <p className="empty">No tasks for this event yet</p>
+        <p className="empty">Nothing planned for this event yet</p>
       )}
       <div className="planner-event-tasks-foot">
-        <Link href={`/portal/planner?event=${eventId}`} className="button small ghost">
-          Open in the planner
+        <Link href={boardEventHref("events", eventId)} className="button small ghost">
+          Events board
+        </Link>
+        <Link href={boardEventHref("documents", eventId)} className="button small ghost">
+          Documents board
         </Link>
         {canEdit && (
-          <Link href={addTaskHref(eventId)} className="button small">
-            <Plus size={14} aria-hidden="true" />
-            Add a task
-          </Link>
+          <>
+            <Link href={addTaskHref("events", eventId)} className="button small">
+              <Plus size={14} aria-hidden="true" />
+              Add a task
+            </Link>
+            <Link href={addTaskHref("documents", eventId)} className="button small">
+              <Plus size={14} aria-hidden="true" />
+              Add a document
+            </Link>
+          </>
         )}
       </div>
     </div>

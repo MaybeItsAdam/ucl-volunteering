@@ -111,14 +111,52 @@ export interface CommitteeMember {
 
 // ── Planner ──
 
-export const TASK_STATUSES = ["todo", "doing", "done"] as const;
-export type TaskStatus = (typeof TASK_STATUSES)[number];
+/**
+ * The planner's two boards. Events: getting an event planned, publicised and
+ * written up afterwards. Documents: the paperwork (risk assessments, event
+ * plans, SU forms, room bookings).
+ */
+export const TASK_BOARDS = ["events", "documents"] as const;
+export type TaskBoard = (typeof TASK_BOARDS)[number];
+
+export const TASK_BOARD_LABELS: Record<TaskBoard, string> = {
+  events: "Events",
+  documents: "Documents",
+};
+
+/**
+ * Each board's columns, in order. An item in the last one is finished
+ * (`completedAt` is set). Matches the checks in the planner_boards migration.
+ */
+export const BOARD_STATUSES = {
+  events: ["backlog", "planned", "ready_to_post", "content", "done"],
+  documents: ["backlog", "drafting", "in_review", "submitted", "approved"],
+} as const satisfies Record<TaskBoard, readonly string[]>;
+
+export type TaskStatus = (typeof BOARD_STATUSES)[TaskBoard][number];
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
-  todo: "To do",
-  doing: "Doing",
+  backlog: "Backlog",
+  planned: "Planned",
+  ready_to_post: "Ready to post",
+  content: "Content",
   done: "Done",
+  drafting: "Drafting",
+  in_review: "In review",
+  submitted: "Submitted",
+  approved: "Approved",
 };
+
+/** Whether `status` is one of `board`'s columns. */
+export function isBoardStatus(board: TaskBoard, status: unknown): status is TaskStatus {
+  return (BOARD_STATUSES[board] as readonly unknown[]).includes(status);
+}
+
+/** The board's last column: Done or Approved. */
+export function finalStatus(board: TaskBoard): TaskStatus {
+  const statuses = BOARD_STATUSES[board];
+  return statuses[statuses.length - 1];
+}
 
 /** The event a task is part of, as much of it as the planner shows. */
 export interface TaskEvent {
@@ -128,16 +166,23 @@ export interface TaskEvent {
   status: EventStatus;
 }
 
-/** One row of `public.tasks`, as the UI sees it. `dueOn` is a London day (YYYY-MM-DD), not an instant. */
+/**
+ * One row of `public.tasks`, as the UI sees it: an item on one of the
+ * planner's boards. With no `eventId` it's an action on its own. Every item
+ * has an assignee. `dueOn` is a London day (YYYY-MM-DD), not an instant.
+ */
 export interface Task {
   id: string;
+  board: TaskBoard;
   title: string;
   notes: string | null;
   status: TaskStatus;
-  assigneeId: string | null;
+  assigneeId: string;
   dueOn: string | null;
   eventId: string | null;
   event: TaskEvent | null;
+  /** A link to the document itself, http(s). */
+  docUrl: string | null;
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
