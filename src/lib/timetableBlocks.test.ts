@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BUSY_NOTE, isTimetableBlock, sessionsToBlocks } from "./timetableBlocks";
+import { BUSY_NOTE, isTimetableBlock, PERSONAL_BUSY_NOTE, sessionsToBlocks } from "./timetableBlocks";
 
 describe("sessionsToBlocks", () => {
   it("places a session on its London weekday and minutes (BST)", () => {
@@ -50,4 +50,15 @@ describe("sessionsToBlocks", () => {
   it("skips empty or backwards sessions", () => {
     expect(sessionsToBlocks([{ memberId: "m1", startsAt: "2026-10-05T10:00:00Z", endsAt: "2026-10-05T10:00:00Z" }])).toEqual([]);
   });
+
+  it("says only 'Busy' for someone else's personal calendar, and which one to its owner", () => {
+    const session = { memberId: "m1", uid: "a", startsAt: "2026-10-05T09:00:00Z", endsAt: "2026-10-05T10:00:00Z" };
+    const [theirs] = sessionsToBlocks([{ ...session, kind: "google" }]);
+    expect(theirs.note).toBe(PERSONAL_BUSY_NOTE);
+    const [mine] = sessionsToBlocks([{ ...session, kind: "outlook", mine: true }]);
+    expect(mine.note).toBe("Busy (Outlook)");
+    const [lecture] = sessionsToBlocks([{ ...session, kind: "ucl_timetable" }]);
+    expect(lecture.note).toBe(BUSY_NOTE);
+  });
 });
+

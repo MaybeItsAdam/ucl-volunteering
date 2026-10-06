@@ -68,6 +68,12 @@ export type IcsEvent = {
   recurrenceId: string | null;
   /** Whether this occurrence came out of an `RRULE` expansion. */
   recurring: boolean;
+  /**
+   * False when the event says it doesn't block time: `TRANSP:TRANSPARENT`
+   * ("show as free" in Google and Apple), or Exchange's
+   * `X-MICROSOFT-CDO-BUSYSTATUS:FREE`, which Outlook's published feeds use.
+   */
+  busy: boolean;
 };
 
 export type IcsCalendar = {
@@ -451,6 +457,11 @@ function firstValue(properties: IcsProperty[], name: string): IcsProperty | unde
  * *replaces* one, and a replacement wins even where an `EXDATE` also matched —
  * a meeting moved to a new room is not a meeting cancelled.
  */
+function isBusy(properties: IcsProperty[]): boolean {
+  if (firstValue(properties, "TRANSP")?.value.trim().toUpperCase() === "TRANSPARENT") return false;
+  return firstValue(properties, "X-MICROSOFT-CDO-BUSYSTATUS")?.value.trim().toUpperCase() !== "FREE";
+}
+
 export function parseIcs(raw: string, options: ExpandOptions): IcsCalendar {
   const unsupported: string[] = [];
   const { events: rawEvents, calendarName } = collectEvents(unfold(raw));
@@ -576,6 +587,7 @@ export function parseIcs(raw: string, options: ExpandOptions): IcsCalendar {
           : status,
         recurrenceId: recurring ? key : null,
         recurring,
+        busy: isBusy(source.properties),
       });
     };
 

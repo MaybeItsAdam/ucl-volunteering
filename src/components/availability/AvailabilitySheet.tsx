@@ -3,20 +3,20 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sheet } from "@/components/Sheet";
-import type { TimetableStatus } from "@/lib/timetable";
+import type { CalendarLinksState } from "@/lib/calendarLinks";
 import type { AvailabilityBlock, CommitteeMember } from "@/lib/types";
 import { colourOf } from "./colours";
 import { CommitteeView, type ShownMember } from "./CommitteeView";
 import { DAY_RANGE, WEEKDAYS, WHOLE_WEEK, WIDE_RANGE } from "./grid";
-import { TimetableLink } from "./TimetableLink";
+import { MyCalendars } from "./MyCalendars";
 import { WeekEditor } from "./WeekEditor";
 import "./availability.css";
 
 type Tab = "mine" | "committee";
 
 /**
- * Availability, opened from the calendar: your own week to edit (and your UCL
- * timetable to link), and the committee's combined with the best times to
+ * Availability, opened from the calendar: your own week to edit (and your
+ * calendars to link), and the committee's combined with the best times to
  * meet. Which days and hours both show is chosen once, here, and opens wide
  * enough to show everything already marked.
  *
@@ -27,17 +27,17 @@ export function AvailabilitySheet({
   me,
   members,
   blocks: initialBlocks,
-  timetableBlocks,
-  timetableStatus,
+  calendarBlocks,
+  calendarLinks,
   canSave,
   onClose,
 }: {
   me: CommitteeMember;
   members: CommitteeMember[];
   blocks: AvailabilityBlock[];
-  /** This week's lectures from linked UCL timetables. Shown, never edited or saved. */
-  timetableBlocks: AvailabilityBlock[];
-  timetableStatus: TimetableStatus | null;
+  /** This week's busy times from linked calendars. Shown, never edited or saved. */
+  calendarBlocks: AvailabilityBlock[];
+  calendarLinks: CalendarLinksState | null;
   canSave: boolean;
   onClose: () => void;
 }) {
@@ -64,7 +64,7 @@ export function AvailabilitySheet({
   }, [members, me]);
   const myColour = shownMembers.find((m) => m.id === me.id)?.colour ?? null;
   const mine = useMemo(() => initialBlocks.filter((b) => b.memberId === me.id), [initialBlocks, me.id]);
-  const withTimetables = useMemo(() => [...blocks, ...timetableBlocks], [blocks, timetableBlocks]);
+  const withCalendars = useMemo(() => [...blocks, ...calendarBlocks], [blocks, calendarBlocks]);
 
   function close() {
     if (dirty.current && !window.confirm("Your week has unsaved changes — close without saving?")) return;
@@ -130,15 +130,15 @@ export function AvailabilitySheet({
               router.refresh();
             }}
           />
-          <TimetableLink initialStatus={timetableStatus} />
+          <MyCalendars initialState={calendarLinks} />
         </div>
 
         {tab === "committee" && (
           <div className="avail">
-            <CommitteeView members={shownMembers} blocks={withTimetables} days={days} range={range} />
-            {timetableBlocks.length > 0 && (
+            <CommitteeView members={shownMembers} blocks={withCalendars} days={days} range={range} />
+            {calendarBlocks.length > 0 && (
               <p className="avail-timetable-note">
-                <span>Lectures are this week&rsquo;s, from linked UCL timetables</span>
+                <span>Busy times are this week&rsquo;s, from linked calendars</span>
                 <span>Everyone else sees yours only as busy</span>
               </p>
             )}

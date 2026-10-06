@@ -1,7 +1,8 @@
-import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "crypto";
+import { createCipheriv, createDecipheriv, createHmac, hkdfSync, randomBytes } from "crypto";
 
 /**
- * At-rest encryption for committee members' UCL timetable links. Ported from
+ * At-rest encryption for committee members' calendar links (the UCL timetable
+ * and personal Google, Outlook and iCloud feeds). Ported from
  * Adam's Campus Toolbox (`personalTimetableCrypto.ts`), under this app's own
  * key and HKDF domain.
  *
@@ -41,6 +42,27 @@ function getKey(): Buffer {
     hkdfSync("sha256", material, new Uint8Array(0), Buffer.from(HKDF_INFO), 32),
   );
   return cachedKey;
+}
+
+/** Separate from the encryption key, so a fingerprint can never help decrypt. */
+const FINGERPRINT_INFO = "ucl-volunteering/calendar-link-fingerprint/v1";
+let cachedFingerprintKey: Buffer | null = null;
+
+/**
+ * A keyed fingerprint of a normalised link (HMAC-SHA256 under a key derived
+ * from `TIMETABLE_FEED_KEY`), stored beside it so the same calendar can't be
+ * linked twice without decrypting every link. Keyed rather than a bare hash so
+ * the database alone can't confirm a guessed link.
+ */
+export function feedUrlFingerprint(url: string): string {
+  if (!cachedFingerprintKey) {
+    const material = Buffer.from(process.env.TIMETABLE_FEED_KEY ?? "", "base64");
+    getKey(); // the same "is it configured" checks, and errors, as encryption
+    cachedFingerprintKey = Buffer.from(
+      hkdfSync("sha256", material, new Uint8Array(0), Buffer.from(FINGERPRINT_INFO), 32),
+    );
+  }
+  return createHmac("sha256", cachedFingerprintKey).update(url).digest("base64url").slice(0, 32);
 }
 
 /** Whether a link can be stored on this deployment at all. */

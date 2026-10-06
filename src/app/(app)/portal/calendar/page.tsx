@@ -7,7 +7,7 @@ import { listAvailability, listEvents } from "@/lib/plan";
 import { isDayKey, londonDayKey, londonTime, londonWeek, shiftDayKey, termWeek } from "@/lib/planTime";
 import { requireCapability } from "@/lib/session";
 import { isSupabaseConfigured } from "@/lib/supabase";
-import { getTimetableStatus, refreshIfStale, timetableBlocksForWeek, type TimetableStatus } from "@/lib/timetable";
+import { calendarBlocksForWeek, getCalendarLinks, refreshIfStale, type CalendarLinksState } from "@/lib/calendarLinks";
 import { volsocFeedUrl } from "@/lib/calendarFeed";
 import { lastOrganiserSync, organiserFeedUrl } from "@/lib/toolboxEvents";
 import { CATEGORY_LABELS, EVENT_CATEGORIES, type AvailabilityBlock, type CommitteeMember, type PlanEvent } from "@/lib/types";
@@ -59,8 +59,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
   let events: PlanEvent[] = [];
   let members: CommitteeMember[] = [];
   let blocks: AvailabilityBlock[] = [];
-  let timetableBlocks: AvailabilityBlock[] = [];
-  let timetableStatus: TimetableStatus | null = null;
+  let calendarBlocks: AvailabilityBlock[] = [];
+  let calendarLinks: CalendarLinksState | null = null;
   let sync: Awaited<ReturnType<typeof lastOrganiserSync>> = null;
   let loadError: string | null = null;
   if (dbReady) {
@@ -73,16 +73,17 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
     } catch (error) {
       loadError = error instanceof Error ? error.message : "The plan couldn't be loaded";
     }
-    // Linked UCL timetables join the availability overlay for this week. A
-    // failure here only loses the lectures, never the plan.
+    // Linked calendars (UCL timetables, personal calendars) join the
+    // availability overlay for this week. A failure here only loses the busy
+    // times, never the plan.
     try {
       const ids = new Set([...members.map((m) => m.id), member.id]);
-      [timetableStatus, timetableBlocks] = await Promise.all([
-        getTimetableStatus(member.id),
-        timetableBlocksForWeek(member.id, [...ids], week),
+      [calendarLinks, calendarBlocks] = await Promise.all([
+        getCalendarLinks(member.id),
+        calendarBlocksForWeek(member.id, [...ids], week),
       ]);
     } catch (error) {
-      console.error("[plan] timetables", error);
+      console.error("[plan] calendar links", error);
     }
     after(() => refreshIfStale(member.id));
   }
@@ -163,8 +164,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
         me={{ id: member.id, name: member.name, colour: member.colour }}
         members={members}
         blocks={blocks}
-        timetableBlocks={timetableBlocks}
-        timetableStatus={timetableStatus}
+        calendarBlocks={calendarBlocks}
+        calendarLinks={calendarLinks}
         canSaveAvailability={dbReady && !loadError}
         editAvailability={editAvailability}
         prevWeek={prevWeek}
