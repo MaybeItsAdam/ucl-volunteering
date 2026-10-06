@@ -20,23 +20,30 @@ describe("capabilities", () => {
     expect(can(as("admin"), "manage_members")).toBe(true);
   });
 
-  it("gives someone with no role nothing", () => {
+  it("gives someone with no role What's on and nothing of the committee's", () => {
+    expect(can(as(null), "view_whats_on")).toBe(true);
     for (const capability of ["view_plan", "edit_plan", "manage_members", "trigger_sync"] as const) {
       expect(can(as(null), capability)).toBe(false);
+    }
+  });
+
+  it("lets everyone signed in see What's on, and nobody signed out anything", () => {
+    for (const role of ["committee", "principal", "admin"] as const) expect(can(as(role), "view_whats_on")).toBe(true);
+    for (const capability of ["view_whats_on", "view_plan", "edit_plan", "manage_members", "trigger_sync"] as const) {
       expect(can(null, capability)).toBe(false);
     }
   });
 });
 
 describe("tabs", () => {
-  it("shows a person with no role only Settings", () => {
-    expect(availablePages(as(null))).toEqual(["settings"]);
+  it("lands a person with no role on What's on", () => {
+    expect(availablePages(as(null))).toEqual(["whats_on", "settings"]);
     expect(availablePages(null)).toEqual(["settings"]);
   });
 
   it("puts the calendar first for the committee, and members only for principals", () => {
-    expect(availablePages(as("committee"))).toEqual(["calendar", "planner", "settings"]);
-    expect(availablePages(as("principal"))).toEqual(["calendar", "planner", "members", "settings"]);
+    expect(availablePages(as("committee"))).toEqual(["calendar", "planner", "whats_on", "settings"]);
+    expect(availablePages(as("principal"))).toEqual(["calendar", "planner", "whats_on", "members", "settings"]);
   });
 });
 

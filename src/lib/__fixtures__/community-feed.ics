@@ -1,0 +1,48 @@
+BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Adam's Campus Toolbox//Master Calendar//EN
+NAME:Street Aid Society
+BEGIN:VEVENT
+UID:past@adamscampustoolbox.org.uk
+DTSTART:20261001T170000Z
+DTEND:20261001T183000Z
+SUMMARY:Last week's handout
+END:VEVENT
+BEGIN:VEVENT
+UID:yesterday@adamscampustoolbox.org.uk
+DTSTART:20261005T170000Z
+DTEND:20261005T183000Z
+SUMMARY:Hot Drink Handout Session - Taster Outreach
+LOCATION:132 Foster Court
+URL:https://studentsunionucl.org/whats-on/give-it-go/hot-drink-handout-sess
+ ion-taster-outreach?v=97282
+END:VEVENT
+BEGIN:VEVENT
+UID:soon@adamscampustoolbox.org.uk
+DTSTART:20261008T170000Z
+DTEND:20261008T183000Z
+SUMMARY:Hot Drink Handout Session
+LOCATION:132 Foster Court
+DESCRIPTION:Our regular outreach sessions are back!\nGrab a ticket.
+URL:javascript:alert(1)
+END:VEVENT
+BEGIN:VEVENT
+UID:cancelled@adamscampustoolbox.org.uk
+DTSTART:20261010T100000Z
+DTEND:20261010T120000Z
+SUMMARY:Sock drive
+STATUS:CANCELLED
+END:VEVENT
+BEGIN:VEVENT
+UID:soon@adamscampustoolbox.org.uk
+DTSTART:20261008T170000Z
+DTEND:20261008T190000Z
+SUMMARY:Hot Drink Handout Session (longer)
+END:VEVENT
+BEGIN:VEVENT
+UID:far@adamscampustoolbox.org.uk
+DTSTART:20270115T170000Z
+DTEND:20270115T183000Z
+SUMMARY:Next term
+END:VEVENT
+END:VCALENDAR
