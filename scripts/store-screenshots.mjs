@@ -8,6 +8,7 @@
 //   node scripts/store-screenshots.mjs                 # everything
 //   node scripts/store-screenshots.mjs --only feature  # just the feature graphic
 //   node scripts/store-screenshots.mjs --only iphone-69,android-phone
+//   node scripts/store-screenshots.mjs --shots 04-zero-food-waste
 //
 // Needs:
 // - Playwright with Chromium. Not a repo dependency: point PLAYWRIGHT_DIR at any
@@ -93,15 +94,20 @@ async function prepareVolunteer(page) {
 }
 
 async function prepareZfw(page) {
-  const leader = page.locator("#z-leader");
-  if (await leader.count()) await leader.fill("Priya Shah");
-  const outlet = page.locator("#z-outlet");
-  if (await outlet.count()) await outlet.selectOption({ index: 1 });
-  const taps = { mains: 14, "fruit and yoghurt pots": 6, "pastries and pasties": 9, snacks: 4 };
-  for (const [label, n] of Object.entries(taps)) {
-    const plus = page.getByRole("button", { name: `One more ${label}` });
-    if (!(await plus.count())) continue;
-    for (let i = 0; i < n; i++) await plus.click();
+  // People as tags, the outlet from its suggestions, then a few lines through
+  // the add sheet. Never submitted.
+  for (const name of ["Priya Shah", "Tom"]) {
+    await page.fill("#z-people", name);
+    await page.keyboard.press("Enter");
+  }
+  await page.fill("#z-outlet", "cruci");
+  await page.getByRole("option", { name: "Cruciform Cafe" }).click();
+  const lines = [["Mains", 14], ["Fruit and yoghurt pots", 6], ["Pastries and pasties", 9]];
+  for (const [label, n] of lines) {
+    await page.locator(".zfw-add").click();
+    await page.locator(".zfw-kind", { hasText: label }).first().click();
+    await page.getByLabel("Amount").fill(String(n));
+    await page.locator('.zfw-sheet button[type="submit"]').click();
   }
   await page.evaluate(() => document.activeElement?.blur());
 }
@@ -145,6 +151,9 @@ const args = process.argv.slice(2);
 const onlyIdx = args.indexOf("--only");
 const only = onlyIdx >= 0 ? new Set(args[onlyIdx + 1].split(",")) : null;
 const want = (key) => !only || only.has(key);
+// --shots 04-zero-food-waste,01-calendar: redo just those, leaving the rest.
+const shotsIdx = args.indexOf("--shots");
+const shotsOnly = shotsIdx >= 0 ? new Set(args[shotsIdx + 1].split(",")) : null;
 
 const { chromium } = await loadPlaywright();
 const browser = await chromium.launch();
@@ -186,6 +195,7 @@ try {
     }, { cssW, cssH, t });
 
     for (const shot of SHOTS) {
+      if (shotsOnly && !shotsOnly.has(shot.name)) continue;
       await frame.evaluate((text) => (document.getElementById("headline").textContent = text), shot.headline);
       await frame.evaluate(() => document.fonts.ready);
       const box = await frame.locator("#screen").boundingBox();
