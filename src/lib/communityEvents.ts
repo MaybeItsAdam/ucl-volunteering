@@ -1,13 +1,18 @@
 import type { IcalEvent } from "@/lib/ical";
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { DEFAULT_TOOLBOX_URL, DEFAULT_VOLSOC_ORGANISER_ID, feedFields, fetchOrganiserFeed, safeUrl } from "@/lib/toolboxEvents";
+import {
+  DEFAULT_CALENDAR_ORGANISER_ID,
+  DEFAULT_TOOLBOX_URL,
+  DEFAULT_VOLSOC_ORGANISER_ID,
+  feedFields, fetchOrganiserFeed, safeUrl } from "@/lib/toolboxEvents";
 
 /**
  * What's on: upcoming events from the SU's social impact societies, for
  * everyone signed in.
  *
  * The societies are the Toolbox societies tagged `altruism` (the SU's own
- * grouping: Street Aid, Red Cross, Cancer Charities Alliance, …) plus VolSoc.
+ * grouping: Street Aid, Red Cross, Cancer Charities Alliance, …) plus VolSoc
+ * and UCL Student Social Impact.
  * Once a day each one's public iCal feed is pulled into `community_events`.
  * The feed owns every column, so a society's rows are replaced wholesale. A
  * feed that fails keeps its old rows and records the error on the society; a
@@ -111,15 +116,15 @@ export function parseSocietyList(body: unknown): ToolboxSociety[] {
 
 /**
  * Pure: the societies What's on follows — every one tagged `altruism`, plus
- * VolSoc whatever its tags — by name. Throws if none is tagged, which means the
+ * VolSoc and Student Social Impact (`always`) whatever their tags — by name. Throws if none is tagged, which means the
  * Toolbox's tagging broke rather than that every society left.
  */
 export function selectCommunitySocieties(
   all: ToolboxSociety[],
-  volsocId: string = DEFAULT_VOLSOC_ORGANISER_ID,
+  always: readonly string[] = [DEFAULT_VOLSOC_ORGANISER_ID, DEFAULT_CALENDAR_ORGANISER_ID],
 ): ToolboxSociety[] {
   const chosen = new Map<string, ToolboxSociety>();
-  for (const s of all) if (s.tags.includes(COMMUNITY_TAG) || s.id === volsocId) chosen.set(s.id, s);
+  for (const s of all) if (s.tags.includes(COMMUNITY_TAG) || always.includes(s.id)) chosen.set(s.id, s);
   if (![...chosen.values()].some((s) => s.tags.includes(COMMUNITY_TAG))) {
     throw new Error(`No Toolbox society is tagged ${COMMUNITY_TAG}`);
   }
@@ -243,7 +248,10 @@ export async function runCommunitySync(options: { now?: Date } = {}): Promise<Co
   // Who to sync: the Toolbox's list now, or failing that the last one stored.
   let societies: { id: string; name: string }[];
   try {
-    const chosen = selectCommunitySocieties(await fetchSocietyList(), process.env.TOOLBOX_ORGANISER_ID || undefined);
+    const chosen = selectCommunitySocieties(await fetchSocietyList(), [
+      process.env.TOOLBOX_ORGANISER_ID || DEFAULT_VOLSOC_ORGANISER_ID,
+      process.env.CALENDAR_ORGANISER_ID || DEFAULT_CALENDAR_ORGANISER_ID,
+    ]);
     const { error: upsertError } = await supabase
       .from("community_societies")
       .upsert(chosen.map(societyRow), { onConflict: "organiser_id" });

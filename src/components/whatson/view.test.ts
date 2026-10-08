@@ -46,6 +46,7 @@ describe("URL state", () => {
     expect(toggleSociety(["a", "c"], "a", KNOWN)).toEqual(["c"]);
     expect(whatsOnHref("month", [])).toBe("/portal/whats-on");
     expect(whatsOnHref("week", ["a", "c"])).toBe("/portal/whats-on?range=week&s=a%2Cc");
+    expect(whatsOnHref("all", [], "/calendar")).toBe("/calendar?range=all");
   });
 });
 

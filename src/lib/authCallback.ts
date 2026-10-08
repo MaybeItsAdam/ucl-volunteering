@@ -26,3 +26,16 @@ export function authCallbackUrl(requestUrl: URL, requestedReturnTo?: string | nu
   }
   return candidate.toString();
 }
+
+/** Where sign-in remembers to send someone back to, between /api/auth/start and the exchange. */
+export const RETURN_COOKIE = "volsoc_return";
+
+/**
+ * A page on this site to land on after sign-in (`/volunteer`), or null. Only
+ * a plain path: `//host` and `/\host` are other sites to a browser.
+ */
+export function safeReturnPath(value: string | null | undefined): string | null {
+  if (!value || value.length > 200 || !value.startsWith("/")) return null;
+  if (value.startsWith("//") || value.startsWith("/\\") || /[\u0000-\u001f\\]/.test(value)) return null;
+  return value;
+}

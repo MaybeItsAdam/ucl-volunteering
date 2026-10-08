@@ -48,7 +48,13 @@ describe("parseSocietyList", () => {
 });
 
 describe("selectCommunitySocieties", () => {
-  it("takes the altruism societies and VolSoc, by name", () => {
+  it("takes the altruism societies, VolSoc and Student Social Impact, by name", () => {
+    const withUssi = [...list.societies, { id: "org_uni_juev5rp0v", name: "UCL Student Social Impact" }, { id: "org_uni_other", name: "Other" }];
+    expect(selectCommunitySocieties(parseSocietyList(withUssi)).map((s) => s.id)).toContain("org_uni_juev5rp0v");
+    expect(selectCommunitySocieties(parseSocietyList(withUssi)).map((s) => s.id)).not.toContain("org_uni_other");
+  });
+
+  it("takes the altruism societies and VolSoc from the fixture, by name", () => {
     expect(selectCommunitySocieties(parseSocietyList(list)).map((s) => s.name)).toEqual([
       "Cancer Charities Alliance Society",
       "Street Aid Society",

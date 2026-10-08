@@ -54,6 +54,8 @@ without printing any value.
 | `ADMIN_EMAILS` | no | Comma-separated; these people sign in as admin |
 | `TOOLBOX_API_TOKEN` | no | Only if the Toolbox feed ever needs authenticating |
 | `TIMETABLE_FEED_KEY` | no | Encrypts saved UCL timetable links: `openssl rand -base64 32`. Unset, nobody can link one. Never rotate it casually: every saved link becomes unreadable and has to be pasted again |
+| `ZFW_SHEET_WEBHOOK_URL` | no | The `/exec` URL of `apps-script/zero-food-waste`, which appends `/zero-food-waste` logs to the team's sheet. Unset, the form says it isn't connected |
+| `ZFW_SHEET_SECRET` | no | Shared with that script's `ZFW_SECRET` property: `openssl rand -hex 32` |
 
 If Vercel's Supabase integration is installed it owns the `SUPABASE_*` and
 `POSTGRES_*` names; keep those out of Doppler.
@@ -105,6 +107,21 @@ Cron (`/api/sync/organiser-events`), or from the plan page's sync button:
 
 The feed owns those rows' title, time and place; the committee owns the rest.
 Events typed into the app are `volsoc` rows and fully editable.
+
+## Public pages
+
+- `/calendar`: What's on, open to anyone: upcoming events from the Toolbox
+  societies tagged `altruism` (Street Aid, Red Cross, Student Action for
+  Refugees, …) plus VolSoc and UCL Student Social Impact, synced daily into
+  `community_events` (`src/lib/communityEvents.ts`). One combined feed to
+  subscribe to at `/calendar.ics`.
+- `/volunteer`: the volunteer register. Needs a UCL sign-in (any role, or
+  none), which lands back on the form; signing up again updates your answers,
+  and you can take yourself off. The committee reads it on the portal's
+  Volunteers tab (filter, CSV, copy emails).
+- `/zero-food-waste`: no sign-in. Shift leaders log what they collected; each
+  log is a new row in the Zero Food Waste sheet via
+  `apps-script/zero-food-waste`.
 
 ## Scripts
 
