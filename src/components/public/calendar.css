@@ -1,0 +1,206 @@
+/* ==========================================================================
+   PUBLIC CALENDAR: the week grid at /calendar.
+
+   Every row (day heads, all-day strip, time grid) is one grid sharing
+   --cal-cols, set inline: an hour gutter, then a column a day weighted by how
+   busy it is. The whole thing sits in one scroller so the head sticks to the
+   top and the gutter to the left, and on a phone it swipes sideways a day at
+   a time. Cards take their society's colour (--soc, --soc-dark, set inline
+   from the Toolbox) as a tint: data, not theme, so it never touches chrome.
+   ========================================================================== */
+
+.cal {
+  --cal-gutter: 52px;
+  /* A day with events never gets narrower than this; an empty one is a strip. */
+  --cal-min: 120px;
+  --cal-empty: 44px;
+  --cal-head: 52px;
+  display: grid; gap: 12px; min-width: 0;
+}
+
+/* ── Week bar and society chips ─────────────────────────────────────────── */
+
+.cal-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cal-weeknav { display: contents; }
+.cal-weeknav .icon-button { border-color: var(--line); }
+.cal-weeknav .icon-button:disabled { opacity: .35; cursor: default; }
+.cal-range { display: flex; align-items: baseline; gap: 10px; font-size: 20px; }
+.cal-range-count { font-family: var(--font-body); font-size: 13px; font-weight: 600; }
+
+.cal-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cal-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: 32px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: var(--radius-control);
+  background: var(--raised); color: var(--ink);
+  font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer;
+}
+.cal-chip:hover { background: var(--hover); }
+.cal-chip[aria-pressed="false"] { color: var(--dim); background: transparent; border-style: dashed; }
+.cal-chip[aria-pressed="false"] .cal-swatch { opacity: .3; }
+.cal-swatch { width: 10px; height: 10px; flex: none; border-radius: 9999px; background: var(--c); }
+
+/* Each event's hue: its society's colour, the dark-mode one in the dark. */
+.cal-chip, .cal-event, .cal-chipevent, .cal-sheet { --c: var(--soc, var(--primary)); }
+:root[data-theme="dark"] :is(.cal-chip, .cal-event, .cal-chipevent, .cal-sheet) { --c: var(--soc-dark, var(--soc, var(--primary))); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :is(.cal-chip, .cal-event, .cal-chipevent, .cal-sheet) { --c: var(--soc-dark, var(--soc, var(--primary))); }
+}
+
+/* ── The scroller ───────────────────────────────────────────────────────── */
+
+.cal-scroller {
+  position: relative;
+  /* Its own stacking context: the sticky heads and gutter layer inside the
+     grid, never over the site's header or the phone tab bar. */
+  isolation: isolate;
+  overflow: auto; overscroll-behavior-x: contain;
+  max-height: max(420px, calc(100dvh - 220px));
+  border: 1px solid var(--line); border-radius: var(--radius-card);
+  background: var(--raised);
+  scroll-padding-left: var(--cal-gutter);
+  scrollbar-width: thin;
+}
+/* One grid for the day heads, the all-day strip and the time grid, so they
+   share their columns exactly. Its width is set inline (the days' minimums, or
+   the scroller if wider) and the fr shared out over that. */
+.cal-grid {
+  display: grid;
+  grid-template-columns: var(--cal-gutter) var(--cal-cols);
+  grid-template-rows: auto auto var(--cal-grid-height);
+}
+
+/* Day heads stick to the top, the gutter to the left, the corner to both. */
+.cal-corner, .cal-dayhead {
+  grid-row: 1; position: sticky; top: 0; z-index: 30;
+  background: var(--alt); border-bottom: 1px solid var(--line);
+}
+.cal-corner { grid-column: 1; left: 0; z-index: 40; }
+.cal-dayhead {
+  display: grid; justify-items: center; align-content: center; gap: 0;
+  min-height: var(--cal-head); padding: 6px 4px; min-width: 0;
+  border-left: 1px solid var(--line);
+  scroll-snap-align: start;
+}
+.cal-dayhead-date { font-family: var(--font-display); font-size: 22px; font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.cal-dayhead[data-empty] .cal-dayhead-date { font-size: 15px; color: var(--muted); }
+.cal-dayhead[data-past] > * { opacity: .6; }
+.cal-dayhead[data-today] .micro-label { color: var(--info-text); }
+.cal-dayhead[data-today] .cal-dayhead-date {
+  display: inline-grid; place-items: center; min-width: 32px; height: 32px; padding: 0 4px;
+  border-radius: 9999px; background: var(--primary); color: var(--on-primary);
+}
+
+/* All-day strip: its own rows, on the grid's columns. */
+.cal-allday {
+  grid-row: 2; grid-column: 1 / -1;
+  display: grid; grid-template-columns: subgrid;
+  grid-auto-rows: 26px; row-gap: 3px; padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+.cal-allday-label {
+  grid-column: 1; grid-row: 1; align-self: center; padding-left: 6px; font-size: 9px;
+  position: sticky; left: 0; z-index: 2; background: var(--raised);
+}
+.cal-chipevent {
+  min-width: 0; margin: 0 3px; padding: 0 8px; text-align: left;
+  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); border-left: 3px solid var(--c);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--c) 14%, var(--raised)); color: var(--ink);
+  font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;
+}
+
+/* ── Time grid ──────────────────────────────────────────────────────────── */
+
+.cal-gutter {
+  grid-row: 3; grid-column: 1;
+  position: sticky; left: 0; z-index: 20;
+  background: var(--raised);
+}
+.cal-hour {
+  position: absolute; right: 6px; transform: translateY(-50%);
+  font-size: 10px; font-weight: 700; color: var(--muted); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.cal-hour:first-child { transform: none; top: 3px !important; }
+.cal-col { grid-row: 3; position: relative; min-width: 0; border-left: 1px solid var(--line); }
+.cal-col[data-today] { background: color-mix(in srgb, var(--primary) 5%, transparent); }
+.cal-col[data-empty] { background: var(--alt); }
+.cal-col[data-past] .cal-event { opacity: .55; }
+
+.cal-lines { grid-row: 3; grid-column: 2 / -1; position: relative; pointer-events: none; z-index: 1; }
+.cal-line { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line-muted); }
+
+.cal-now { position: absolute; left: 0; right: 0; height: 2px; margin-top: -1px; background: var(--danger); z-index: 50; pointer-events: none; }
+.cal-now::before {
+  content: ""; position: absolute; left: -5px; top: -4px;
+  width: 10px; height: 10px; border-radius: 9999px; background: var(--danger);
+}
+
+/* Cards: tinted fill, a 3px rule in the society's colour, hairline border. */
+.cal-event {
+  position: absolute; display: flex; flex-direction: column; gap: 1px;
+  padding: 4px 6px 4px 8px; overflow: hidden; text-align: left;
+  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); border-left: 3px solid var(--c);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--c) 14%, var(--raised)); color: var(--ink);
+  cursor: pointer; transition: background-color .12s ease;
+}
+.cal-event:hover { background: color-mix(in srgb, var(--c) 24%, var(--raised)); }
+.cal-event:focus-visible { outline-offset: 0; }
+/* A card painted over another gets an outline of the page, so the edge between them reads. */
+.cal-event[data-stacked] { outline: 1px solid var(--raised); }
+.cal-event-title {
+  font-size: 12.5px; font-weight: 700; line-height: 1.2;
+  overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+}
+.cal-event-time, .cal-event-host { font-size: 11px; line-height: 1.2; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cal-event-host { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-event[data-size="sm"] .cal-event-title { -webkit-line-clamp: 1; }
+.cal-event[data-size="xs"] { flex-direction: row; align-items: center; gap: 6px; padding-top: 0; padding-bottom: 0; }
+.cal-event[data-size="xs"] .cal-event-title { -webkit-line-clamp: 1; flex: 1; min-width: 0; font-size: 11.5px; }
+.cal-event[data-cancelled] .cal-event-title, .cal-chipevent[data-cancelled], .cal-cancelled { text-decoration: line-through; color: var(--muted); }
+
+.cal-empty { margin: 0; text-align: center; }
+
+/* ── Event sheet ────────────────────────────────────────────────────────── */
+
+.cal-sheet { display: grid; gap: 12px; justify-items: start; }
+.cal-sheet h2 { font-size: 22px; }
+.cal-sheet-host { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.cal-sheet .details { width: 100%; margin: 0; }
+.cal-sheet .details a { display: inline-flex; align-items: center; gap: 4px; }
+.cal-sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+
+/* ── Phones ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  /* A busy day is most of the screen; swipe for the next. */
+  .cal {
+    --cal-gutter: 44px;
+    --cal-min: calc(100vw - 2 * max(16px, var(--safe-left)) - var(--cal-gutter) - 46px);
+    --cal-empty: 40px;
+  }
+  /* Scrolled to the top of the page's content, the grid fills the screen
+     between the top bar and the tab bar. */
+  .cal-scroller {
+    scroll-snap-type: x mandatory;
+    max-height: none;
+    height: calc(100dvh - 56px - var(--safe-top) - 64px - var(--safe-bottom) - 12px);
+    margin: 0 calc(-1 * max(16px, var(--safe-right))) 0 calc(-1 * max(16px, var(--safe-left)));
+    border-radius: 0; border-left: 0; border-right: 0;
+  }
+  .cal-bar { flex-wrap: nowrap; gap: 6px; }
+  .cal-range { flex: 1; min-width: 0; justify-content: center; font-size: 17px; white-space: nowrap; }
+  .cal-weeknav .icon-button { width: 44px; height: 40px; flex: none; }
+  .cal-today { flex: none; }
+  .cal-chips {
+    flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none;
+    margin: 0 calc(-1 * max(16px, var(--safe-right))) 0 calc(-1 * max(16px, var(--safe-left)));
+    padding: 0 max(16px, var(--safe-right)) 2px max(16px, var(--safe-left));
+  }
+  .cal-chips::-webkit-scrollbar { display: none; }
+  .cal-chip { min-height: 36px; }
+  .cal-event-title { font-size: 13px; }
+  .cal-sheet-actions .button { flex: 1 1 100%; min-height: 44px; }
+}

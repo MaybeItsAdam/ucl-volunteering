@@ -24,9 +24,38 @@
 .pub-main { padding: 24px max(16px, var(--safe-right)) calc(48px + var(--safe-bottom)) max(16px, var(--safe-left)); }
 .pub-lede { margin: 0; max-width: 62ch; }
 
-@media (max-width: 560px) {
-  .pub-brand span { display: none; }
-  .pub-bar { gap: 8px; }
+.pub-nav-icon, .pub-nav-short { display: none; }
+
+/* Public pages keep their own title on phones (the portal's moves to its title bar). */
+.pub-main .page-head > h1, .pub-main .page-head > .micro-label { display: block; }
+@media (max-width: 768px) {
+  .pub-main .page-head { grid-template-columns: 1fr auto; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .pub-main .page-head h1 { font-size: 26px; }
+}
+
+/* Phones: the pages move to a tab bar along the bottom, like the portal's. */
+@media (max-width: 768px) {
+  .pub-bar { min-height: calc(52px + var(--safe-top)); }
+  .pub-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    gap: 0; padding: 6px var(--safe-right) max(6px, var(--safe-bottom)) var(--safe-left);
+    background: var(--raised); border-top: 1px solid var(--line);
+  }
+  .pub-nav a {
+    flex: 1; flex-direction: column; justify-content: center; gap: 3px;
+    min-height: 50px; padding: 0; margin: 0; border: 0;
+    font-size: 9px; letter-spacing: .12em;
+  }
+  .pub-nav a[aria-current="page"] { border: 0; color: var(--ink); }
+  .pub-nav-icon {
+    display: inline-grid; place-items: center; width: 44px; height: 26px;
+    border-radius: var(--radius-control); transition: background-color .18s ease;
+  }
+  .pub-nav a[aria-current="page"] .pub-nav-icon { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--info-text); }
+  .pub-nav-long { display: none; }
+  .pub-nav-short { display: inline; }
+  .pub-main { padding: 16px max(16px, var(--safe-right)) calc(88px + var(--safe-bottom)) max(16px, var(--safe-left)); }
+  .pub-theme { width: 40px; height: 40px; }
 }
 
 /* Forms */
@@ -61,7 +90,27 @@
 .pub-week-cell:hover { background: var(--hover); }
 .pub-week-cell:has(input:checked) { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 18%, var(--raised)); }
 
-.pub-counts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; align-items: start; }
+/* Counts: one hairline row each, the name on the left and a stepper on the right. */
+.pub-counts {
+  list-style: none; margin: 0 0 12px; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); column-gap: 24px;
+}
+.pub-count {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 0; border-bottom: 1px solid var(--line-muted);
+}
+.pub-count-label { display: grid; gap: 1px; min-width: 0; font-weight: 600; font-size: 14px; }
+.pub-count-label .hint { font-size: 12px; font-weight: 500; color: var(--muted); }
+.pub-stepper { display: flex; align-items: center; gap: 2px; flex: none; }
+.pub-stepper .icon-button { width: 36px; height: 36px; border-color: var(--line); }
+.pub-stepper .icon-button:disabled { opacity: .35; cursor: default; }
+.pub-stepper input {
+  width: 56px; min-height: 36px; padding: 4px 6px; text-align: center;
+  border: 1px solid var(--line-input); border-radius: var(--radius-control);
+  background: var(--raised); font-variant-numeric: tabular-nums; -moz-appearance: textfield;
+}
+.pub-stepper input::-webkit-inner-spin-button, .pub-stepper input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.pub-stepper input:focus { outline: none; border-color: var(--primary); }
 .pub-total { display: flex; align-items: baseline; gap: 12px; margin: 4px 0 0; padding-top: 12px; border-top: 1px solid var(--line-muted); }
 .pub-total .mono { font-family: var(--font-display); font-size: 28px; font-weight: 700; }
 
@@ -73,3 +122,20 @@
 .pub-signin p { margin: 0; }
 .pub-signed-in { margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .pub-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Calendar page: the intro and the Week / List switch (the grid is calendar.css). */
+.cal-intro { margin: 0; max-width: 62ch; }
+.cal-page .page-actions { align-items: center; }
+@media (max-width: 768px) {
+  /* Every pixel above the grid is one less hour on screen. */
+  .cal-intro, .cal-page .page-head > .micro-label { display: none !important; }
+  .cal-page .page-head { grid-template-columns: auto 1fr; align-items: center; gap: 10px; }
+  .cal-page .page-actions { grid-column: 2; grid-row: 1; justify-content: flex-end; flex-wrap: nowrap; gap: 6px; }
+  .cal-page .segmented a { padding: 0 10px; }
+}
+.segmented a {
+  display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px;
+  border: 1px solid transparent; border-radius: 5px;
+  color: var(--muted); font-size: 13px; font-weight: 700; text-decoration: none;
+}
+.segmented a.active { background: var(--raised); border-color: var(--line); color: var(--ink); }

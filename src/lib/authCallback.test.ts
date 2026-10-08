@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authCallbackUrl, safeReturnPath } from "./authCallback";
+import { appCallbackLink, authCallbackUrl, parseAppCallback, safeReturnPath } from "./authCallback";
 
 describe("sign-in callback origin", () => {
   it("returns people to whichever domain started sign-in", () => {
@@ -36,5 +36,20 @@ describe("return path after sign-in", () => {
     for (const bad of ["https://evil.example", "//evil.example", "/\\evil.example", "volunteer", "/a\nb", "", null, undefined]) {
       expect(safeReturnPath(bad)).toBeNull();
     }
+  });
+});
+
+describe("phone app callback", () => {
+  it("round-trips the token and landing page", () => {
+    const link = appCallbackLink("a.b+c", "/volunteer");
+    expect(link).toBe("uclvolunteering://auth/callback?next=%2Fvolunteer#token=a.b%2Bc");
+    expect(parseAppCallback(link)).toEqual({ token: "a.b+c", next: "/volunteer" });
+    expect(parseAppCallback(appCallbackLink("t", null))).toEqual({ token: "t", next: null });
+  });
+
+  it("ignores other links and unsafe landing pages", () => {
+    expect(parseAppCallback("https://uclvolunteering.org/auth/callback#token=t")).toBeNull();
+    expect(parseAppCallback("uclvolunteering://auth/callback")).toBeNull();
+    expect(parseAppCallback("uclvolunteering://auth/callback?next=//evil.example#token=t")).toEqual({ token: "t", next: null });
   });
 });

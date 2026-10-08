@@ -15,3 +15,14 @@ legacy/dist
 
 # Apps Script secrets, pushed with clasp but never committed
 apps-script/**/Secret.js
+
+# Mobile release: signing material and fastlane's scratch files
+*.jks
+android/app/key.properties
+fastlane/*.json
+fastlane/report.xml
+fastlane/README.md
+vendor/bundle
+.bundle
+*.ipa
+*.app.dSYM.zip

@@ -3,6 +3,7 @@ import { londonDateAt, londonWeek } from "@/lib/planTime";
 import type { PlanEvent } from "@/lib/types";
 import {
   clampToWindow,
+  peakOverlap,
   dragStartMinute,
   eventDaySpan,
   layoutWeek,
@@ -226,5 +227,13 @@ describe("drag arithmetic", () => {
   it("turns a click into an hour and a drag into its snapped span", () => {
     expect(selectionRange(605, 605)).toEqual({ start: 600, end: 660 });
     expect(selectionRange(700, 602)).toEqual({ start: 600, end: 705 });
+  });
+});
+
+describe("peakOverlap", () => {
+  it("counts the most cards open at once, touching ones apart", () => {
+    expect(peakOverlap([])).toBe(0);
+    expect(peakOverlap([{ top: 600, bottom: 660 }, { top: 660, bottom: 720 }])).toBe(1);
+    expect(peakOverlap([{ top: 600, bottom: 720 }, { top: 630, bottom: 700 }, { top: 640, bottom: 650 }, { top: 710, bottom: 800 }])).toBe(3);
   });
 });

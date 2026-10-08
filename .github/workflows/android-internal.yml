@@ -1,0 +1,102 @@
+name: Android internal testing
+
+# Every push to main builds the Android shell and uploads it to the Play
+# Console internal track, after lint, typecheck and tests pass.
+#
+# The app is a Capacitor shell that loads https://uclvolunteering.org, so
+# most website changes reach phones through the Vercel deploy alone; the
+# per-push build keeps internal testers on a binary that matches main anyway.
+# Dispatch it by hand to re-run, or to push the current main to production.
+#
+# Push runs stay off until the repo variable ANDROID_PLAY_ENABLED is "true":
+# the Play Console refuses API uploads until the app has had one build
+# uploaded by hand (`bundle exec fastlane android bundle`). Dispatch always runs.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      lane:
+        description: "beta = internal testing, release = production (10% rollout)"
+        type: choice
+        options: [beta, release]
+        default: beta
+
+# One store upload at a time, and never cancel one halfway.
+concurrency:
+  group: android-play
+  cancel-in-progress: false
+
+jobs:
+  # Gate: nothing reaches testers unless main is green.
+  test:
+    name: Pre-deploy checks
+    if: github.event_name == 'workflow_dispatch' || vars.ANDROID_PLAY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+
+  deploy:
+    name: Android -> Play ${{ inputs.lane || 'beta' }}
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - run: npm ci
+
+      - name: Sync Capacitor Android shell
+        run: npx cap sync android
+
+      - name: Write signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/upload-keystore.jks
+          cat > android/app/key.properties <<PROPS
+          storeFile=../upload-keystore.jks
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
+          PROPS
+
+      - name: Write Play service account key
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > fastlane/sa-key-play.json
+
+      - name: Build & upload
+        # No BUILD_NUMBER: the Fastfile reads the highest versionCode on the
+        # Play tracks and adds one, so laptop uploads can't collide with CI.
+        run: bundle exec fastlane android ${{ inputs.lane || 'beta' }}
+        env:
+          PLAY_JSON_KEY_FILE: fastlane/sa-key-play.json

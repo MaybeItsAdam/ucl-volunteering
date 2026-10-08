@@ -1,0 +1,9 @@
+for_platform :ios do
+  app_identifier "org.uclvolunteering.app"
+  team_id ENV["TEAM_ID"] || "6NQNU5YSC2"
+end
+
+for_platform :android do
+  package_name "org.uclvolunteering.app"
+  json_key_file ENV["PLAY_JSON_KEY_FILE"]
+end

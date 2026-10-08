@@ -638,3 +638,11 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); widt
 .account-settings .panel .theme-setting { margin-bottom: 8px; }
 .account-settings form { margin: 0; }
 
+
+/* The phone app, swapping a UCL sign-in for a session (NativeAuthBridge). */
+.native-auth-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  display: grid; place-items: center;
+  background: var(--paper); color: var(--ink);
+  font-family: var(--font-display); font-size: 20px;
+}

@@ -112,9 +112,12 @@ export function cascadeLayout(items: readonly Interval[]): Placed[] {
 
 // ── Events into days ─────────────────────────────────────────────────────
 
+/** What the layout needs of an event; the planner's and the public calendar's both fit. */
+export type TimedEvent = Pick<PlanEvent, "id" | "title" | "startsAt" | "endsAt" | "allDay">;
+
 /** One event's part of one day, in London minutes of that day. */
-export interface DaySegment {
-  event: PlanEvent;
+export interface DaySegment<E extends TimedEvent = PlanEvent> {
+  event: E;
   day: string;
   /** True minutes, 0–1440. */
   start: number;
@@ -137,8 +140,8 @@ export interface DaySegment {
   stacked: boolean;
 }
 
-export interface AllDayItem {
-  event: PlanEvent;
+export interface AllDayItem<E extends TimedEvent = PlanEvent> {
+  event: E;
   /** Index into the week's days of its first and last visible day (inclusive). */
   firstDay: number;
   lastDay: number;
@@ -146,21 +149,21 @@ export interface AllDayItem {
   row: number;
 }
 
-export interface WeekLayout {
-  allDay: AllDayItem[];
+export interface WeekLayout<E extends TimedEvent = PlanEvent> {
+  allDay: AllDayItem<E>[];
   /** Timed segments per day key, in the order they should paint. */
-  days: Record<string, DaySegment[]>;
+  days: Record<string, DaySegment<E>[]>;
   /** Count of events touching each day (all-day included). */
   counts: Record<string, number>;
 }
 
 /** An all-day event, or a timed one of 24 hours or more, goes in the strip. */
-export function isAllDayLike(event: PlanEvent): boolean {
+export function isAllDayLike(event: TimedEvent): boolean {
   return event.allDay || Date.parse(event.endsAt) - Date.parse(event.startsAt) >= MINUTES_PER_DAY * 60_000;
 }
 
 /** First and last London day an event covers, end exclusive (an event ending at midnight doesn't touch the next day). */
-export function eventDaySpan(event: PlanEvent): { first: string; last: string } {
+export function eventDaySpan(event: TimedEvent): { first: string; last: string } {
   const start = new Date(event.startsAt);
   const end = new Date(Math.max(Date.parse(event.endsAt), start.getTime()));
   const first = londonDayKey(start);
@@ -184,10 +187,10 @@ export function clampToWindow(start: number, end: number, windowStart = WINDOW_S
 }
 
 /** Lay a week of events out: the all-day strip, and timed segments per day, overlaps cascaded. */
-export function layoutWeek(events: readonly PlanEvent[], days: readonly string[]): WeekLayout {
+export function layoutWeek<E extends TimedEvent = PlanEvent>(events: readonly E[], days: readonly string[]): WeekLayout<E> {
   const firstDay = days[0];
   const lastDay = days[days.length - 1];
-  const result: WeekLayout = { allDay: [], days: {}, counts: {} };
+  const result: WeekLayout<E> = { allDay: [], days: {}, counts: {} };
   for (const day of days) {
     result.days[day] = [];
     result.counts[day] = 0;
@@ -251,6 +254,23 @@ export function layoutWeek(events: readonly PlanEvent[], days: readonly string[]
     placed.forEach((p, i) => Object.assign(segments[i], { left: p.left, width: p.width, z: p.z, stacked: p.stacked }));
   }
   return result;
+}
+
+/**
+ * The most segments that overlap at any one moment in a day: how many cards
+ * end up side by side, which the public calendar widens a busy day by.
+ */
+export function peakOverlap(segments: readonly { top: number; bottom: number }[]): number {
+  const edges = segments.flatMap((s) => [
+    [s.top, 1],
+    [s.bottom, -1],
+  ]);
+  // Ends before starts at the same minute: touching cards don't overlap.
+  edges.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  let open = 0;
+  let peak = 0;
+  for (const [, d] of edges) peak = Math.max(peak, (open += d));
+  return peak;
 }
 
 // ── Drag arithmetic ──────────────────────────────────────────────────────

@@ -1,12 +1,66 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { Minus, Plus } from "lucide-react";
 import { COUNTS, OUTLETS, type CountKey } from "@/lib/zeroFoodWaste";
 
 type Status = { kind: "idle" } | { kind: "sending" } | { kind: "done"; outlet: string; total: number } | { kind: "error"; message: string };
 
 const OTHER = "__other";
 const blankCounts = () => Object.fromEntries(COUNTS.map((c) => [c.key, ""])) as Record<CountKey, string>;
+
+const MAX_COUNT = 2000;
+
+/**
+ * One count: type it, or step it with − and +, which on a phone is quicker
+ * than the keypad for the small numbers most shifts bring in.
+ */
+function CountRow({
+  id,
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  hint: string | null;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const n = Number(value) || 0;
+  const step = (by: number) => {
+    const next = Math.min(MAX_COUNT, Math.max(0, n + by));
+    onChange(next ? String(next) : "");
+  };
+  return (
+    <li className="pub-count">
+      <label htmlFor={id} className="pub-count-label">
+        <span>{label}</span>
+        {hint && <span className="hint">{hint}</span>}
+      </label>
+      <div className="pub-stepper">
+        <button type="button" className="icon-button" onClick={() => step(-1)} disabled={!n} aria-label={`One fewer ${label.toLowerCase()}`}>
+          <Minus size={16} aria-hidden="true" />
+        </button>
+        <input
+          id={id}
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={MAX_COUNT}
+          step={1}
+          placeholder="0"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <button type="button" className="icon-button" onClick={() => step(1)} aria-label={`One more ${label.toLowerCase()}`}>
+          <Plus size={16} aria-hidden="true" />
+        </button>
+      </div>
+    </li>
+  );
+}
 
 /**
  * One outlet's collection on one shift. After a save the date and shift
@@ -95,37 +149,19 @@ export function ZeroFoodWasteForm({ today }: { today: string }) {
         <fieldset>
           <legend className="micro-label">What you collected</legend>
           <p className="muted small">Number of items; leave anything you didn&apos;t get blank</p>
-          <div className="pub-counts">
+          <ul className="pub-counts">
             {COUNTS.map((c) => (
-              <div key={c.key} className="field">
-                <label htmlFor={`z-${c.key}`}>{c.label}</label>
-                <input
-                  id={`z-${c.key}`}
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  max={2000}
-                  step={1}
-                  value={counts[c.key]}
-                  onChange={(e) => setCounts({ ...counts, [c.key]: e.target.value })}
-                />
-                {c.hint && <span className="hint">{c.hint}</span>}
-              </div>
-            ))}
-            <div className="field">
-              <label htmlFor="z-incentives">Incentives</label>
-              <input
-                id="z-incentives"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                max={2000}
-                step={1}
-                value={incentives}
-                onChange={(e) => setIncentives(e.target.value)}
+              <CountRow
+                key={c.key}
+                id={`z-${c.key}`}
+                label={c.label}
+                hint={c.hint}
+                value={counts[c.key]}
+                onChange={(value) => setCounts((now) => ({ ...now, [c.key]: value }))}
               />
-            </div>
-          </div>
+            ))}
+            <CountRow id="z-incentives" label="Incentives" hint="Given out on the shift" value={incentives} onChange={setIncentives} />
+          </ul>
           <p className="pub-total">
             <span className="micro-label">Total</span>
             <span className="mono">{total}</span>
