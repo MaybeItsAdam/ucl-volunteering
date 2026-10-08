@@ -21,6 +21,7 @@ export const OUTLETS = [
   "Engineering Cafe",
   "Housman",
   "IOE Cafe",
+  "North Observatory",
   "Science Library Cafe",
   "Smashed it!",
   "Street Slice",
@@ -46,7 +47,8 @@ export interface ZfwEntry {
   /** A London day, YYYY-MM-DD. */
   date: string;
   outlet: string;
-  shiftLeader: string;
+  /** Who was on the shift, as typed, each once. */
+  people: string[];
   counts: Record<CountKey, number>;
   total: number;
   incentives: number | null;
@@ -59,6 +61,22 @@ export interface ZfwRow {
 }
 
 const MAX_COUNT = 2000;
+export const MAX_PEOPLE = 12;
+
+/** Names as typed, trimmed, blank ones dropped, each once (ignoring case), in order. */
+export function cleanPeople(value: unknown): string[] {
+  const list = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
+  const seen = new Set<string>();
+  const people: string[] = [];
+  for (const raw of list) {
+    if (typeof raw !== "string") continue;
+    const name = raw.trim().replace(/\s+/g, " ").slice(0, 60);
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    people.push(name);
+  }
+  return people.slice(0, MAX_PEOPLE);
+}
 
 function count(value: unknown): number | null {
   if (value === "" || value === null || value === undefined) return 0;
@@ -71,12 +89,12 @@ export function parseZfwEntry(body: unknown, today: string): { value: ZfwEntry; 
   const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   const date = typeof b.date === "string" ? b.date : "";
   const outlet = typeof b.outlet === "string" ? b.outlet.trim().slice(0, 80) : "";
-  const shiftLeader = typeof b.shiftLeader === "string" ? b.shiftLeader.trim().slice(0, 80) : "";
+  const people = cleanPeople(b.people);
 
   if (!isDayKey(date)) return { error: "Pick the date of the shift" };
   if (date > today) return { error: "That date hasn't happened yet" };
   if (!outlet) return { error: "Pick the outlet" };
-  if (!shiftLeader) return { error: "Add the shift leader's name" };
+  if (!people.length) return { error: "Add who was on the shift" };
 
   const raw = (b.counts && typeof b.counts === "object" ? b.counts : {}) as Record<string, unknown>;
   const counts = {} as Record<CountKey, number>;
@@ -94,12 +112,16 @@ export function parseZfwEntry(body: unknown, today: string): { value: ZfwEntry; 
     if (incentives === null) return { error: "Incentives should be a whole number" };
   }
 
-  return { value: { date, outlet, shiftLeader, counts, total, incentives } };
+  return { value: { date, outlet, people, counts, total, incentives } };
 }
 
-/** The entry as the sheet's columns. Blank counts stay blank, as the team writes them. */
+/**
+ * The entry as the sheet's columns. Blank counts stay blank, as the team
+ * writes them. Everyone on the shift goes in the sheet's "Shift Leader"
+ * column, comma-separated, which keeps the team's existing column.
+ */
 export function toZfwRow(entry: ZfwEntry): ZfwRow {
-  const values: Record<string, string | number> = { Outlet: entry.outlet, "Shift Leader": entry.shiftLeader, Total: entry.total };
+  const values: Record<string, string | number> = { Outlet: entry.outlet, "Shift Leader": entry.people.join(", "), Total: entry.total };
   for (const { key, header } of COUNTS) values[header] = entry.counts[key] || "";
   values.Incentives = entry.incentives ?? "";
   return { date: entry.date, values };

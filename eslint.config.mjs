@@ -12,5 +12,11 @@ export default defineConfig([
     "apps-script/**",
     "maps/**",
     "next-env.d.ts",
+    // The Capacitor shells: native projects, generated bridge JS, and gems.
+    "android/**",
+    "ios/**",
+    "capacitor-dist/**",
+    "vendor/**",
+    ".claude/**",
   ]),
 ]);

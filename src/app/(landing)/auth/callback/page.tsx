@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { VolSocHand } from "@/components/landing/VolSocHand";
+import { appCallbackLink, safeReturnPath } from "@/lib/authCallback";
 
 /**
  * The Toolbox sends people back here with `#token=` in the fragment, which never
@@ -11,12 +12,25 @@ import { VolSocHand } from "@/components/landing/VolSocHand";
 export default function AuthCallback() {
   const [message, setMessage] = useState("Checking your UCL account…");
   const [failed, setFailed] = useState(false);
+  const [appLink, setAppLink] = useState<string | null>(null);
 
   useEffect(() => {
     async function completeSignIn() {
       const token = new URLSearchParams(window.location.hash.slice(1)).get("token");
+      // Read before the fragment goes: replaceState with the path alone drops the query too.
+      const query = new URLSearchParams(window.location.search);
       history.replaceState(null, "", window.location.pathname);
       if (!token) throw new Error("The sign-in response did not include a token — please try again");
+
+      // Started in the phone app: this is its system browser, so hand the token over.
+      if (query.get("native") === "1") {
+        const link = appCallbackLink(token, safeReturnPath(query.get("next")));
+        setMessage("Opening the VolSoc app…");
+        // Browsers may refuse a scripted jump to an app, so keep a link to tap.
+        setAppLink(link);
+        window.location.replace(link);
+        return;
+      }
 
       const response = await fetch("/api/auth/exchange", {
         method: "POST",
@@ -42,7 +56,9 @@ export default function AuthCallback() {
       <VolSocHand className="uvs-signin-logo" />
       <h1 id="signin-title">{failed ? "Not quite there" : "Signing you in"}</h1>
       <p role={failed ? "alert" : "status"}>{message}</p>
-      {failed ? (
+      {appLink && !failed ? (
+        <a className="uvs-cta uvs-cta-primary" href={appLink}>Open the VolSoc app</a>
+      ) : failed ? (
         <Link className="uvs-cta uvs-cta-primary" href="/auth/signin">Try UCL sign-in again</Link>
       ) : (
         <span className="uvs-signin-dots" aria-hidden="true"><i /><i /><i /></span>

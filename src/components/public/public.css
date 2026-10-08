@@ -24,9 +24,38 @@
 .pub-main { padding: 24px max(16px, var(--safe-right)) calc(48px + var(--safe-bottom)) max(16px, var(--safe-left)); }
 .pub-lede { margin: 0; max-width: 62ch; }
 
-@media (max-width: 560px) {
-  .pub-brand span { display: none; }
-  .pub-bar { gap: 8px; }
+.pub-nav-icon, .pub-nav-short { display: none; }
+
+/* Public pages keep their own title on phones (the portal's moves to its title bar). */
+.pub-main .page-head > h1, .pub-main .page-head > .micro-label { display: block; }
+@media (max-width: 768px) {
+  .pub-main .page-head { grid-template-columns: 1fr auto; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .pub-main .page-head h1 { font-size: 26px; }
+}
+
+/* Phones: the pages move to a tab bar along the bottom, like the portal's. */
+@media (max-width: 768px) {
+  .pub-bar { min-height: calc(52px + var(--safe-top)); }
+  .pub-nav {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    gap: 0; padding: 6px var(--safe-right) max(6px, var(--safe-bottom)) var(--safe-left);
+    background: var(--raised); border-top: 1px solid var(--line);
+  }
+  .pub-nav a {
+    flex: 1; flex-direction: column; justify-content: center; gap: 3px;
+    min-height: 50px; padding: 0; margin: 0; border: 0;
+    font-size: 9px; letter-spacing: .12em;
+  }
+  .pub-nav a[aria-current="page"] { border: 0; color: var(--ink); }
+  .pub-nav-icon {
+    display: inline-grid; place-items: center; width: 44px; height: 26px;
+    border-radius: var(--radius-control); transition: background-color .18s ease;
+  }
+  .pub-nav a[aria-current="page"] .pub-nav-icon { background: color-mix(in srgb, var(--primary) 12%, transparent); color: var(--info-text); }
+  .pub-nav-long { display: none; }
+  .pub-nav-short { display: inline; }
+  .pub-main { padding: 16px max(16px, var(--safe-right)) calc(88px + var(--safe-bottom)) max(16px, var(--safe-left)); }
+  .pub-theme { width: 40px; height: 40px; }
 }
 
 /* Forms */
@@ -61,7 +90,101 @@
 .pub-week-cell:hover { background: var(--hover); }
 .pub-week-cell:has(input:checked) { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 18%, var(--raised)); }
 
-.pub-counts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; align-items: start; }
+/* Zero Food Waste: people as tags, the outlet with suggestions, and what was
+   collected as lines added through a sheet. */
+.zfw-people {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  min-height: 38px; padding: 4px 6px;
+  border: 1px solid var(--line-input); border-radius: var(--radius-control); background: var(--raised);
+  cursor: text;
+}
+.zfw-people:focus-within { border-color: var(--primary); }
+.field .zfw-people input:not([type]), .field .zfw-people input {
+  flex: 1; min-width: 140px; min-height: 28px !important; padding: 2px 4px !important;
+  border: 0 !important; background: none !important; outline: none;
+}
+.zfw-person {
+  display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--primary) 40%, transparent); border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--primary) 10%, var(--raised));
+  font-size: 14px; font-weight: 600;
+}
+.zfw-person-remove {
+  display: inline-grid; place-items: center; width: 20px; height: 20px; padding: 0;
+  border: 0; border-radius: 4px; background: none; color: var(--muted); cursor: pointer;
+}
+.zfw-person-remove:hover { background: var(--hover); color: var(--ink); }
+
+.zfw-combo { position: relative; display: grid; gap: 4px; }
+.zfw-options {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30;
+  max-height: 264px; overflow-y: auto; margin: 0; padding: 4px; list-style: none;
+  border: 1px solid var(--line-input); border-radius: var(--radius-card); background: var(--raised);
+}
+.zfw-options li { padding: 9px 10px; border-radius: 5px; cursor: pointer; font-size: 15px; }
+.zfw-options li[aria-selected="true"] { background: color-mix(in srgb, var(--primary) 12%, var(--raised)); }
+
+.zfw-lines { list-style: none; margin: 0 0 8px; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-card); overflow: hidden; }
+.zfw-lines li + li { border-top: 1px solid var(--line-muted); }
+.zfw-line {
+  display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; padding: 0 14px;
+  border: 0; background: var(--raised); text-align: left; cursor: pointer;
+}
+.zfw-line:hover { background: var(--hover); }
+.zfw-line-label { flex: 1; font-weight: 600; }
+.zfw-line-amount { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
+
+/* The long + button. */
+.zfw-add {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; min-height: 56px; padding: 0 16px;
+  border: 1.5px dashed color-mix(in srgb, var(--primary) 70%, var(--line)); border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--primary) 6%, transparent); color: var(--info-text);
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: background-color .12s ease;
+}
+.zfw-add:hover { background: color-mix(in srgb, var(--primary) 12%, transparent); }
+
+/* The add sheet. */
+.zfw-sheet { display: grid; gap: 18px; padding: 4px 2px 2px; }
+.zfw-sheet h2 { font-size: 20px; }
+.zfw-sheet fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.zfw-sheet legend { margin-bottom: 8px; }
+.zfw-kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+.zfw-kind {
+  display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 8px 12px;
+  border: 1px solid var(--line-input); border-radius: var(--radius-control); background: var(--raised); cursor: pointer;
+}
+.zfw-kind input { position: absolute; opacity: 0; pointer-events: none; }
+.zfw-kind:has(input:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
+.zfw-kind[data-picked] { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, var(--raised)); }
+.zfw-kind-text { flex: 1; display: grid; gap: 1px; min-width: 0; }
+.zfw-kind-label { font-weight: 700; font-size: 15px; }
+.zfw-kind-hint { font-size: 12px; color: var(--muted); }
+.zfw-sheet fieldset:disabled .zfw-amount { opacity: .45; }
+.zfw-amount { display: flex; align-items: stretch; justify-content: center; gap: 8px; }
+.zfw-arrow {
+  display: grid; place-items: center; width: 64px; min-height: 56px; padding: 0;
+  border: 1px solid var(--line-input); border-radius: var(--radius-control); background: var(--raised); cursor: pointer;
+}
+.zfw-arrow:hover { background: var(--hover); }
+.zfw-arrow:disabled { opacity: .35; cursor: default; }
+.zfw-amount input {
+  width: 120px; min-height: 56px; padding: 0 8px; text-align: center;
+  border: 1px solid var(--line-input); border-radius: var(--radius-control); background: var(--raised);
+  font-family: var(--font-display); font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+}
+.zfw-amount input::-webkit-inner-spin-button, .zfw-amount input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.zfw-amount input:focus { outline: none; border-color: var(--primary); }
+.zfw-sheet-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.zfw-sheet-actions .button.danger { margin-right: auto; }
+@media (max-width: 768px) {
+  .zfw-kinds { grid-template-columns: 1fr 1fr; }
+  .zfw-kind-hint { display: none; }
+  .zfw-sheet-actions .button.primary { flex: 1; min-height: 48px; }
+  .pub-form > button[type="submit"] { width: 100%; min-height: 48px; }
+}
 .pub-total { display: flex; align-items: baseline; gap: 12px; margin: 4px 0 0; padding-top: 12px; border-top: 1px solid var(--line-muted); }
 .pub-total .mono { font-family: var(--font-display); font-size: 28px; font-weight: 700; }
 
@@ -73,3 +196,20 @@
 .pub-signin p { margin: 0; }
 .pub-signed-in { margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .pub-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Calendar page: the intro and the Week / List switch (the grid is calendar.css). */
+.cal-intro { margin: 0; max-width: 62ch; }
+.cal-page .page-actions { align-items: center; }
+@media (max-width: 768px) {
+  /* Every pixel above the grid is one less hour on screen. */
+  .cal-intro, .cal-page .page-head > .micro-label { display: none !important; }
+  .cal-page .page-head { grid-template-columns: auto 1fr; align-items: center; gap: 10px; }
+  .cal-page .page-actions { grid-column: 2; grid-row: 1; justify-content: flex-end; flex-wrap: nowrap; gap: 6px; }
+  .cal-page .segmented a { padding: 0 10px; }
+}
+.segmented a {
+  display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px;
+  border: 1px solid transparent; border-radius: 5px;
+  color: var(--muted); font-size: 13px; font-weight: 700; text-decoration: none;
+}
+.segmented a.active { background: var(--raised); border-color: var(--line); color: var(--ink); }
