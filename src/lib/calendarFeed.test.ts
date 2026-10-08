@@ -24,7 +24,7 @@ const page = (id: string) => `https://uclvolunteering.org/portal/calendar/events
 
 describe("calendar feed", () => {
   it("escapes text", () => {
-    expect(escapeText("a,b;c\\d\ne")).toBe("a\\,b\;c\\\\d\\ne");
+    expect(escapeText("a,b;c\\d\ne")).toBe("a\\,b\\;c\\\\d\\ne");
   });
 
   it("folds long lines at 75 octets without splitting a character", () => {

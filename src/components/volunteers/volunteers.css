@@ -1,0 +1,11 @@
+/* The Volunteers tab. Builds on globals: .table, .input, .tag, .button. Prefixed vol-. */
+
+.vol-intro { margin: 0; max-width: 70ch; }
+.vol-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; }
+.vol-search { grid-column: 1 / -1; }
+.vol-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.vol-actions { display: flex; gap: 8px; }
+.vol-table td { vertical-align: top; }
+.vol-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.vol-tags .tag { white-space: normal; }
+.vol-notes { max-width: 32ch; white-space: pre-wrap; }

@@ -33,13 +33,13 @@ export function rangeEnd(range: Range, now: Date): Date | null {
   return null;
 }
 
-/** The link for a filter state, leaving defaults out of the URL. */
-export function whatsOnHref(range: Range, societies: readonly string[]): string {
+/** The link for a filter state on the page at `base`, leaving defaults out of the URL. */
+export function whatsOnHref(range: Range, societies: readonly string[], base: string = "/portal/whats-on"): string {
   const params = new URLSearchParams();
   if (range !== DEFAULT_RANGE) params.set("range", range);
   if (societies.length) params.set("s", societies.join(","));
   const query = params.toString();
-  return query ? `/portal/whats-on?${query}` : "/portal/whats-on";
+  return query ? `${base}?${query}` : base;
 }
 
 /** `selected` with `id` added, or taken out if it was there, in the known order. */

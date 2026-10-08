@@ -1,0 +1,75 @@
+/* The public pages: calendar (styled by whatson.css), volunteer sign-up, Zero Food Waste log.
+   Builds on globals (.page, .panel, .field, .button, .notice). Prefixed pub-. */
+
+.pub-shell { min-height: 100vh; min-height: 100dvh; background: var(--paper); }
+.pub-bar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 20px;
+  min-height: calc(56px + var(--safe-top));
+  padding: var(--safe-top) max(16px, var(--safe-right)) 0 max(16px, var(--safe-left));
+  background: var(--raised); border-bottom: 1px solid var(--line);
+}
+.pub-brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 18px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.pub-brand-mark { width: 34px; height: auto; color: var(--ink); }
+.pub-nav { display: flex; align-self: stretch; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.pub-nav a {
+  display: inline-flex; align-items: center; padding: 0 10px; margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; white-space: nowrap;
+  color: var(--muted); text-decoration: none;
+}
+.pub-nav a:hover { color: var(--ink); }
+.pub-nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--primary); }
+.pub-theme { margin-left: auto; flex: none; }
+.pub-main { padding: 24px max(16px, var(--safe-right)) calc(48px + var(--safe-bottom)) max(16px, var(--safe-left)); }
+.pub-lede { margin: 0; max-width: 62ch; }
+
+@media (max-width: 560px) {
+  .pub-brand span { display: none; }
+  .pub-bar { gap: 8px; }
+}
+
+/* Forms */
+.pub-form { display: grid; gap: 20px; }
+.pub-form fieldset { margin: 0; padding: 0; border: 0; min-width: 0; display: grid; gap: 8px; }
+.pub-form fieldset + fieldset { padding-top: 18px; border-top: 1px solid var(--line); }
+.pub-form legend { padding: 0; margin-bottom: 8px; }
+.pub-form fieldset > p { margin: -6px 0 2px; }
+.pub-form .field { margin-bottom: 0; }
+.pub-form .field-row { gap: 12px; }
+.pub-form > .button { justify-self: start; min-width: 160px; }
+.pub-choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; }
+.pub-choice {
+  display: flex; align-items: flex-start; gap: 10px; min-height: 44px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--raised);
+  font-size: 14px; line-height: 1.35; cursor: pointer;
+}
+.pub-choice:hover { background: var(--hover); }
+.pub-choice:has(input:checked) { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, var(--raised)); }
+.pub-choice input { flex: none; margin: 1px 0 0; }
+.pub-consent { font-size: 13px; }
+
+/* The week grid: a day per row, morning / afternoon / evening across. */
+.pub-week { display: grid; grid-template-columns: 48px repeat(3, minmax(0, 1fr)); gap: 4px; max-width: 460px; }
+.pub-week > .micro-label { text-align: center; }
+.pub-week-row { display: contents; }
+.pub-week-day { align-self: center; font-size: 13px; font-weight: 700; }
+.pub-week-cell {
+  display: grid; place-items: center; height: 40px;
+  border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--raised); cursor: pointer;
+}
+.pub-week-cell:hover { background: var(--hover); }
+.pub-week-cell:has(input:checked) { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 18%, var(--raised)); }
+
+.pub-counts { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; align-items: start; }
+.pub-total { display: flex; align-items: baseline; gap: 12px; margin: 4px 0 0; padding-top: 12px; border-top: 1px solid var(--line-muted); }
+.pub-total .mono { font-family: var(--font-display); font-size: 28px; font-weight: 700; }
+
+/* Off-screen rather than display: none, which some bots skip. */
+.pub-honeypot { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+
+/* Volunteer sign-up: the sign-in prompt, who's signed in, save and remove. */
+.pub-signin { display: grid; gap: 12px; justify-items: start; }
+.pub-signin p { margin: 0; }
+.pub-signed-in { margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
+.pub-actions { display: flex; flex-wrap: wrap; gap: 8px; }

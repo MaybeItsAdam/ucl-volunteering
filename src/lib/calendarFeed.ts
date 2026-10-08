@@ -31,7 +31,7 @@ export function volsocFeedUrl(appUrl: string, token = process.env.CALENDAR_FEED_
 
 /** RFC 5545 TEXT: backslash, semicolon, comma and newline escaped. */
 export function escapeText(value: string): string {
-  return value.replace(/\\/g, "\\\\").replace(/;/g, "\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  return value.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
 }
 
 /** Lines over 75 octets continue on the next, indented by a space. */

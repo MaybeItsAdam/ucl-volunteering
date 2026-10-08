@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { authCallbackUrl } from "./authCallback";
+import { authCallbackUrl, safeReturnPath } from "./authCallback";
 
 describe("sign-in callback origin", () => {
   it("returns people to whichever domain started sign-in", () => {
@@ -23,5 +23,18 @@ describe("sign-in callback origin", () => {
     expect(authCallbackUrl(request, "https://ucl-volunteering.vercel.app/auth/callback?next=https://x.example")).toBeNull();
     expect(authCallbackUrl(request, "https://ucl-volunteering.vercel.app/auth/callback#x")).toBeNull();
     expect(authCallbackUrl(request, "not a url")).toBeNull();
+  });
+});
+
+describe("return path after sign-in", () => {
+  it("keeps a path on this site", () => {
+    expect(safeReturnPath("/volunteer")).toBe("/volunteer");
+    expect(safeReturnPath("/portal/calendar?week=2026-10-05")).toBe("/portal/calendar?week=2026-10-05");
+  });
+
+  it("refuses anything that could leave the site", () => {
+    for (const bad of ["https://evil.example", "//evil.example", "/\\evil.example", "volunteer", "/a\nb", "", null, undefined]) {
+      expect(safeReturnPath(bad)).toBeNull();
+    }
   });
 });

@@ -141,6 +141,16 @@
   background: color-mix(in srgb, var(--uvs-strong-cyan) 88%, var(--uvs-prussian-blue));
 }
 
+.uvs-cta-secondary {
+  border-color: currentColor;
+  color: inherit;
+  background: transparent;
+}
+
+.uvs-cta-secondary:hover {
+  transform: translateY(-1px);
+}
+
 .uvs-cta:focus-visible {
   outline: 2px solid var(--uvs-ink);
   outline-offset: 3px;

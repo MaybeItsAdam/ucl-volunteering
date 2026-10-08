@@ -6,7 +6,7 @@ import { SignInPanel } from "./SignInPanel";
 import { VolSocHand } from "./VolSocHand";
 
 /**
- * The society's name and the committee's way in. Signed out, the button opens
+ * The society's name, the way in for volunteers, and the committee's. Signed out, the button opens
  * the sign-in box right here rather than sending you to a page that looks the
  * same; signed in, it goes straight to the portal.
  */
@@ -29,6 +29,12 @@ export function HomeIntro({ signedIn }: { signedIn: boolean }) {
             Committee sign in
           </button>
         )}
+        <Link className="uvs-cta uvs-cta-secondary" href="/volunteer">
+          Volunteer with us
+        </Link>
+        <Link className="uvs-cta uvs-cta-secondary" href="/calendar">
+          What&apos;s on
+        </Link>
       </div>
     </>
   );

@@ -1,0 +1,221 @@
+"use client";
+
+import { useState, type FormEvent } from "react";
+import { COMMITMENTS, DAY_PARTS, DAYS, INTERESTS, PERIODS, type Volunteer } from "@/lib/volunteers";
+
+type Status =
+  | { kind: "idle" }
+  | { kind: "sending" }
+  | { kind: "done" }
+  | { kind: "removed" }
+  | { kind: "error"; message: string };
+
+function toggle(list: string[], key: string): string[] {
+  return list.includes(key) ? list.filter((k) => k !== key) : [...list, key];
+}
+
+/** Ticks for a list of options, laid out as a wrapping grid of checkboxes. */
+function Choices({
+  options,
+  value,
+  onChange,
+}: {
+  options: readonly { key: string; label: string }[];
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  return (
+    <div className="pub-choices">
+      {options.map((o) => (
+        <label key={o.key} className="pub-choice">
+          <input type="checkbox" checked={value.includes(o.key)} onChange={() => onChange(toggle(value, o.key))} />
+          <span>{o.label}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The volunteer sign-up, for someone signed in with UCL: their name and email
+ * come from that, and a returning volunteer sees their answers to change.
+ * Every level of time counts, from a single drop-in to several times a week,
+ * so only how often is required.
+ */
+export function VolunteerForm({
+  signedInAs,
+  existing,
+}: {
+  signedInAs: { name: string; email: string };
+  existing: Volunteer | null;
+}) {
+  const [study, setStudy] = useState(existing?.study ?? "");
+  const [commitment, setCommitment] = useState<string>(existing?.commitment ?? "");
+  const [periods, setPeriods] = useState<string[]>(existing?.periods ?? []);
+  const [slots, setSlots] = useState<string[]>(existing?.slots ?? []);
+  const [interests, setInterests] = useState<string[]>(existing?.interests ?? []);
+  const [notes, setNotes] = useState(existing?.notes ?? "");
+  const [consent, setConsent] = useState(Boolean(existing));
+  const [onList, setOnList] = useState(Boolean(existing));
+  const [status, setStatus] = useState<Status>({ kind: "idle" });
+
+  async function remove() {
+    if (!window.confirm("Take yourself off VolSoc's volunteer list?")) return;
+    setStatus({ kind: "sending" });
+    try {
+      const res = await fetch("/api/volunteers", { method: "DELETE" });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error || "Something went wrong, try again in a minute");
+      setOnList(false);
+      setConsent(false);
+      setStatus({ kind: "removed" });
+    } catch (error) {
+      setStatus({ kind: "error", message: error instanceof Error ? error.message : "Something went wrong" });
+    }
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    setStatus({ kind: "sending" });
+    try {
+      const res = await fetch("/api/volunteers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ study, commitment, periods, slots, interests, notes, consent }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error || "Something went wrong, try again in a minute");
+      setOnList(true);
+      setStatus({ kind: "done" });
+      window.scrollTo({ top: 0 });
+    } catch (error) {
+      setStatus({ kind: "error", message: error instanceof Error ? error.message : "Something went wrong" });
+    }
+  }
+
+  if (status.kind === "done") {
+    return (
+      <div className="notice ok" role="status">
+        <strong>You&apos;re on the list, thank you</strong>
+        <p>
+          We&apos;ll be in touch at {signedInAs.email} when something comes up that fits. Come back to this page any time to
+          change your answers
+        </p>
+        <button type="button" className="button small" onClick={() => setStatus({ kind: "idle" })}>
+          See my answers
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form className="panel pub-form" onSubmit={submit}>
+      {status.kind === "removed" && (
+        <div className="notice ok" role="status">
+          <strong>You&apos;re off the list</strong>
+          <p>Changed your mind? Fill this in again whenever you like</p>
+        </div>
+      )}
+
+      <fieldset>
+        <legend className="micro-label">About you</legend>
+        <p className="pub-signed-in">
+          Signed in as <strong>{signedInAs.name}</strong> <span className="muted">{signedInAs.email}</span>
+        </p>
+        <div className="field">
+          <label htmlFor="v-study">Course and year</label>
+          <input id="v-study" placeholder="Optional, e.g. BSc Geography, 2nd year" value={study} onChange={(e) => setStudy(e.target.value)} />
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend className="micro-label">How often could you help?</legend>
+        <p className="muted small">Any amount helps, even once</p>
+        <div className="pub-choices">
+          {COMMITMENTS.map((c) => (
+            <label key={c.key} className="pub-choice">
+              <input type="radio" name="commitment" required checked={commitment === c.key} onChange={() => setCommitment(c.key)} />
+              <span>{c.label}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend className="micro-label">When in the year?</legend>
+        <Choices options={PERIODS} value={periods} onChange={setPeriods} />
+      </fieldset>
+
+      <fieldset>
+        <legend className="micro-label">When in a typical week?</legend>
+        <p className="muted small">Tick the times you&apos;re usually free</p>
+        <div className="pub-week" role="group" aria-label="Free times in a typical week">
+          <span />
+          {DAY_PARTS.map((p) => (
+            <span key={p.key} className="micro-label">
+              {p.label}
+            </span>
+          ))}
+          {DAYS.map((d) => (
+            <div key={d.key} className="pub-week-row">
+              <span className="pub-week-day">{d.label}</span>
+              {DAY_PARTS.map((p) => {
+                const slot = `${d.key}_${p.key}`;
+                return (
+                  <label key={slot} className="pub-week-cell">
+                    <input type="checkbox" checked={slots.includes(slot)} onChange={() => setSlots(toggle(slots, slot))} />
+                    <span className="sr-only">
+                      {d.label} {p.label.toLowerCase()}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend className="micro-label">What would you like to do?</legend>
+        <Choices options={INTERESTS} value={interests} onChange={setInterests} />
+      </fieldset>
+
+      <div className="field">
+        <label htmlFor="v-notes">Anything else</label>
+        <textarea
+          id="v-notes"
+          maxLength={1000}
+          placeholder="Skills, languages, a DBS check, access needs, anything you'd like us to know"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+        />
+      </div>
+
+      <label className="pub-choice pub-consent">
+        <input type="checkbox" required checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+        <span>
+          VolSoc&apos;s committee can keep these details and email me about Volunteering. I can ask to be removed at any
+          time
+        </span>
+      </label>
+
+      {status.kind === "error" && (
+        <div className="notice bad" role="alert">
+          <strong>That didn&apos;t send</strong>
+          <p>{status.message}</p>
+        </div>
+      )}
+
+      <div className="pub-actions">
+        <button type="submit" className="button primary" disabled={status.kind === "sending"}>
+          {status.kind === "sending" ? "Sending…" : onList ? "Save my answers" : "Sign me up"}
+        </button>
+        {onList && (
+          <button type="button" className="button danger" onClick={remove} disabled={status.kind === "sending"}>
+            Take me off the list
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}

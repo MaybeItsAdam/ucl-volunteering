@@ -1,6 +1,8 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { nextMemberColour } from "@/lib/access";
 import { audit } from "@/lib/audit";
+import { RETURN_COOKIE, safeReturnPath } from "@/lib/authCallback";
 import { lockedGovernanceRole } from "@/lib/roleLocks";
 import { isSessionSecretConfigured, setSessionCookie } from "@/lib/session";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
@@ -33,6 +35,11 @@ export async function POST(request: Request) {
     );
   }
 
+  // Set by /api/auth/start?next=; read once, then cleared.
+  const jar = await cookies();
+  const redirectTo = safeReturnPath(jar.get(RETURN_COOKIE)?.value) ?? "/portal";
+  jar.delete(RETURN_COOKIE);
+
   const toolboxRole = getSocietyGovernanceRole(identity);
   const name = identity.name?.trim() || identity.email;
 
@@ -47,7 +54,7 @@ export async function POST(request: Request) {
       name,
       governanceRoleAtSignIn: toolboxRole,
     });
-    return NextResponse.json({ ok: true, redirectTo: "/portal" });
+    return NextResponse.json({ ok: true, redirectTo });
   }
 
   const supabase = getSupabaseAdmin();
@@ -121,5 +128,5 @@ export async function POST(request: Request) {
     governanceRoleAtSignIn: member.governance_role,
   });
 
-  return NextResponse.json({ ok: true, redirectTo: "/portal" });
+  return NextResponse.json({ ok: true, redirectTo });
 }

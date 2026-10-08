@@ -28,7 +28,7 @@ const REQUIRED = {
 };
 
 /** Present in some configs, never required: noted so a typo'd name stands out. */
-const OPTIONAL = ["ADMIN_EMAILS", "TOOLBOX_ORGANISER_ID", "CALENDAR_ORGANISER_ID", "TOOLBOX_API_TOKEN", "TIMETABLE_FEED_KEY", "CALENDAR_FEED_TOKEN"];
+const OPTIONAL = ["ADMIN_EMAILS", "TOOLBOX_ORGANISER_ID", "CALENDAR_ORGANISER_ID", "TOOLBOX_API_TOKEN", "TIMETABLE_FEED_KEY", "CALENDAR_FEED_TOKEN", "ZFW_SHEET_WEBHOOK_URL", "ZFW_SHEET_SECRET"];
 
 /** Shape checks for the ones that break quietly when pasted wrong. */
 const SHAPE = {

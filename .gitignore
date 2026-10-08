@@ -12,3 +12,6 @@ coverage
 # The parked Vite app's build output
 legacy/node_modules
 legacy/dist
+
+# Apps Script secrets, pushed with clasp but never committed
+apps-script/**/Secret.js
