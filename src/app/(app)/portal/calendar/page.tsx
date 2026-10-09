@@ -9,15 +9,17 @@ import { requireCapability } from "@/lib/session";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { calendarBlocksForWeek, getCalendarLinks, refreshIfStale, type CalendarLinksState } from "@/lib/calendarLinks";
 import { volsocFeedUrl } from "@/lib/calendarFeed";
-import { lastOrganiserSync, organiserFeedUrl } from "@/lib/toolboxEvents";
+import { listCommunityEvents } from "@/lib/communityEvents";
+import { DEFAULT_CALENDAR_ORGANISER_ID, DEFAULT_VOLSOC_ORGANISER_ID, lastOrganiserSync, organiserFeedUrl } from "@/lib/toolboxEvents";
+import { societyLabel } from "@/components/whatson/view";
 import { CATEGORY_LABELS, EVENT_CATEGORIES, type AvailabilityBlock, type CommitteeMember, type PlanEvent } from "@/lib/types";
 import { dayLabel, googleAddUrl, weekRange } from "@/components/plan/format";
 import { PlanSubnav } from "@/components/plan/PlanSubnav";
 import { CalendarLinks, type CalendarFeedLink } from "@/components/plan/CalendarLinks";
 import { SyncStatus } from "@/components/plan/SyncStatus";
-import { WeekPlanner } from "@/components/plan/WeekPlanner";
+import { WeekPlanner, type OtherSocietyEvent } from "@/components/plan/WeekPlanner";
 
-export const metadata: Metadata = { title: "Calendar" };
+export const metadata: Metadata = { title: "Schedule" };
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
@@ -88,6 +90,42 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
     after(() => refreshIfStale(member.id));
   }
 
+  // Other societies' events this week, from the public calendar. VolSoc's and
+  // Student Social Impact's are left out: the plan already has them.
+  let others: OtherSocietyEvent[] = [];
+  if (dbReady) {
+    try {
+      const own = new Set([
+        process.env.TOOLBOX_ORGANISER_ID || DEFAULT_VOLSOC_ORGANISER_ID,
+        process.env.CALENDAR_ORGANISER_ID || DEFAULT_CALENDAR_ORGANISER_ID,
+      ]);
+      const community = await listCommunityEvents(now);
+      const bySociety = new Map(community.societies.map((s) => [s.id, s]));
+      const from = week.start.getTime();
+      const to = week.end.getTime();
+      others = community.events
+        .filter((e) => !own.has(e.societyId) && !e.cancelled && Date.parse(e.endsAt) > from && Date.parse(e.startsAt) < to)
+        .map((e) => {
+          const society = bySociety.get(e.societyId);
+          return {
+            other: true as const,
+            id: `other-${e.id}`,
+            title: e.title,
+            startsAt: e.startsAt,
+            endsAt: e.endsAt,
+            allDay: e.allDay,
+            location: e.location,
+            url: e.url,
+            society: society ? societyLabel(society.name, society.id) : "Another society",
+            colour: society?.colour ?? null,
+            darkColour: society?.darkColour ?? null,
+          };
+        });
+    } catch (error) {
+      console.error("[plan] other societies' events", error);
+    }
+  }
+
   const chip = dbReady ? syncChip(sync, today) : { label: "Not synced", tone: "neutral" as const, title: undefined };
   const canEdit = dbReady && can(profile, "edit_plan");
   const socialImpactFeed = organiserFeedUrl();
@@ -108,37 +146,32 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
       googleUrl: googleAddUrl(socialImpactFeed),
     },
   ];
-  const title = `${term.label} · ${weekRange(week.monday)}`;
+  const isThisWeek = week.days.includes(today);
 
   return (
     <section className="page plan-page">
-      <header className="page-head">
-        <span className="micro-label">VolSoc plan</span>
-        <h1>{title}</h1>
-        <div className="page-actions">
-          <CalendarLinks feeds={feeds} />
-          <SyncStatus label={chip.label} tone={chip.tone} title={chip.title} canSync={dbReady && can(profile, "trigger_sync")} />
-        </div>
-      </header>
-
-      <PlanSubnav active="week" week={week.monday} />
-
-      <div className="plan-weekbar">
-        {/* On a phone the shell's large title says "Calendar" and hides the h1, so the week is named here. */}
-        <h2 className="plan-phone-title">{title}</h2>
-        <nav className="plan-weeknav" aria-label="Week">
+      {/* One bar: the week, the plan's views, and the feeds and sync. */}
+      <div className="plan-bar">
+        <div className="plan-bar-week">
           <Link className="icon-button" href={`/portal/calendar?week=${prevWeek}`} aria-label="Previous week">
             <ChevronLeft size={18} aria-hidden="true" />
-          </Link>
-          <Link className="button small" href="/portal/calendar" aria-current={week.days.includes(today) ? "true" : undefined}>
-            Today
           </Link>
           <Link className="icon-button" href={`/portal/calendar?week=${nextWeek}`} aria-label="Next week">
             <ChevronRight size={18} aria-hidden="true" />
           </Link>
-        </nav>
-        <span className="micro-label plan-termlabel">{term.termLabel}</span>
-        {canEdit && <span className="plan-hint">Drag VolSoc events to reschedule</span>}
+          <h1 className="plan-range">{weekRange(week.monday)}</h1>
+          <span className="plan-range-term muted">{term.label}</span>
+          {!isThisWeek && (
+            <Link className="button small" href="/portal/calendar">
+              Today
+            </Link>
+          )}
+        </div>
+        <div className="plan-bar-tools">
+          <PlanSubnav active="week" week={week.monday} />
+          <CalendarLinks feeds={feeds} />
+          <SyncStatus label={chip.label} tone={chip.tone} title={chip.title} canSync={dbReady && can(profile, "trigger_sync")} />
+        </div>
       </div>
 
       {!dbReady && (
@@ -171,6 +204,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
         prevWeek={prevWeek}
         nextWeek={nextWeek}
         initialDay={initialDay}
+        others={others}
       />
 
       <footer className="plan-legend">
@@ -186,9 +220,6 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
             Provisional
           </li>
         </ul>
-        <p className="muted small">
-          Showing {events.length} event{events.length === 1 ? "" : "s"} for {term.label} ({weekRange(week.monday)})
-        </p>
       </footer>
     </section>
   );

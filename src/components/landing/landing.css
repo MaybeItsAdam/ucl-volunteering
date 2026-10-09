@@ -154,14 +154,6 @@
   transform: translateY(-1px);
 }
 
-/* The committee's way in: quiet, under the three for everyone. */
-.uvs-committee-link {
-  display: inline-flex; align-items: center; min-height: 44px; padding: 0; margin-top: 0.2rem;
-  border: 0; background: none; color: inherit; font: inherit; font-size: 0.85rem; font-weight: 600;
-  opacity: 0.75; text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
-}
-.uvs-committee-link:hover { opacity: 1; }
-.uvs-committee-link:focus-visible { outline: 2px solid var(--uvs-ink); outline-offset: 3px; }
 
 .uvs-cta:focus-visible {
   outline: 2px solid var(--uvs-ink);

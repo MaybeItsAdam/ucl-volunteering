@@ -3,7 +3,11 @@ import "./plan.css";
 
 export type PlanSection = "week" | "list" | "feeds";
 
-/** Week · List · Public calendar, shared by the plan pages. Carries the week across so List → Week lands where you were. */
+/**
+ * Week · List · Public calendar, shared by the plan pages, as a segmented
+ * control that sits in a toolbar. Carries the week across so List → Week
+ * lands where you were.
+ */
 export function PlanSubnav({ active, week }: { active: PlanSection; week?: string }) {
   const items: { key: PlanSection; href: string; label: string }[] = [
     { key: "week", href: week ? `/portal/calendar?week=${week}` : "/portal/calendar", label: "Week" },
@@ -11,7 +15,7 @@ export function PlanSubnav({ active, week }: { active: PlanSection; week?: strin
     { key: "feeds", href: "/portal/calendar/feeds", label: "Public calendar" },
   ];
   return (
-    <nav className="subnav plan-subnav" aria-label="Plan">
+    <nav className="segmented plan-subnav" aria-label="Schedule">
       {items.map((item) => (
         <Link
           key={item.key}

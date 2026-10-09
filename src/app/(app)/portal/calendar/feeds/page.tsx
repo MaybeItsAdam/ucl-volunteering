@@ -25,8 +25,13 @@ export default async function PublicCalendarFeedsPage() {
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://uclvolunteering.org").replace(/\/+$/, "");
 
   return (
-    <section className="page">
-      <PlanSubnav active="feeds" />
+    <section className="page plan-page">
+      <div className="plan-bar">
+        <h1 className="plan-range">Public calendar</h1>
+        <div className="plan-bar-tools">
+          <PlanSubnav active="feeds" />
+        </div>
+      </div>
       <p className="muted small pcs-intro">
         What feeds <Link href="/calendar">the public calendar</Link>, synced every morning. Anyone can subscribe to the
         lot at <code>{appUrl}/calendar.ics</code>

@@ -13,13 +13,37 @@
 .plan-cancelled { text-decoration: line-through; text-decoration-thickness: 2px; color: var(--muted); }
 .plan-pre { white-space: pre-wrap; }
 
+/* The whole width, like the public calendar. */
+.plan-page { max-width: none; gap: 10px; }
+
 /* Plan pages use .segmented with links as well as buttons. */
-.plan-page .segmented a {
+.segmented a {
   display: inline-flex; align-items: center; min-height: 34px; padding: 0 12px;
   border: 1px solid transparent; border-radius: 5px;
   color: var(--muted); font-size: 13px; font-weight: 700; text-decoration: none;
 }
-.plan-page .segmented a.active { background: var(--raised); border-color: var(--line); color: var(--ink); }
+.segmented a:hover { color: var(--ink); }
+.segmented a.active { background: var(--raised); border-color: var(--line); color: var(--ink); }
+
+/* ── The bar: the week on the left, views and feeds on the right ────────── */
+
+.plan-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.plan-bar-week { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.plan-bar-week .icon-button { border-color: var(--line); }
+.plan-range { margin: 0 0 0 4px; font-size: 22px; line-height: 1.1; white-space: nowrap; }
+.plan-range-term { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.plan-bar-tools { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.plan-bar-tools .segmented { flex-wrap: nowrap; }
+.plan-bar > .plan-range:first-child { margin-left: 0; }
+.plan-bar-tools .segmented a { min-height: 30px; padding: 0 10px; }
+.plan-bar-tools > .button.small, .plan-bar-tools .plan-sync .button { min-height: 34px; }
+
+/* Planned: provisional events and availability, on or off. */
+.plan-planned[aria-pressed="true"] { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--raised)); color: var(--info-text); }
+.plan-planned-count {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px;
+  border-radius: var(--radius-control); background: var(--well); font-size: 11px; font-variant-numeric: tabular-nums;
+}
 
 /* ── Header strip ───────────────────────────────────────────────────────── */
 
@@ -28,23 +52,18 @@
 .plan-spin { animation: plan-spin .9s linear infinite; }
 @keyframes plan-spin { to { transform: rotate(360deg); } }
 
-.plan-weekbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
-.plan-weeknav { display: inline-flex; align-items: center; gap: 4px; }
-.plan-weeknav .icon-button { border-color: var(--line); }
-.plan-weeknav [aria-current="true"] { border-color: var(--primary); }
-.plan-termlabel { margin-right: auto; }
-.plan-phone-title { display: none; }
 @media (max-width: 768px) {
-  /* One row: the week's name, then its arrows. The term and drag hint go. */
-  .plan-weekbar { flex-wrap: nowrap; gap: 8px; }
-  .plan-phone-title { display: block; flex: 1; min-width: 0; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .plan-termlabel, .plan-hint { display: none; }
-  /* Feeds and sync on one line that scrolls rather than wraps. */
-  .plan-page .page-head { min-width: 0; }
-  .plan-page .page-actions { min-width: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 6px; }
-  .plan-page .page-actions > *, .plan-sync { flex: none; flex-wrap: nowrap; }
+  /* Two rows: the week, then views, feeds and sync, compact. */
+  .plan-bar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .plan-bar-week .icon-button { width: 40px; height: 40px; flex: none; }
+  .plan-range { font-size: 19px; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .plan-bar-tools { gap: 6px; overflow-x: auto; scrollbar-width: none; }
+  .plan-bar-tools > * { flex: none; }
+  .plan-bar-tools .segmented { flex-wrap: nowrap; flex: none; }
+  .plan-bar-tools .calendar-links-label, .plan-sync-label, .plan-bar-tools .plan-sync .tag { display: none; }
+  .plan-bar-tools .plan-sync { flex-wrap: nowrap; margin-left: auto; gap: 6px; }
+  .plan-bar-tools > .button.small, .plan-bar-tools .plan-sync .button { min-height: 36px; padding: 0 9px; }
 }
-.plan-hint { font-size: 12px; color: var(--muted); }
 
 /* ── Overlay legend + toolbar ───────────────────────────────────────────── */
 
@@ -269,8 +288,15 @@
 
 @media (max-width: 719px) {
   .plan-page { --plan-gutter: 52px; }
-  .plan-hint { display: none; }
-  .plan-toolbar { flex-wrap: wrap; justify-content: space-between; width: 100%; margin-left: 0; }
+  /* Planned and New event share a row, the availability scrolls under them,
+     then the days; the week's arrows in the bar do what the day stepper did. */
+  .plan-toolbar { display: contents; }
+  .plan-planned { order: 1; }
+  .plan-new { order: 2; margin-left: auto; min-width: 40px; justify-content: center; }
+  .plan-new-label { display: none; }
+  .plan-overlay-legend { order: 3; }
+  .plan-daytabs { order: 4; }
+  .plan-daystep { display: none; }
   .plan-allday-label { font-size: 8px; letter-spacing: .08em; padding-left: 4px; }
   .plan-daytabs {
     display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; width: 100%;
@@ -284,7 +310,6 @@
   .plan-daytab[data-today] .plan-daytab-date { color: var(--info-text); }
   .plan-daytab-name { font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
   .plan-daytab-date { font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; }
-  .plan-daystep { display: flex; align-items: center; gap: 4px; }
   .plan-daystep .icon-button { border-color: var(--line); }
   .plan-daystep-label { min-width: 92px; text-align: center; font-weight: 700; }
 
@@ -415,3 +440,31 @@
   .pcs-add .field input { font-size: 16px; }
   .pcs-row { padding: 10px 12px; }
 }
+
+/* ── Other societies' events (read only) ────────────────────────────────── */
+
+/* Tinted in the society's own colour, like the public calendar, with a
+   lighter rule than the committee's own so they read as someone else's. */
+.plan-other { --c: var(--soc, var(--muted)); }
+:root[data-theme="dark"] .plan-other { --c: var(--soc-dark, var(--soc, var(--muted))); }
+.plan-other {
+  border: 1px solid color-mix(in srgb, var(--c) 35%, transparent); border-left: 3px solid color-mix(in srgb, var(--c) 70%, transparent);
+  border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--c) 9%, var(--raised)); color: var(--ink); text-decoration: none;
+}
+.plan-event.plan-other:hover { background: color-mix(in srgb, var(--c) 18%, var(--raised)); }
+.plan-other .plan-event-cat { color: color-mix(in srgb, var(--c) 65%, var(--ink)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-others-toggle[aria-pressed="true"] svg { color: var(--info-text); }
+
+/* ── Marking busy straight on the grid ──────────────────────────────────── */
+
+.plan-mark[aria-pressed="true"] { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
+.plan-marking-hint { margin: 0; color: var(--info-text); font-weight: 600; }
+/* While marking, every press is for the grid: cards fade and let it through. */
+.plan-planner[data-marking] :is(.plan-event, .plan-chip) { pointer-events: none; opacity: .45; }
+.plan-planner[data-marking] .plan-col { cursor: crosshair; }
+.plan-ghost[data-mode="busy"] {
+  border-color: var(--danger); background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+.plan-ghost[data-mode="busy"] .plan-ghost-time { background: var(--danger); color: #fff; }
+.plan-ghost[data-mode="busy"] .plan-ghost-title { color: var(--danger-text); }

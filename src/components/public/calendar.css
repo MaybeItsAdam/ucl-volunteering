@@ -156,9 +156,11 @@
 .cal-lines { grid-row: 3; grid-column: 2 / -1; position: relative; pointer-events: none; z-index: 1; }
 .cal-line { position: absolute; left: 0; right: 0; border-top: 1px solid var(--line-muted); }
 
-.cal-now { position: absolute; left: 0; right: 0; height: 2px; margin-top: -1px; background: var(--danger); z-index: 50; pointer-events: none; }
+.cal-now { position: absolute; left: 0; right: 0; height: 2px; margin-top: -1px; background: var(--danger); z-index: 15; pointer-events: none; }
+/* Over the events but under the sticky day heads and hour gutter, and its dot inside
+   the day's column, never over the day before it. */
 .cal-now::before {
-  content: ""; position: absolute; left: -5px; top: -4px;
+  content: ""; position: absolute; left: 0; top: -4px;
   width: 10px; height: 10px; border-radius: 9999px; background: var(--danger);
 }
 

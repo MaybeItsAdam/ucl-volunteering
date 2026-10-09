@@ -9,7 +9,7 @@ import { dayLabel, myResponse, responseCounts, SOURCE_LABELS, STATUS_TAG, timeRa
 import { PlanSubnav } from "@/components/plan/PlanSubnav";
 import "@/components/plan/plan.css";
 
-export const metadata: Metadata = { title: "Calendar list" };
+export const metadata: Metadata = { title: "Schedule list" };
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
@@ -69,10 +69,9 @@ export default async function PlanListPage({ searchParams }: { searchParams: Sea
 
   return (
     <section className="page plan-page">
-      <header className="page-head">
-        <span className="micro-label">The plan</span>
-        <h1>All events</h1>
-        <div className="page-actions">
+      <div className="plan-bar">
+        <h1 className="plan-range">All events</h1>
+        <div className="plan-bar-tools">
           <div className="segmented" role="group" aria-label="Which events">
             <Link href="/portal/calendar/list" aria-pressed={!showPast} className={!showPast ? "active" : undefined}>
               Upcoming
@@ -81,10 +80,9 @@ export default async function PlanListPage({ searchParams }: { searchParams: Sea
               Show past
             </Link>
           </div>
+          <PlanSubnav active="list" />
         </div>
-      </header>
-
-      <PlanSubnav active="list" />
+      </div>
 
       {!dbReady && (
         <div className="notice warn">
