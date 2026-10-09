@@ -154,10 +154,17 @@ platform :android do
   lane :beta do
     prepare_android_build
     gradle(project_dir: "android", task: "bundleRelease")
+    # The build only: the store listing (fastlane/metadata) is edited in the
+    # Play Console, and pushing it from here needs a permission an upload key
+    # shouldn't have, which failed every release at the final commit.
     upload_to_play_store(
       track: "internal",
       aab: "android/app/build/outputs/bundle/release/app-release.aab",
       json_key: ENV["PLAY_JSON_KEY_FILE"],
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
     )
   end
 
