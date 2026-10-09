@@ -47,7 +47,6 @@ export default async function VolunteerPage() {
           <a className="button primary" href="/api/auth/start?next=/volunteer">
             Continue with UCL sign-in
           </a>
-          <p className="muted small">Through Adam&apos;s Campus Toolbox, so we never see your password</p>
         </div>
       )}
     </section>

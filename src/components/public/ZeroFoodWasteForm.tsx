@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { ChevronDown, ChevronUp, Pencil, Plus, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Minus, Pencil, Plus, X } from "lucide-react";
 import { Sheet } from "@/components/Sheet";
 import { cleanPeople, COUNTS, MAX_PEOPLE, OUTLETS, type CountKey } from "@/lib/zeroFoodWaste";
 
@@ -11,13 +11,14 @@ type Status =
   | { kind: "done"; outlet: string; total: number }
   | { kind: "error"; message: string };
 
-/** What the add sheet can log: each food column, and incentives given out. */
-type Kind = CountKey | "incentives";
+/** What the add sheet can log: each food column. Incentives have their own counter. */
+type Kind = CountKey;
 
-const KINDS: { key: Kind; label: string; hint: string | null }[] = [
-  ...COUNTS.map((c) => ({ key: c.key as Kind, label: c.label, hint: c.hint })),
-  { key: "incentives", label: "Incentives", hint: "Given out on the shift, not part of the total" },
-];
+const KINDS: { key: Kind; label: string; hint: string | null }[] = COUNTS.map((c) => ({
+  key: c.key,
+  label: c.label,
+  hint: c.hint,
+}));
 const labelOf = (key: Kind) => KINDS.find((k) => k.key === key)?.label ?? key;
 
 const MAX_AMOUNT = 2000;
@@ -282,6 +283,7 @@ export function ZeroFoodWasteForm({ today }: { today: string }) {
   const [outlet, setOutlet] = useState("");
   const [people, setPeople] = useState<string[]>([]);
   const [amounts, setAmounts] = useState<Partial<Record<Kind, number>>>({});
+  const [incentives, setIncentives] = useState(0);
   const [adding, setAdding] = useState<{ start: Kind | null } | null>(null);
   const [website, setWebsite] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
@@ -303,13 +305,14 @@ export function ZeroFoodWasteForm({ today }: { today: string }) {
       const res = await fetch("/api/zero-food-waste", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, outlet: name, people: crew, counts, incentives: amounts.incentives ?? "", website }),
+        body: JSON.stringify({ date, outlet: name, people: crew, counts, incentives, website }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; total?: number };
       if (!res.ok) throw new Error(data.error || "Something went wrong, try again in a minute");
       setStatus({ kind: "done", outlet: name, total: data.total ?? total });
       setOutlet("");
       setAmounts({});
+      setIncentives(0);
       window.scrollTo({ top: 0 });
     } catch (error) {
       setStatus({ kind: "error", message: error instanceof Error ? error.message : "Something went wrong" });
@@ -374,6 +377,44 @@ export function ZeroFoodWasteForm({ today }: { today: string }) {
         <div className="pub-honeypot" aria-hidden="true">
           <label htmlFor="z-website">Website</label>
           <input id="z-website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
+        </div>
+
+        <div className="zfw-incentives">
+          <label htmlFor="z-incentives" className="zfw-incentives-text">
+            <span className="zfw-incentives-label">Incentives</span>
+            <span className="zfw-incentives-hint">Given out on the shift, not part of the total</span>
+          </label>
+          <div className="zfw-stepper">
+            <button
+              type="button"
+              className="zfw-step"
+              aria-label="One fewer incentive"
+              disabled={incentives <= 0}
+              onClick={() => setIncentives((n) => Math.max(0, n - 1))}
+            >
+              <Minus size={18} aria-hidden="true" />
+            </button>
+            <input
+              id="z-incentives"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              max={MAX_AMOUNT}
+              step={1}
+              value={incentives}
+              onChange={(e) => setIncentives(Math.max(0, Math.min(MAX_AMOUNT, Math.floor(Number(e.target.value) || 0))))}
+              onFocus={(e) => e.target.select()}
+            />
+            <button
+              type="button"
+              className="zfw-step"
+              aria-label="One more incentive"
+              disabled={incentives >= MAX_AMOUNT}
+              onClick={() => setIncentives((n) => Math.min(MAX_AMOUNT, n + 1))}
+            >
+              <Plus size={18} aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         {status.kind === "error" && (

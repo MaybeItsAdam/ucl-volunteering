@@ -15,9 +15,11 @@ export const dynamic = "force-dynamic";
 export default function ZeroFoodWastePage() {
   return (
     <section className="page narrow">
-      <header className="page-head">
+      <header className="page-head zfw-head">
         <span className="micro-label">Zero Food Waste</span>
         <h1>Log a collection</h1>
+        {/* eslint-disable-next-line @next/next/no-img-element -- a small fixed asset, no resizing needed */}
+        <img className="zfw-logo" src="/zfw.png" alt="Zero Food Waste UCL" width={307} height={360} />
       </header>
       <p className="muted pub-lede">
         One entry per outlet, straight after your shift. It goes into the team&apos;s{" "}

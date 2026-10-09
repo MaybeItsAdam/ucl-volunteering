@@ -26,7 +26,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en-GB" className={`${leagueSpartan.variable} ${workSans.variable}`} suppressHydrationWarning>
+    <html lang="en-GB" data-theme="light" className={`${leagueSpartan.variable} ${workSans.variable}`} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

@@ -25,9 +25,9 @@ function subscribe(listener: () => void) {
 function readChoice(): ThemeChoice {
   try {
     const saved = localStorage.getItem(THEME_STORAGE_KEY);
-    return saved === "light" || saved === "dark" ? saved : "system";
+    return saved === "dark" || saved === "system" ? saved : "light";
   } catch {
-    return "system";
+    return "light";
   }
 }
 
@@ -36,7 +36,8 @@ function choose(next: ThemeChoice) {
   if (next === "system") root.removeAttribute("data-theme");
   else root.setAttribute("data-theme", next);
   try {
-    if (next === "system") localStorage.removeItem(THEME_STORAGE_KEY);
+    // Light is the default, so it needn't be stored.
+    if (next === "light") localStorage.removeItem(THEME_STORAGE_KEY);
     else localStorage.setItem(THEME_STORAGE_KEY, next);
   } catch {
     // Storage blocked: the choice still applies until the app is closed.
@@ -44,9 +45,9 @@ function choose(next: ThemeChoice) {
   listeners.forEach((listener) => listener());
 }
 
-// The server can't see localStorage, so it renders "system" and hydration then
-// switches to the saved choice without a mismatch.
-const useThemeChoice = () => useSyncExternalStore(subscribe, readChoice, () => "system" as ThemeChoice);
+// The server can't see localStorage, so it renders the default, light, and
+// hydration then switches to the saved choice without a mismatch.
+const useThemeChoice = () => useSyncExternalStore(subscribe, readChoice, () => "light" as ThemeChoice);
 
 /**
  * One tap between light and dark, in the top bar. From "system" it flips
