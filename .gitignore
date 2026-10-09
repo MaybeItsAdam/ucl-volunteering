@@ -26,3 +26,6 @@ vendor/bundle
 .bundle
 *.ipa
 *.app.dSYM.zip
+
+# Local email previews (image paths only resolve on this machine)
+emails/*.preview.html
