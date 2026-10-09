@@ -14,6 +14,7 @@ const event = (over: Partial<CommunityEvent> = {}): CommunityEvent => ({
   endsAt: "2026-10-12T18:30:00.000Z",
   allDay: false,
   location: "132 Foster Court",
+  description: null,
   url: "https://example.org/e/1",
   cancelled: false,
   ...over,

@@ -39,9 +39,9 @@ export function CalendarLinks({ feeds }: { feeds: CalendarFeedLink[] }) {
   if (!feeds.length) return null;
   return (
     <>
-      <button type="button" className="button small" onClick={() => setOpen(true)}>
+      <button type="button" className="button small calendar-links-open" aria-label="Subscribe" onClick={() => setOpen(true)}>
         <Rss size={14} aria-hidden="true" />
-        Subscribe
+        <span className="calendar-links-label">Subscribe</span>
       </button>
       {open && (
         <Sheet onClose={() => setOpen(false)} labelledBy="calendar-links-title">
