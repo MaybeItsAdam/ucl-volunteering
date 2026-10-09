@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { COMMITMENTS, DAY_PARTS, DAYS, INTERESTS, PERIODS, type Volunteer } from "@/lib/volunteers";
+import { londonDayKey } from "@/lib/planTime";
+import { COMMITMENTS, INTERESTS, type FreeBlock, type Volunteer } from "@/lib/volunteers";
+import { FreeTimeGrid } from "./FreeTimeGrid";
 
 type Status =
   | { kind: "idle" }
@@ -51,13 +53,14 @@ export function VolunteerForm({
 }) {
   const [study, setStudy] = useState(existing?.study ?? "");
   const [commitment, setCommitment] = useState<string>(existing?.commitment ?? "");
-  const [periods, setPeriods] = useState<string[]>(existing?.periods ?? []);
-  const [slots, setSlots] = useState<string[]>(existing?.slots ?? []);
+  const [until, setUntil] = useState(existing?.available_until ?? "");
+  const [freeTimes, setFreeTimes] = useState<FreeBlock[]>(existing?.free_times ?? []);
   const [interests, setInterests] = useState<string[]>(existing?.interests ?? []);
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [consent, setConsent] = useState(Boolean(existing));
   const [onList, setOnList] = useState(Boolean(existing));
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+  const [today] = useState(() => londonDayKey(new Date()));
 
   async function remove() {
     if (!window.confirm("Take yourself off VolSoc's volunteer list?")) return;
@@ -81,7 +84,7 @@ export function VolunteerForm({
       const res = await fetch("/api/volunteers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ study, commitment, periods, slots, interests, notes, consent }),
+        body: JSON.stringify({ study, commitment, available_until: until, free_times: freeTimes, interests, notes, consent }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) throw new Error(data.error || "Something went wrong, try again in a minute");
@@ -129,8 +132,7 @@ export function VolunteerForm({
       </fieldset>
 
       <fieldset>
-        <legend className="micro-label">How often could you help?</legend>
-        <p className="muted small">Any amount helps, even once</p>
+        <legend className="micro-label">How often could you help? Any amount helps</legend>
         <div className="pub-choices">
           {COMMITMENTS.map((c) => (
             <label key={c.key} className="pub-choice">
@@ -142,37 +144,23 @@ export function VolunteerForm({
       </fieldset>
 
       <fieldset>
-        <legend className="micro-label">When in the year?</legend>
-        <Choices options={PERIODS} value={periods} onChange={setPeriods} />
+        <legend className="micro-label">Around to help until</legend>
+        <div className="field pub-until">
+          <input
+            id="v-until"
+            type="date"
+            aria-label="Around to help until"
+            min={today}
+            value={until}
+            onChange={(e) => setUntil(e.target.value)}
+          />
+          <span className="hint">Leave it blank if you&apos;ve no end in mind</span>
+        </div>
       </fieldset>
 
       <fieldset>
         <legend className="micro-label">When in a typical week?</legend>
-        <p className="muted small">Tick the times you&apos;re usually free</p>
-        <div className="pub-week" role="group" aria-label="Free times in a typical week">
-          <span />
-          {DAY_PARTS.map((p) => (
-            <span key={p.key} className="micro-label">
-              {p.label}
-            </span>
-          ))}
-          {DAYS.map((d) => (
-            <div key={d.key} className="pub-week-row">
-              <span className="pub-week-day">{d.label}</span>
-              {DAY_PARTS.map((p) => {
-                const slot = `${d.key}_${p.key}`;
-                return (
-                  <label key={slot} className="pub-week-cell">
-                    <input type="checkbox" checked={slots.includes(slot)} onChange={() => setSlots(toggle(slots, slot))} />
-                    <span className="sr-only">
-                      {d.label} {p.label.toLowerCase()}
-                    </span>
-                  </label>
-                );
-              })}
-            </div>
-          ))}
-        </div>
+        <FreeTimeGrid value={freeTimes} onChange={setFreeTimes} />
       </fieldset>
 
       <fieldset>

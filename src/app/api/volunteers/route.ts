@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { readJson } from "@/app/api/plan/http";
+import { londonDayKey } from "@/lib/planTime";
 import { requireApiCapability } from "@/lib/session";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 import { parseVolunteer } from "@/lib/volunteers";
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
   const { body, error } = await readJson(request);
   if (error) return error;
 
-  const parsed = parseVolunteer(body);
+  const parsed = parseVolunteer(body, londonDayKey(new Date()));
   if (!parsed.value) return NextResponse.json({ error: parsed.error }, { status: 400 });
 
   const { member } = auth;

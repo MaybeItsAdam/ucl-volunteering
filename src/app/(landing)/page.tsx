@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { HomeIntro } from "@/components/landing/HomeIntro";
-import { getSession } from "@/lib/session";
+import { can, profileOf } from "@/lib/access";
+import { getCurrentMember } from "@/lib/session";
 
 export const metadata: Metadata = {
   title: { absolute: "UCL Volunteering Society" },
 };
 
-/** Public front page: the flag, and the committee's way in. */
+/** Public front page: the flag, the ways in for everyone, and the committee's. */
 export default async function HomePage() {
-  return <HomeIntro signedIn={Boolean(await getSession())} />;
+  const member = await getCurrentMember();
+  return <HomeIntro signedIn={Boolean(member)} committee={member ? can(profileOf(member), "view_plan") : false} />;
 }

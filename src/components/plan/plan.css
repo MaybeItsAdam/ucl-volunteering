@@ -35,7 +35,14 @@
 .plan-termlabel { margin-right: auto; }
 .plan-phone-title { display: none; }
 @media (max-width: 768px) {
-  .plan-phone-title { display: block; width: 100%; font-size: 18px; }
+  /* One row: the week's name, then its arrows. The term and drag hint go. */
+  .plan-weekbar { flex-wrap: nowrap; gap: 8px; }
+  .plan-phone-title { display: block; flex: 1; min-width: 0; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .plan-termlabel, .plan-hint { display: none; }
+  /* Feeds and sync on one line that scrolls rather than wraps. */
+  .plan-page .page-head { min-width: 0; }
+  .plan-page .page-actions { min-width: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 6px; }
+  .plan-page .page-actions > *, .plan-sync { flex: none; flex-wrap: nowrap; }
 }
 .plan-hint { font-size: 12px; color: var(--muted); }
 
@@ -64,6 +71,15 @@
 .plan-controls > .plan-overlay-legend { flex: 1 1 auto; }
 .plan-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-left: auto; }
 .plan-daytabs, .plan-daystep { display: none; }
+@media (max-width: 768px) {
+  /* Who's shown and the availability buttons share one scrolling row. */
+  .plan-planner { grid-template-columns: minmax(0, 1fr); }
+  .plan-controls { gap: 8px; min-width: 0; }
+  .plan-overlay-legend { flex: 1 1 100%; min-width: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 6px; }
+  .plan-overlay-legend > *, .plan-overlay-members { flex: none; flex-wrap: nowrap; }
+  .plan-overlay-legend > .micro-label { display: none; }
+  .plan-planner { gap: 8px; }
+}
 
 .plan-error { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; }
 .plan-error strong, .plan-error p { grid-column: 1; }

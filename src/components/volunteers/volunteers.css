@@ -9,3 +9,25 @@
 .vol-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .vol-tags .tag { white-space: normal; }
 .vol-notes { max-width: 32ch; white-space: pre-wrap; }
+.vol-count { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.vol-free-at { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.vol-free { margin: 2px 0 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
+
+/* Who's free when: the week, each half-hour tinted by how many are free. */
+.vol-heat { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--raised); }
+.vol-heat-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.vol-heat-grid { max-width: 640px; }
+.vol-heat-row { display: grid; grid-template-columns: 44px repeat(7, minmax(0, 1fr)); }
+.vol-heat-row > .micro-label { text-align: center; padding-bottom: 4px; }
+.vol-heat-time { position: relative; top: -6px; padding-right: 8px; text-align: right; font-size: 11px; line-height: 1; color: var(--muted); font-variant-numeric: tabular-nums; }
+.vol-heat-cell {
+  display: block; height: 14px; padding: 0; margin: 0; min-width: 0; cursor: pointer;
+  border: 0; border-left: 1px solid var(--line-muted); border-top: 1px dashed var(--line-muted); border-radius: 0;
+  background: color-mix(in srgb, var(--success) calc(var(--heat) * 85%), var(--raised));
+}
+.vol-heat-row.is-hour .vol-heat-cell { border-top: 1px solid var(--line); }
+.vol-heat-row > .vol-heat-cell:last-child { border-right: 1px solid var(--line-muted); }
+.vol-heat-row:last-child .vol-heat-cell { border-bottom: 1px solid var(--line-muted); }
+.vol-heat-cell:hover { outline: 1px solid var(--ink); outline-offset: -1px; }
+.vol-heat-cell[aria-selected="true"] { outline: 2px solid var(--primary); outline-offset: -2px; position: relative; z-index: 1; }
+.vol-heat-cell:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
