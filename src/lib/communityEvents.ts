@@ -12,7 +12,8 @@ import {
  *
  * The societies are the Toolbox societies tagged `altruism` (the SU's own
  * grouping: Street Aid, Red Cross, Cancer Charities Alliance, …) plus VolSoc
- * and UCL Student Social Impact.
+ * and UCL Student Social Impact, plus whatever the committee adds by hand
+ * (`manual`): an untagged Toolbox society, or any iCal feed (lib/communityFeeds).
  * Once a day each one's public iCal feed is pulled into `community_events`.
  * The feed owns every column, so a society's rows are replaced wholesale. A
  * feed that fails keeps its old rows and records the error on the society; a
@@ -25,6 +26,8 @@ import {
 export const COMMUNITY_SYNC_KIND = "community_events";
 /** The SU's tag for social impact societies on the Toolbox. */
 export const COMMUNITY_TAG = "altruism";
+/** The id prefix of a hand-added feed that isn't a Toolbox society. */
+export const FEED_ID_PREFIX = "ical_";
 /** Events are kept from a day ago, so one running now still shows, to this far ahead. */
 export const WINDOW_PAST_MS = 24 * 60 * 60_000;
 export const WINDOW_AHEAD_DAYS = 60;
@@ -176,6 +179,27 @@ export function planSocietyEvents(feed: IcalEvent[], now: Date): CommunityEventR
   return [...byUid.values()].sort((a, b) => a.starts_at.localeCompare(b.starts_at));
 }
 
+/** A society or feed to pull: a Toolbox society's own feed unless `feedUrl` says otherwise. */
+export interface SyncTarget {
+  id: string;
+  name: string;
+  feedUrl?: string | null;
+}
+
+/**
+ * Pull one society's feed and replace its stored events. Returns how many were
+ * written; throws with a message fit to show on a failure.
+ */
+export async function syncSociety(target: SyncTarget, now: Date = new Date()): Promise<number> {
+  const rows = planSocietyEvents(await fetchOrganiserFeed(target.feedUrl ?? societyFeedUrl(target.id), target.name), now);
+  const { data, error } = await getSupabaseAdmin().rpc("replace_community_events", {
+    p_organiser_id: target.id,
+    p_events: rows,
+  });
+  if (error) throw new Error(`Database error: ${error.message}`);
+  return typeof data === "number" ? data : rows.length;
+}
+
 /** `fn` over `items`, at most `limit` at a time, results in input order. */
 export async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results = new Array<R>(items.length);
@@ -245,12 +269,24 @@ export async function runCommunitySync(options: { now?: Date } = {}): Promise<Co
     return error ? { ok: false, runId, error, summary } : { ok: true, runId, summary };
   };
 
+  // The committee's own additions, kept whatever the Toolbox's tags say.
+  const { data: manualRows, error: manualError } = await supabase
+    .from("community_societies")
+    .select("organiser_id, name, feed_url")
+    .eq("manual", true);
+  if (manualError) errors.push(`Database error: ${manualError.message}`);
+  const manual = manualRows ?? [];
+  const manualFeeds: SyncTarget[] = manual
+    .filter((row) => row.feed_url)
+    .map((row) => ({ id: row.organiser_id as string, name: row.name as string, feedUrl: row.feed_url as string }));
+
   // Who to sync: the Toolbox's list now, or failing that the last one stored.
-  let societies: { id: string; name: string }[];
+  let societies: SyncTarget[];
   try {
     const chosen = selectCommunitySocieties(await fetchSocietyList(), [
       process.env.TOOLBOX_ORGANISER_ID || DEFAULT_VOLSOC_ORGANISER_ID,
       process.env.CALENDAR_ORGANISER_ID || DEFAULT_CALENDAR_ORGANISER_ID,
+      ...manual.filter((row) => !row.feed_url).map((row) => row.organiser_id as string),
     ]);
     const { error: upsertError } = await supabase
       .from("community_societies")
@@ -259,7 +295,8 @@ export async function runCommunitySync(options: { now?: Date } = {}): Promise<Co
     const { data: stored, error: storedError } = await supabase
       .from("community_societies")
       .select("organiser_id")
-      .eq("included", true);
+      .eq("included", true)
+      .eq("manual", false);
     if (storedError) throw new Error(`Database error: ${storedError.message}`);
     const keep = new Set(chosen.map((s) => s.id));
     const dropped = (stored ?? []).map((row) => row.organiser_id as string).filter((id) => !keep.has(id));
@@ -270,29 +307,23 @@ export async function runCommunitySync(options: { now?: Date } = {}): Promise<Co
         .in("organiser_id", dropped);
       if (dropError) throw new Error(`Database error: ${dropError.message}`);
     }
-    societies = chosen;
+    societies = [...chosen, ...manualFeeds];
   } catch (error) {
     errors.push(error instanceof Error ? error.message : "The Toolbox society list couldn't be read");
     const { data, error: readError } = await supabase
       .from("community_societies")
-      .select("organiser_id, name")
+      .select("organiser_id, name, feed_url")
       .eq("included", true);
     if (readError || !data?.length) return finish();
     summary.usedStoredList = true;
-    societies = data.map((row) => ({ id: row.organiser_id as string, name: row.name as string }));
+    societies = data.map((row) => ({ id: row.organiser_id as string, name: row.name as string, feedUrl: row.feed_url as string | null }));
   }
   summary.societies = societies.length;
 
   await mapWithConcurrency(societies, CONCURRENCY, async (society) => {
     try {
-      const rows = planSocietyEvents(await fetchOrganiserFeed(societyFeedUrl(society.id), society.name), now);
-      const { data, error } = await supabase.rpc("replace_community_events", {
-        p_organiser_id: society.id,
-        p_events: rows,
-      });
-      if (error) throw new Error(`Database error: ${error.message}`);
+      summary.events += await syncSociety(society, now);
       summary.feedsOk += 1;
-      summary.events += typeof data === "number" ? data : rows.length;
     } catch (error) {
       const message = error instanceof Error ? error.message : `${society.name} sync failed`;
       summary.feedsFailed += 1;
@@ -326,9 +357,15 @@ export interface CommunityEvent {
   endsAt: string;
   allDay: boolean;
   location: string | null;
-  /** The event's own page, or its society's on the Toolbox. */
+  /** Clipped by the sync. */
+  description: string | null;
+  /** The event's own page, its society's on the Toolbox, or failing both its place on our calendar. */
   url: string;
   cancelled: boolean;
+}
+
+function appUrl(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL || "https://uclvolunteering.org").replace(/\/+$/, "");
 }
 
 /** Included societies, and their events that haven't ended by `now`, soonest first. Throws on a database error. */
@@ -339,13 +376,13 @@ export async function listCommunityEvents(now: Date = new Date()): Promise<{
   const supabase = getSupabaseAdmin();
   const { data: societyRows, error: societyError } = await supabase
     .from("community_societies")
-    .select("organiser_id, name, logo_url, colour, dark_colour")
+    .select("organiser_id, name, label, logo_url, colour, dark_colour")
     .eq("included", true)
     .order("name");
   if (societyError) throw new Error(societyError.message);
   const societies: CommunitySociety[] = (societyRows ?? []).map((row) => ({
     id: row.organiser_id,
-    name: row.name,
+    name: row.label || row.name,
     logoUrl: safeUrl(row.logo_url),
     colour: hexColour(row.colour),
     darkColour: hexColour(row.dark_colour),
@@ -354,7 +391,7 @@ export async function listCommunityEvents(now: Date = new Date()): Promise<{
 
   const { data: eventRows, error: eventError } = await supabase
     .from("community_events")
-    .select("id, organiser_id, title, starts_at, ends_at, all_day, location, url, cancelled")
+    .select("id, organiser_id, title, starts_at, ends_at, all_day, location, description, url, cancelled")
     .in("organiser_id", societies.map((s) => s.id))
     .gte("ends_at", now.toISOString())
     .order("starts_at")
@@ -368,7 +405,10 @@ export async function listCommunityEvents(now: Date = new Date()): Promise<{
     endsAt: row.ends_at,
     allDay: row.all_day,
     location: row.location,
-    url: safeUrl(row.url) ?? societyPageUrl(row.organiser_id),
+    description: row.description,
+    url:
+      safeUrl(row.url) ??
+      (row.organiser_id.startsWith(FEED_ID_PREFIX) ? `${appUrl()}/calendar?event=${row.id}` : societyPageUrl(row.organiser_id)),
     cancelled: row.cancelled,
   }));
   return { societies, events };

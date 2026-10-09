@@ -8,11 +8,11 @@ import { VolSocHand } from "./VolSocHand";
 /**
  * The society's name and the three ways in for everyone: what's on, signing up
  * to volunteer, and logging a Zero Food Waste collection. The committee's way
- * in sits quietly underneath; signed out, it opens the sign-in box right here
- * rather than sending you to a page that looks the same, and signed in on the
- * committee it goes straight to the dashboard.
+ * in sits quietly underneath when signed out, opening the sign-in box right
+ * here rather than sending you to a page that looks the same. Signed in, the
+ * dashboard is in the tabs.
  */
-export function HomeIntro({ signedIn, committee }: { signedIn: boolean; committee: boolean }) {
+export function HomeIntro({ signedIn }: { signedIn: boolean }) {
   const [signingIn, setSigningIn] = useState(false);
 
   if (signingIn) return <SignInPanel onBack={() => setSigningIn(false)} />;
@@ -32,16 +32,10 @@ export function HomeIntro({ signedIn, committee }: { signedIn: boolean; committe
           Log a Zero Food Waste collection
         </Link>
       </div>
-      {committee ? (
-        <Link className="uvs-committee-link" href="/portal">
-          Committee dashboard
-        </Link>
-      ) : (
-        !signedIn && (
-          <button type="button" className="uvs-committee-link" onClick={() => setSigningIn(true)}>
-            Committee sign in
-          </button>
-        )
+      {!signedIn && (
+        <button type="button" className="uvs-committee-link" onClick={() => setSigningIn(true)}>
+          Committee sign in
+        </button>
       )}
     </>
   );

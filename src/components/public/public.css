@@ -245,15 +245,12 @@
 .pub-signed-in { margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; }
 .pub-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
-/* Calendar page: the intro and the Week / List switch (the grid is calendar.css). */
-.cal-intro { margin: 0; max-width: 62ch; }
-.cal-page .page-actions { align-items: center; }
+/* Calendar page: the whole width, and no more than a sliver above the grid
+   (the grid itself is calendar.css). */
+.pub-main:has(> .cal-page) { padding-top: 12px; padding-bottom: 12px; }
+.pub-main > .cal-page { max-width: none; }
 @media (max-width: 768px) {
-  /* Every pixel above the grid is one less hour on screen. */
-  .cal-intro, .cal-page .page-head > .micro-label { display: none !important; }
-  .cal-page .page-head { grid-template-columns: auto 1fr; align-items: center; gap: 10px; }
-  .cal-page .page-actions { grid-column: 2; grid-row: 1; justify-content: flex-end; flex-wrap: nowrap; gap: 6px; }
-  .cal-page .segmented a { padding: 0 10px; }
+  .pub-main:has(> .cal-page) { padding-top: calc(8px + var(--safe-top)); padding-bottom: calc(64px + var(--safe-bottom)); }
 }
 .segmented a {
   display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px;
