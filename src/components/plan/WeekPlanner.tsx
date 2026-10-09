@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, CalendarOff, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { CalendarClock, CalendarOff, ChevronLeft, ChevronRight, Eye, EyeOff, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -123,6 +123,9 @@ export interface WeekPlannerProps {
   initialDay: number;
 }
 
+/** Where "Planned" is remembered, on the device. */
+const PLANNED_KEY = "volsoc.plan.planned";
+
 export function WeekPlanner({
   days,
   events,
@@ -153,9 +156,30 @@ export function WeekPlanner({
     setSeenEvents(events);
     setOverrides({});
   }
+  // "Planned" shows everything the committee is working on: provisional
+  // events (synced and new events start that way) and everyone's
+  // availability. On unless switched off; off, the week is only what's confirmed.
+  const [planned, setPlanned] = useState(true);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- storage is only readable after hydration
+    if (window.localStorage.getItem(PLANNED_KEY) === "0" && !editAvailability) setPlanned(false);
+  }, [editAvailability]);
+  function togglePlanned() {
+    const next = !planned;
+    setPlanned(next);
+    try {
+      window.localStorage.setItem(PLANNED_KEY, next ? "1" : "0");
+    } catch {
+      // Not remembered, but still applied.
+    }
+  }
+  const hiddenCount = events.filter((e) => e.status === "provisional").length;
   const shown = useMemo(
-    () => events.map((e) => (overrides[e.id] ? { ...e, ...overrides[e.id] } : e)),
-    [events, overrides],
+    () =>
+      events
+        .filter((e) => planned || e.status !== "provisional")
+        .map((e) => (overrides[e.id] ? { ...e, ...overrides[e.id] } : e)),
+    [events, overrides, planned],
   );
   const layout = useMemo(() => layoutWeek(shown, days), [shown, days]);
 
@@ -373,8 +397,8 @@ export function WeekPlanner({
 
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
   const overlayBlocks = useMemo(
-    () => [...blocks, ...calendarBlocks].filter((b) => overlay.includes(b.memberId)),
-    [blocks, calendarBlocks, overlay],
+    () => (planned ? [...blocks, ...calendarBlocks].filter((b) => overlay.includes(b.memberId)) : []),
+    [blocks, calendarBlocks, overlay, planned],
   );
 
   function closeAvailability() {
@@ -399,42 +423,55 @@ export function WeekPlanner({
   return (
     <div className="plan-planner" data-dragging={preview ? "" : undefined}>
       <div className="plan-controls">
+        <button
+          type="button"
+          className="button small plan-planned"
+          aria-pressed={planned}
+          onClick={togglePlanned}
+          title={planned ? "Hide provisional events and availability" : "Show provisional events and availability"}
+        >
+          {planned ? <Eye size={14} aria-hidden="true" /> : <EyeOff size={14} aria-hidden="true" />}
+          Planned
+          {!planned && hiddenCount > 0 && <span className="plan-planned-count">{hiddenCount}</span>}
+        </button>
         {/* Availability: whose unavailable times to lay over the week, and your own to edit */}
-        <div className="plan-overlay-legend" role="group" aria-label="Availability">
-          <span className="micro-label">Availability</span>
-          <div className="plan-overlay-members" role="group" aria-label="Show when committee members are unavailable">
-            {members.map((m) => {
-              const on = overlay.includes(m.id);
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  className="plan-member-toggle hit"
-                  data-colour={m.colour ?? undefined}
-                  aria-pressed={on}
-                  title={`Show when ${m.name} is unavailable`}
-                  onClick={() => setOverlay((o) => (on ? o.filter((id) => id !== m.id) : [...o, m.id]))}
-                >
-                  <span className="swatch" data-colour={m.colour ?? undefined} aria-hidden="true" />
-                  {m.name}
+        {planned && (
+          <div className="plan-overlay-legend" role="group" aria-label="Availability">
+            <span className="micro-label">Availability</span>
+            <div className="plan-overlay-members" role="group" aria-label="Show when committee members are unavailable">
+              {members.map((m) => {
+                const on = overlay.includes(m.id);
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    className="plan-member-toggle hit"
+                    data-colour={m.colour ?? undefined}
+                    aria-pressed={on}
+                    title={`Show when ${m.name} is unavailable`}
+                    onClick={() => setOverlay((o) => (on ? o.filter((id) => id !== m.id) : [...o, m.id]))}
+                  >
+                    <span className="swatch" data-colour={m.colour ?? undefined} aria-hidden="true" />
+                    {m.name}
+                  </button>
+                );
+              })}
+              {overlay.length > 0 && (
+                <button type="button" className="button ghost small" onClick={() => setOverlay([])}>
+                  Clear
                 </button>
-              );
-            })}
-            {overlay.length > 0 && (
-              <button type="button" className="button ghost small" onClick={() => setOverlay([])}>
-                Clear
-              </button>
-            )}
+              )}
+            </div>
+            <button type="button" className="button small plan-availability-edit" onClick={() => setAvailabilityOpen(true)}>
+              <CalendarOff size={14} aria-hidden="true" />
+              Edit my availability
+            </button>
+            <button type="button" className="button small plan-availability-edit" onClick={() => setCalendarsOpen(true)}>
+              <CalendarClock size={14} aria-hidden="true" />
+              My calendars
+            </button>
           </div>
-          <button type="button" className="button small plan-availability-edit" onClick={() => setAvailabilityOpen(true)}>
-            <CalendarOff size={14} aria-hidden="true" />
-            Edit my availability
-          </button>
-          <button type="button" className="button small plan-availability-edit" onClick={() => setCalendarsOpen(true)}>
-            <CalendarClock size={14} aria-hidden="true" />
-            My calendars
-          </button>
-        </div>
+        )}
 
         <div className="plan-toolbar">
           <div className="plan-daytabs" role="tablist" aria-label="Day">

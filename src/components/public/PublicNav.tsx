@@ -15,9 +15,9 @@ const COMMITTEE_LINK = { href: "/portal", label: "Committee", short: "Committee"
 const SIGN_IN_LINK = { href: "/auth/signin", label: "Sign in", short: "Sign in", icon: LogIn } as const;
 
 /**
- * Tabs in the top bar on wide screens, a bar along the bottom on phones. The
- * last tab is the way in: sign in when signed out, the committee's dashboard
- * once a committee member is signed in.
+ * The phone's tab bar along the bottom (wide screens use SiteNav in the top
+ * bar). The last tab is the way in: sign in when signed out, the committee's
+ * dashboard once a committee member is signed in.
  */
 export function PublicNav({ committee = false, signedIn = false }: { committee?: boolean; signedIn?: boolean }) {
   const pathname = usePathname();

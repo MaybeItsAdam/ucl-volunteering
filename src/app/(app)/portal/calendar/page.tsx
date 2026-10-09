@@ -108,37 +108,32 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
       googleUrl: googleAddUrl(socialImpactFeed),
     },
   ];
-  const title = `${term.label} · ${weekRange(week.monday)}`;
+  const isThisWeek = week.days.includes(today);
 
   return (
     <section className="page plan-page">
-      <header className="page-head">
-        <span className="micro-label">VolSoc plan</span>
-        <h1>{title}</h1>
-        <div className="page-actions">
-          <CalendarLinks feeds={feeds} />
-          <SyncStatus label={chip.label} tone={chip.tone} title={chip.title} canSync={dbReady && can(profile, "trigger_sync")} />
-        </div>
-      </header>
-
-      <PlanSubnav active="week" week={week.monday} />
-
-      <div className="plan-weekbar">
-        {/* On a phone the shell's large title says "Calendar" and hides the h1, so the week is named here. */}
-        <h2 className="plan-phone-title">{title}</h2>
-        <nav className="plan-weeknav" aria-label="Week">
+      {/* One bar: the week, the plan's views, and the feeds and sync. */}
+      <div className="plan-bar">
+        <div className="plan-bar-week">
           <Link className="icon-button" href={`/portal/calendar?week=${prevWeek}`} aria-label="Previous week">
             <ChevronLeft size={18} aria-hidden="true" />
-          </Link>
-          <Link className="button small" href="/portal/calendar" aria-current={week.days.includes(today) ? "true" : undefined}>
-            Today
           </Link>
           <Link className="icon-button" href={`/portal/calendar?week=${nextWeek}`} aria-label="Next week">
             <ChevronRight size={18} aria-hidden="true" />
           </Link>
-        </nav>
-        <span className="micro-label plan-termlabel">{term.termLabel}</span>
-        {canEdit && <span className="plan-hint">Drag VolSoc events to reschedule</span>}
+          <h1 className="plan-range">{weekRange(week.monday)}</h1>
+          <span className="plan-range-term muted">{term.label}</span>
+          {!isThisWeek && (
+            <Link className="button small" href="/portal/calendar">
+              Today
+            </Link>
+          )}
+        </div>
+        <div className="plan-bar-tools">
+          <PlanSubnav active="week" week={week.monday} />
+          <CalendarLinks feeds={feeds} />
+          <SyncStatus label={chip.label} tone={chip.tone} title={chip.title} canSync={dbReady && can(profile, "trigger_sync")} />
+        </div>
       </div>
 
       {!dbReady && (
@@ -186,9 +181,6 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
             Provisional
           </li>
         </ul>
-        <p className="muted small">
-          Showing {events.length} event{events.length === 1 ? "" : "s"} for {term.label} ({weekRange(week.monday)})
-        </p>
       </footer>
     </section>
   );

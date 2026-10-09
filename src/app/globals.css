@@ -526,9 +526,9 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); widt
 .app-shell { min-height: 100vh; min-height: 100dvh; background: var(--paper); overflow-x: clip; touch-action: pan-y pinch-zoom; }
 .app-bar {
   position: sticky; top: 0; z-index: 20;
-  display: flex; align-items: center; gap: 24px;
+  display: flex; align-items: center; gap: 20px;
   height: calc(56px + var(--safe-top));
-  padding: var(--safe-top) max(24px, var(--safe-right)) 0 max(24px, var(--safe-left));
+  padding: var(--safe-top) max(16px, var(--safe-right)) 0 max(16px, var(--safe-left));
   background: var(--raised); border-bottom: 1px solid var(--line);
 }
 .app-brand { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 18px; font-weight: 700; text-decoration: none; white-space: nowrap; }
@@ -545,6 +545,23 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); widt
 .app-tabs a.active .app-tab-icon { color: var(--primary); }
 .app-tab-icon { display: inline-grid; place-items: center; }
 .app-bar-account { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+/* The top bar's tabs on wide screens, shared by the public pages and the app:
+   the public ones, a divider, then the committee's. */
+.site-nav { display: flex; align-self: stretch; align-items: stretch; gap: 2px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.site-nav a {
+  display: inline-flex; align-items: center; gap: 7px; padding: 0 10px; margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; white-space: nowrap;
+  color: var(--muted); text-decoration: none;
+}
+.site-nav a:hover { color: var(--ink); }
+.site-nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--primary); }
+.site-nav a[aria-current="page"] svg { color: var(--primary); }
+.site-nav-divider { flex: none; width: 1px; margin: 16px 8px; background: var(--line); }
+/* Wide screens: SiteNav is the tabs; AppTabs is only the phone's bottom bar. */
+@media (min-width: 769px) { .app-bar .app-tabs { display: none; } }
+@media (max-width: 768px) { .site-nav { display: none; } }
 .app-main { padding: 24px max(24px, var(--safe-right)) 48px max(24px, var(--safe-left)); }
 
 /* Account menu (top bar, wide screens). */

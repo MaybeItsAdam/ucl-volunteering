@@ -24,3 +24,12 @@ export function availablePages(profile: AccessProfile | null): AppPage[] {
   pages.push("settings");
   return pages;
 }
+
+/**
+ * The committee's pages that earn a tab in the top bar beside the public
+ * ones: What's on is the public calendar again, and Settings is in the
+ * account menu.
+ */
+export function committeeTabs(pages: AppPage[]): AppPage[] {
+  return pages.filter((p) => p !== "whats_on" && p !== "settings");
+}

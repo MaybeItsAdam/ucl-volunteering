@@ -20,7 +20,9 @@
 }
 .pub-nav a:hover { color: var(--ink); }
 .pub-nav a[aria-current="page"] { color: var(--ink); border-bottom-color: var(--primary); }
-.pub-theme { margin-left: auto; flex: none; }
+.pub-account { margin-left: auto; flex: none; display: flex; align-items: center; gap: 8px; }
+/* Wide screens: SiteNav is the tabs; PublicNav is only the phone's bottom bar. */
+@media (min-width: 769px) { .pub-nav { display: none; } }
 .pub-main { padding: 24px max(16px, var(--safe-right)) calc(48px + var(--safe-bottom)) max(16px, var(--safe-left)); }
 .pub-lede { margin: 0; max-width: 62ch; }
 
@@ -38,7 +40,7 @@
   /* No top bar: the brand and theme go (the theme follows the phone's), and
      the tabs, its only other content, are fixed to the bottom. */
   .pub-bar { display: contents; }
-  .pub-brand, .pub-theme { display: none; }
+  .pub-brand, .pub-account { display: none; }
   .pub-nav {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
     gap: 0; padding: 4px var(--safe-right) max(4px, var(--safe-bottom)) var(--safe-left);

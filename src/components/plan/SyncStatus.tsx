@@ -47,9 +47,16 @@ export function SyncStatus({
         {label}
       </span>
       {canSync && (
-        <button type="button" className="button small" onClick={sync} disabled={working} aria-busy={working}>
+        <button
+          type="button"
+          className="button small"
+          onClick={sync}
+          disabled={working}
+          aria-busy={working}
+          aria-label={working ? "Syncing" : `Sync now (${label})`}
+        >
           <RefreshCw size={14} aria-hidden="true" className={working ? "plan-spin" : undefined} />
-          {working ? "Syncing…" : "Sync now"}
+          <span className="plan-sync-label">{working ? "Syncing…" : "Sync now"}</span>
         </button>
       )}
       {error && (
