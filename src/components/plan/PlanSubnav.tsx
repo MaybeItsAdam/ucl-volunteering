@@ -15,7 +15,7 @@ export function PlanSubnav({ active, week }: { active: PlanSection; week?: strin
     { key: "feeds", href: "/portal/calendar/feeds", label: "Public calendar" },
   ];
   return (
-    <nav className="segmented plan-subnav" aria-label="Plan">
+    <nav className="segmented plan-subnav" aria-label="Schedule">
       {items.map((item) => (
         <Link
           key={item.key}

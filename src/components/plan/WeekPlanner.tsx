@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, CalendarOff, ChevronLeft, ChevronRight, Eye, EyeOff, Plus } from "lucide-react";
+import { CalendarClock, CalendarOff, ChevronLeft, ChevronRight, Eye, EyeOff, Paintbrush, Plus, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -34,6 +34,7 @@ import {
 import type { CalendarLinksState } from "@/lib/calendarLinks";
 import { AvailabilitySheet } from "@/components/availability/AvailabilitySheet";
 import { MyCalendarsSheet } from "@/components/availability/MyCalendarsSheet";
+import { applyPaint, blocksToCells, cellKey, cellsToBlocks, modeFor, SLOT_MINUTES, type PaintMode } from "@/components/availability/grid";
 import { patchEvent } from "./api";
 import { CreateEventSheet, type CreateDraft } from "./CreateEventSheet";
 import { dayLabel, hourLabel, myResponse, SOURCE_LABELS, timeRange, WEEKDAYS_SHORT } from "./format";
@@ -59,7 +60,43 @@ const TOUCH_SLOP = 8;
 const HOURS = Array.from({ length: (WINDOW_END - WINDOW_START) / 60 }, (_, i) => WINDOW_START / 60 + i);
 const GRID_HEIGHT = (WINDOW_END - WINDOW_START) * PX_PER_MINUTE;
 
-type Mode = "move" | "resize" | "create";
+type Mode = "move" | "resize" | "create" | "busy";
+
+/**
+ * Another society's event from the public calendar, shown read only beside
+ * the committee's own when "Other societies" is on.
+ */
+export interface OtherSocietyEvent {
+  other: true;
+  id: string;
+  title: string;
+  startsAt: string;
+  endsAt: string;
+  allDay: boolean;
+  location: string | null;
+  url: string;
+  society: string;
+  colour: string | null;
+  darkColour: string | null;
+}
+
+type CalItem = PlanEvent | OtherSocietyEvent;
+const isOther = (event: CalItem): event is OtherSocietyEvent => "other" in event;
+
+function remember(key: string, on: boolean) {
+  try {
+    window.localStorage.setItem(key, on ? "1" : "0");
+  } catch {
+    // Not remembered, but still applied.
+  }
+}
+
+/** A drag on the grid, as whole half-hours: at least the one pressed. */
+function busyRange(a: number, b: number): { start: number; end: number } {
+  const start = Math.floor(Math.min(a, b) / SLOT_MINUTES) * SLOT_MINUTES;
+  const end = Math.max(start + SLOT_MINUTES, Math.ceil(Math.max(a, b) / SLOT_MINUTES) * SLOT_MINUTES);
+  return { start: Math.max(0, start), end: Math.min(end, 24 * 60) };
+}
 
 interface Gesture {
   mode: Mode;
@@ -121,10 +158,13 @@ export interface WeekPlannerProps {
   nextWeek: string;
   /** Mobile: the day to open on (0 Monday … 6 Sunday). */
   initialDay: number;
+  /** Other societies' events this week, from the public calendar. */
+  others: OtherSocietyEvent[];
 }
 
-/** Where "Planned" is remembered, on the device. */
+/** Where "Planned" and "Other societies" are remembered, on the device. */
 const PLANNED_KEY = "volsoc.plan.planned";
+const OTHERS_KEY = "volsoc.plan.others";
 
 export function WeekPlanner({
   days,
@@ -142,6 +182,7 @@ export function WeekPlanner({
   prevWeek,
   nextWeek,
   initialDay,
+  others,
 }: WeekPlannerProps) {
   const router = useRouter();
   const now = useSyncExternalStore(subscribeMinute, clientMinute, () => Math.floor(serverNow / 60_000) * 60_000);
@@ -167,12 +208,31 @@ export function WeekPlanner({
   function togglePlanned() {
     const next = !planned;
     setPlanned(next);
-    try {
-      window.localStorage.setItem(PLANNED_KEY, next ? "1" : "0");
-    } catch {
-      // Not remembered, but still applied.
-    }
+    if (!next) setMarking(false);
+    remember(PLANNED_KEY, next);
   }
+
+  // Other societies' events, read only, beside the committee's. Off unless switched on.
+  const [showOthers, setShowOthers] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- storage is only readable after hydration
+    if (window.localStorage.getItem(OTHERS_KEY) === "1") setShowOthers(true);
+  }, []);
+  function toggleOthers() {
+    setShowOthers(!showOthers);
+    remember(OTHERS_KEY, !showOthers);
+  }
+
+  // Marking busy: a drag on the grid paints your own weekly unavailability
+  // (or clears it, if it starts on some), saved as it's let go.
+  const [marking, setMarking] = useState(false);
+  const [myBlocks, setMyBlocks] = useState(() => blocks.filter((b) => b.memberId === me.id));
+  const [seenBlocks, setSeenBlocks] = useState(blocks);
+  if (seenBlocks !== blocks) {
+    setSeenBlocks(blocks);
+    setMyBlocks(blocks.filter((b) => b.memberId === me.id));
+  }
+  const allBlocks = useMemo(() => [...blocks.filter((b) => b.memberId !== me.id), ...myBlocks], [blocks, myBlocks, me.id]);
   const hiddenCount = events.filter((e) => e.status === "provisional").length;
   const shown = useMemo(
     () =>
@@ -181,7 +241,10 @@ export function WeekPlanner({
         .map((e) => (overrides[e.id] ? { ...e, ...overrides[e.id] } : e)),
     [events, overrides, planned],
   );
-  const layout = useMemo(() => layoutWeek(shown, days), [shown, days]);
+  const layout = useMemo(
+    () => layoutWeek<CalItem>(showOthers ? [...shown, ...others] : shown, days),
+    [shown, others, showOthers, days],
+  );
 
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -270,6 +333,8 @@ export function WeekPlanner({
       next = { mode: "move", eventId: g.event!.id, dayIndex: dayAt(clientX, g.dayIndex), start, end: start + duration };
     } else if (g.mode === "resize") {
       next = { mode: "resize", eventId: g.event!.id, dayIndex: g.dayIndex, start: g.origStart, end: resizeEndMinute(minute, g.origStart) };
+    } else if (g.mode === "busy") {
+      next = { mode: "busy", eventId: null, dayIndex: g.dayIndex, ...busyRange(g.grabOffset, minute) };
     } else {
       next = { mode: "create", eventId: null, dayIndex: g.dayIndex, ...selectionRange(g.grabOffset, minute) };
     }
@@ -316,6 +381,8 @@ export function WeekPlanner({
         // A plain click on empty grid with a mouse makes an hour there. A tap
         // does nothing, so a phone scrolls freely; it has the New event button.
         if (g.mode === "create" && !g.touch) setDraft({ day: days[g.dayIndex], ...selectionRange(g.grabOffset, g.grabOffset) });
+        // Marking busy, a click or tap flips the half-hour under it.
+        if (g.mode === "busy") void paintBusy(g.dayIndex, busyRange(g.grabOffset, g.grabOffset), g.grabOffset);
         return;
       }
       suppressClickUntil.current = performance.now() + 400;
@@ -323,6 +390,7 @@ export function WeekPlanner({
       setPreview(null);
       if (!p) return;
       if (p.mode === "create") setDraft({ day: days[p.dayIndex], start: p.start, end: p.end });
+      else if (p.mode === "busy") void paintBusy(p.dayIndex, p, g.grabOffset);
       else if (g.event && (p.dayIndex !== g.dayIndex || p.start !== g.origStart || p.end !== g.origEnd)) {
         void commit(g.event, days[p.dayIndex], p.start, p.end);
       }
@@ -377,8 +445,43 @@ export function WeekPlanner({
   }
 
   function onColumnPointerDown(e: ReactPointerEvent, dayIndex: number) {
+    if (marking) {
+      begin(e, { mode: "busy", dayIndex, origStart: 0, origEnd: 0, grabOffset: minuteAt(e.clientY) });
+      return;
+    }
     if (!canEdit) return;
     begin(e, { mode: "create", dayIndex, origStart: 0, origEnd: 0, grabOffset: minuteAt(e.clientY) });
+  }
+
+  /**
+   * Paint (or clear) your busy time over `range` on a day, every week: clear
+   * if the press began on time already marked, else mark. Saved at once, and
+   * put back if the save fails.
+   */
+  async function paintBusy(dayIndex: number, range: { start: number; end: number }, pressed: number) {
+    const weekday = dayIndex + 1;
+    const cells = blocksToCells(myBlocks);
+    const mode: PaintMode = modeFor(cells, cellKey(weekday, Math.floor(pressed / SLOT_MINUTES) * SLOT_MINUTES));
+    const keys: string[] = [];
+    for (let m = range.start; m < range.end; m += SLOT_MINUTES) keys.push(cellKey(weekday, m));
+    const next = cellsToBlocks(applyPaint(cells, keys, mode));
+    const before = myBlocks;
+    setMyBlocks(next.map((b, i) => ({ ...b, id: `local-${i}`, memberId: me.id })));
+    setError(null);
+    try {
+      const res = await fetch("/api/plan/availability", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ blocks: next }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { blocks?: AvailabilityBlock[]; error?: string };
+      if (!res.ok || !data.blocks) throw new Error(data.error || `Request failed (${res.status})`);
+      setMyBlocks(data.blocks);
+    } catch (e) {
+      setMyBlocks(before);
+      setError(`Couldn't save your availability: ${e instanceof Error ? e.message : "something went wrong"}`);
+    }
   }
 
   // Leaving mid-drag must not leave listeners behind.
@@ -397,8 +500,13 @@ export function WeekPlanner({
 
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
   const overlayBlocks = useMemo(
-    () => (planned ? [...blocks, ...calendarBlocks].filter((b) => overlay.includes(b.memberId)) : []),
-    [blocks, calendarBlocks, overlay, planned],
+    () =>
+      planned
+        ? [...allBlocks, ...calendarBlocks].filter(
+            (b) => overlay.includes(b.memberId) || (marking && b.memberId === me.id),
+          )
+        : [],
+    [allBlocks, calendarBlocks, overlay, planned, marking, me.id],
   );
 
   function closeAvailability() {
@@ -421,7 +529,7 @@ export function WeekPlanner({
   const allDayRows = layout.allDay.reduce((n, a) => Math.max(n, a.row + 1), 0);
 
   return (
-    <div className="plan-planner" data-dragging={preview ? "" : undefined}>
+    <div className="plan-planner" data-dragging={preview ? "" : undefined} data-marking={marking ? "" : undefined}>
       <div className="plan-controls">
         <button
           type="button"
@@ -434,6 +542,19 @@ export function WeekPlanner({
           Planned
           {!planned && hiddenCount > 0 && <span className="plan-planned-count">{hiddenCount}</span>}
         </button>
+        {others.length > 0 && (
+          <button
+            type="button"
+            className="button small plan-planned plan-others-toggle"
+            aria-pressed={showOthers}
+            onClick={toggleOthers}
+            title={showOthers ? "Hide other societies' events" : "Show other societies' events from the public calendar"}
+          >
+            <Users size={14} aria-hidden="true" />
+            Other societies
+            {!showOthers && <span className="plan-planned-count">{others.length}</span>}
+          </button>
+        )}
         {/* Availability: whose unavailable times to lay over the week, and your own to edit */}
         {planned && (
           <div className="plan-overlay-legend" role="group" aria-label="Availability">
@@ -462,6 +583,16 @@ export function WeekPlanner({
                 </button>
               )}
             </div>
+            <button
+              type="button"
+              className="button small plan-availability-edit plan-mark"
+              aria-pressed={marking}
+              onClick={() => setMarking(!marking)}
+              title="Drag on the calendar to mark when you're busy each week; start on a busy time to clear it"
+            >
+              <Paintbrush size={14} aria-hidden="true" />
+              {marking ? "Done marking" : "Mark when I'm busy"}
+            </button>
             <button type="button" className="button small plan-availability-edit" onClick={() => setAvailabilityOpen(true)}>
               <CalendarOff size={14} aria-hidden="true" />
               Edit my availability
@@ -512,13 +643,19 @@ export function WeekPlanner({
             )}
           </div>
           {canEdit && (
-            <button type="button" className="button small primary plan-new" onClick={newEvent}>
+            <button type="button" className="button small primary plan-new" onClick={newEvent} aria-label="New event">
               <Plus size={14} aria-hidden="true" />
-              New event
+              <span className="plan-new-label">New event</span>
             </button>
           )}
         </div>
       </div>
+
+      {marking && (
+        <p className="plan-marking-hint small" role="status">
+          Drag down a day to mark when you&apos;re busy every week, or start on a busy time to clear it. Saved as you go
+        </p>
+      )}
 
       {error && (
         <div className="notice bad plan-error" role="alert">
@@ -556,21 +693,25 @@ export function WeekPlanner({
           <>
             <div className="plan-allday plan-allday--wide" style={{ "--rows": allDayRows } as CSSProperties}>
               <span className="micro-label plan-allday-label">All day</span>
-              {layout.allDay.map((a) => (
-                <EventChip
-                  key={a.event.id}
-                  event={a.event}
-                  myId={myId}
-                  style={{ gridColumn: `${a.firstDay + 2} / ${a.lastDay + 3}`, gridRow: a.row + 1 }}
-                />
-              ))}
+              {layout.allDay.map((a) => {
+                const style = { gridColumn: `${a.firstDay + 2} / ${a.lastDay + 3}`, gridRow: a.row + 1 };
+                return isOther(a.event) ? (
+                  <OtherChip key={a.event.id} event={a.event} style={style} />
+                ) : (
+                  <EventChip key={a.event.id} event={a.event} myId={myId} style={style} />
+                );
+              })}
             </div>
             {allDayForMobile.length > 0 && (
               <div className="plan-allday plan-allday--narrow">
                 <span className="micro-label plan-allday-label">All day</span>
-                {allDayForMobile.map((a) => (
-                  <EventChip key={a.event.id} event={a.event} myId={myId} />
-                ))}
+                {allDayForMobile.map((a) =>
+                  isOther(a.event) ? (
+                    <OtherChip key={a.event.id} event={a.event} />
+                  ) : (
+                    <EventChip key={a.event.id} event={a.event} myId={myId} />
+                  ),
+                )}
               </div>
             )}
           </>
@@ -629,22 +770,29 @@ export function WeekPlanner({
                       );
                     })}
 
-                  {segments.map((s) => (
-                    <EventCard
-                      key={s.event.id}
-                      segment={s}
-                      myId={myId}
-                      draggable={isDraggable(s, canEdit)}
-                      dragging={preview?.eventId === s.event.id}
-                      onPointerDown={(e, mode) => onEventPointerDown(e, s, i, mode)}
-                      onClick={(e) => {
-                        if (performance.now() < suppressClickUntil.current) e.preventDefault();
-                      }}
-                    />
-                  ))}
+                  {segments.map((seg) => {
+                    if (isOther(seg.event)) return <OtherCard key={seg.event.id} segment={seg as DaySegment<OtherSocietyEvent>} />;
+                    const s = seg as DaySegment;
+                    return (
+                      <EventCard
+                        key={s.event.id}
+                        segment={s}
+                        myId={myId}
+                        draggable={!marking && isDraggable(s, canEdit)}
+                        dragging={preview?.eventId === s.event.id}
+                        onPointerDown={(e, mode) => onEventPointerDown(e, s, i, mode)}
+                        onClick={(e) => {
+                          if (performance.now() < suppressClickUntil.current) e.preventDefault();
+                        }}
+                      />
+                    );
+                  })}
 
                   {preview && preview.dayIndex === i && (
-                    <Ghost preview={preview} title={shown.find((e) => e.id === preview.eventId)?.title ?? null} />
+                    <Ghost
+                      preview={preview}
+                      title={preview.mode === "busy" ? "Busy" : (shown.find((e) => e.id === preview.eventId)?.title ?? null)}
+                    />
                   )}
 
                   {isToday && nowMinute >= WINDOW_START && nowMinute <= WINDOW_END && (
@@ -827,5 +975,59 @@ function EventChip({ event, myId, style }: { event: PlanEvent; myId: string; sty
       <span className="plan-event-title">{event.title}</span>
       <ResponseDot event={event} myId={myId} />
     </Link>
+  );
+}
+
+/** The society's colours as the card's hue, light and dark. */
+function otherStyle(event: OtherSocietyEvent): CSSProperties {
+  return event.colour ? ({ "--soc": event.colour, "--soc-dark": event.darkColour ?? event.colour } as CSSProperties) : {};
+}
+
+/** Another society's event: read only, in its colour, opening its own page. */
+function OtherCard({ segment }: { segment: DaySegment<OtherSocietyEvent> }) {
+  const { event } = segment;
+  const height = (segment.bottom - segment.top) * PX_PER_MINUTE;
+  const size = height < 36 ? "xs" : height < 64 ? "sm" : "md";
+  return (
+    <a
+      href={event.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="plan-event plan-other"
+      data-size={size}
+      data-stacked={segment.stacked ? "" : undefined}
+      style={{
+        ...otherStyle(event),
+        top: (segment.top - WINDOW_START) * PX_PER_MINUTE,
+        height,
+        left: `calc(${segment.left * 100}% + 2px)`,
+        width: `calc(${segment.width * 100}% - 4px)`,
+        zIndex: 2 + segment.z,
+      }}
+      aria-label={`${event.title}, ${event.society}, ${formatMinute(segment.start)}–${formatMinute(segment.end)}${event.location ? `, ${event.location}` : ""}`}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      {size === "md" && <span className="plan-event-cat">{event.society}</span>}
+      <span className="plan-event-title">{event.title}</span>
+      <span className="plan-event-time">
+        {formatMinute(segment.start)}–{formatMinute(segment.end)}
+      </span>
+      {size === "md" && event.location && <span className="plan-event-loc">{event.location}</span>}
+    </a>
+  );
+}
+
+function OtherChip({ event, style }: { event: OtherSocietyEvent; style?: CSSProperties }) {
+  return (
+    <a
+      href={event.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="plan-chip plan-other"
+      style={{ ...otherStyle(event), ...style }}
+      aria-label={`${event.title}, ${event.society}, all day`}
+    >
+      <span className="plan-event-title">{event.title}</span>
+    </a>
   );
 }

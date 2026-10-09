@@ -9,7 +9,7 @@ import { dayLabel, myResponse, responseCounts, SOURCE_LABELS, STATUS_TAG, timeRa
 import { PlanSubnav } from "@/components/plan/PlanSubnav";
 import "@/components/plan/plan.css";
 
-export const metadata: Metadata = { title: "Calendar list" };
+export const metadata: Metadata = { title: "Schedule list" };
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 

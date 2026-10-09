@@ -9,15 +9,17 @@ import { requireCapability } from "@/lib/session";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { calendarBlocksForWeek, getCalendarLinks, refreshIfStale, type CalendarLinksState } from "@/lib/calendarLinks";
 import { volsocFeedUrl } from "@/lib/calendarFeed";
-import { lastOrganiserSync, organiserFeedUrl } from "@/lib/toolboxEvents";
+import { listCommunityEvents } from "@/lib/communityEvents";
+import { DEFAULT_CALENDAR_ORGANISER_ID, DEFAULT_VOLSOC_ORGANISER_ID, lastOrganiserSync, organiserFeedUrl } from "@/lib/toolboxEvents";
+import { societyLabel } from "@/components/whatson/view";
 import { CATEGORY_LABELS, EVENT_CATEGORIES, type AvailabilityBlock, type CommitteeMember, type PlanEvent } from "@/lib/types";
 import { dayLabel, googleAddUrl, weekRange } from "@/components/plan/format";
 import { PlanSubnav } from "@/components/plan/PlanSubnav";
 import { CalendarLinks, type CalendarFeedLink } from "@/components/plan/CalendarLinks";
 import { SyncStatus } from "@/components/plan/SyncStatus";
-import { WeekPlanner } from "@/components/plan/WeekPlanner";
+import { WeekPlanner, type OtherSocietyEvent } from "@/components/plan/WeekPlanner";
 
-export const metadata: Metadata = { title: "Calendar" };
+export const metadata: Metadata = { title: "Schedule" };
 
 type SearchParams = Promise<{ [key: string]: string | string[] | undefined }>;
 
@@ -86,6 +88,42 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
       console.error("[plan] calendar links", error);
     }
     after(() => refreshIfStale(member.id));
+  }
+
+  // Other societies' events this week, from the public calendar. VolSoc's and
+  // Student Social Impact's are left out: the plan already has them.
+  let others: OtherSocietyEvent[] = [];
+  if (dbReady) {
+    try {
+      const own = new Set([
+        process.env.TOOLBOX_ORGANISER_ID || DEFAULT_VOLSOC_ORGANISER_ID,
+        process.env.CALENDAR_ORGANISER_ID || DEFAULT_CALENDAR_ORGANISER_ID,
+      ]);
+      const community = await listCommunityEvents(now);
+      const bySociety = new Map(community.societies.map((s) => [s.id, s]));
+      const from = week.start.getTime();
+      const to = week.end.getTime();
+      others = community.events
+        .filter((e) => !own.has(e.societyId) && !e.cancelled && Date.parse(e.endsAt) > from && Date.parse(e.startsAt) < to)
+        .map((e) => {
+          const society = bySociety.get(e.societyId);
+          return {
+            other: true as const,
+            id: `other-${e.id}`,
+            title: e.title,
+            startsAt: e.startsAt,
+            endsAt: e.endsAt,
+            allDay: e.allDay,
+            location: e.location,
+            url: e.url,
+            society: society ? societyLabel(society.name, society.id) : "Another society",
+            colour: society?.colour ?? null,
+            darkColour: society?.darkColour ?? null,
+          };
+        });
+    } catch (error) {
+      console.error("[plan] other societies' events", error);
+    }
   }
 
   const chip = dbReady ? syncChip(sync, today) : { label: "Not synced", tone: "neutral" as const, title: undefined };
@@ -166,6 +204,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Sea
         prevWeek={prevWeek}
         nextWeek={nextWeek}
         initialDay={initialDay}
+        others={others}
       />
 
       <footer className="plan-legend">

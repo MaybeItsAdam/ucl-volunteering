@@ -7,7 +7,7 @@ import { BookUser, CalendarRange, HeartHandshake, ListChecks, Settings, Users } 
 import { APP_PAGE_HREFS, type AppPage } from "@/lib/app-pages";
 
 export const PAGE_META: Record<AppPage, { label: string; icon: typeof Users }> = {
-  calendar: { label: "Plan", icon: CalendarRange },
+  calendar: { label: "Schedule", icon: CalendarRange },
   planner: { label: "Planner", icon: ListChecks },
   volunteers: { label: "Volunteers", icon: BookUser },
   whats_on: { label: "What's on", icon: HeartHandshake },

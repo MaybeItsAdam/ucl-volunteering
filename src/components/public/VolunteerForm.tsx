@@ -149,6 +149,16 @@ export function VolunteerForm({
           <p>Changed your mind? Fill this in again whenever you like</p>
         </div>
       )}
+      {/* Coming back: say so, and that the times can grow. */}
+      {onList && existing && status.kind !== "removed" && (
+        <div className="notice info pub-returning" role="status">
+          <strong>You&apos;re on the list</strong>
+          <p>
+            Your answers from {new Date(existing.updated_at).toLocaleDateString("en-GB", { day: "numeric", month: "long", timeZone: "Europe/London" })}{" "}
+            are below. Fill in any more times you&apos;re free, or change anything, then save
+          </p>
+        </div>
+      )}
 
       <fieldset>
         <legend className="micro-label">About you</legend>

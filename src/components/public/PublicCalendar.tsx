@@ -5,7 +5,6 @@ import {
   CalendarPlus,
   ChevronLeft,
   ChevronRight,
-  Download,
   ExternalLink,
   Link2,
   ListFilter,
@@ -21,7 +20,7 @@ import { eventDaySpan, layoutWeek, peakOverlap, PX_PER_MINUTE, WINDOW_END, WINDO
 import { groupByDay, societyLabel } from "@/components/whatson/view";
 import type { CommunityEvent, CommunitySociety } from "@/lib/communityEvents";
 import { formatMinute, londonDayKey, londonMinuteOfDay, mondayOf, shiftDayKey } from "@/lib/planTime";
-import { eventIcs, matchesQuery } from "./calendarSearch";
+import { matchesQuery } from "./calendarSearch";
 import "./calendar.css";
 
 export type CalendarView = "week" | "list";
@@ -262,18 +261,6 @@ export function PublicCalendar({
 
   // A search that finds nothing this week may find something in another.
   const elsewhere = view === "week" && weekCount === 0 ? upcoming.find((e) => londonDayKey(new Date(e.startsAt)) >= days[6]) : undefined;
-
-  function download(event: CommunityEvent) {
-    const span = eventDaySpan(event);
-    const blob = new Blob([eventIcs(event, hostOf(event), { first: span.first, afterLast: shiftDayKey(span.last, 1) })], {
-      type: "text/calendar",
-    });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${event.title.replace(/[^\w\s-]/g, "").trim().slice(0, 60) || "event"}.ics`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }
 
   async function copyLink() {
     try {
@@ -582,10 +569,6 @@ export function PublicCalendar({
                 <CalendarPlus size={16} aria-hidden="true" />
                 Google Calendar
               </a>
-              <button type="button" className="button" onClick={() => download(open)}>
-                <Download size={16} aria-hidden="true" />
-                .ics
-              </button>
               <button type="button" className="button" onClick={copyLink} aria-live="polite">
                 <Link2 size={16} aria-hidden="true" />
                 {copied ? "Copied" : "Copy link"}
