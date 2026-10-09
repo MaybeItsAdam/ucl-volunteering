@@ -3,6 +3,7 @@ import { PublicCalendar } from "@/components/public/PublicCalendar";
 import { listCommunityEvents, type CommunityEvent, type CommunitySociety } from "@/lib/communityEvents";
 import { isDayKey, isoWeekday, londonDayKey, mondayOf } from "@/lib/planTime";
 import { isSupabaseConfigured } from "@/lib/supabase";
+import { toolboxUrl } from "@/lib/toolbox";
 import "@/components/plan/plan.css";
 
 export const metadata: Metadata = {
@@ -52,6 +53,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           initialQuery={(first(params.q) ?? "").slice(0, 100)}
           initialEvent={first(params.event) ?? null}
           feedUrl={`${appUrl}/calendar.ics`}
+          toolboxCalendarUrl={`${toolboxUrl()}/calendar`}
           now={now.toISOString()}
         />
       )}

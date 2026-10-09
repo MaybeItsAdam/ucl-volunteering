@@ -36,8 +36,7 @@ export function SignInPanel({ onBack }: { onBack?: () => void }) {
       </a>
 
       <p className="uvs-signin-note">
-        Your usual UCL login, through Adam&apos;s Campus Toolbox, so we never see your password —
-        anyone can sign in, and a principal adds you to the committee
+        Your usual UCL login: anyone can sign in, and a principal adds you to the committee
       </p>
 
       {process.env.NODE_ENV === "development" && (

@@ -232,7 +232,42 @@
   .zfw-kind-hint { display: none; }
   .zfw-sheet-actions .button.primary { flex: 1; min-height: 48px; }
   .pub-form > button[type="submit"] { width: 100%; min-height: 48px; }
+  .zfw-incentives-hint { display: none; }
+  .zfw-incentives { padding: 8px 10px; }
+  /* Phones drop a page's own heading, but this one carries the logo. */
+  .pub-main .zfw-head { display: grid; }
+  .zfw-head .zfw-logo { height: 52px; }
 }
+/* Incentives: always there, from 0, in lime moss so they never read as food. */
+.zfw-incentives {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--lime-moss) 45%, transparent); border-radius: var(--radius-card);
+  background: color-mix(in srgb, var(--lime-moss) 12%, var(--raised));
+}
+.zfw-incentives-text { display: grid; gap: 1px; min-width: 0; cursor: pointer; }
+.zfw-incentives-label { font-weight: 700; font-size: 15px; color: var(--success-text); }
+.zfw-incentives-hint { font-size: 12px; color: var(--muted); }
+.zfw-stepper { display: flex; align-items: stretch; gap: 6px; flex: none; }
+.zfw-step {
+  display: grid; place-items: center; width: 44px; min-height: 44px; padding: 0;
+  border: 1px solid color-mix(in srgb, var(--lime-moss) 45%, var(--line-input)); border-radius: var(--radius-control);
+  background: var(--raised); color: var(--success-text); cursor: pointer;
+}
+.zfw-step:hover { background: color-mix(in srgb, var(--lime-moss) 10%, var(--raised)); }
+.zfw-step:disabled { opacity: .35; cursor: default; }
+.zfw-stepper input {
+  width: 64px; min-height: 44px; padding: 0 4px; text-align: center;
+  border: 1px solid color-mix(in srgb, var(--lime-moss) 45%, var(--line-input)); border-radius: var(--radius-control); background: var(--raised);
+  font-family: var(--font-display); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield;
+}
+.zfw-stepper input::-webkit-inner-spin-button, .zfw-stepper input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.zfw-stepper input:focus { outline: none; border-color: var(--lime-moss); }
+
+/* The logo beside the title. */
+.zfw-head .zfw-logo { grid-column: 2; grid-row: 1 / span 2; align-self: center; width: auto; height: 72px; }
+
 .pub-total { display: flex; align-items: baseline; gap: 12px; margin: 4px 0 0; padding-top: 12px; border-top: 1px solid var(--line-muted); }
 .pub-total .mono { font-family: var(--font-display); font-size: 28px; font-weight: 700; }
 

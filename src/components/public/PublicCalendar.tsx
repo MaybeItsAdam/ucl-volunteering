@@ -11,6 +11,7 @@ import {
   ListFilter,
   MapPin,
   Search,
+  Ticket,
   X,
 } from "lucide-react";
 import { Sheet } from "@/components/Sheet";
@@ -94,6 +95,7 @@ export function PublicCalendar({
   initialQuery,
   initialEvent,
   feedUrl,
+  toolboxCalendarUrl,
   now: serverNow,
 }: {
   societies: CommunitySociety[];
@@ -106,6 +108,8 @@ export function PublicCalendar({
   initialEvent: string | null;
   /** The whole calendar's iCal feed. */
   feedUrl: string;
+  /** Every society's events, on the Campus Toolbox. */
+  toolboxCalendarUrl: string;
   /** The server's clock, so the first render matches it. */
   now: string;
 }) {
@@ -314,6 +318,10 @@ export function PublicCalendar({
         </div>
 
         <div className="cal-tools">
+          <p className="cal-ticketed muted">
+            <Ticket size={14} aria-hidden="true" />
+            Some events may be ticketed
+          </p>
           <label className="cal-search">
             <Search size={15} aria-hidden="true" />
             <input
@@ -367,6 +375,11 @@ export function PublicCalendar({
               },
             ]}
           />
+          <a className="button small cal-toolbox" aria-label="See all on Adam's Campus Toolbox" href={toolboxCalendarUrl} target="_blank" rel="noopener noreferrer">
+            <ExternalLink size={14} aria-hidden="true" />
+            <span className="cal-toolbox-label">See all on Adam&apos;s Campus Toolbox</span>
+            <span className="cal-toolbox-short">Toolbox</span>
+          </a>
         </div>
       </div>
 
