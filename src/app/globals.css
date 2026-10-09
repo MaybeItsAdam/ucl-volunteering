@@ -646,3 +646,13 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); widt
   background: var(--paper); color: var(--ink);
   font-family: var(--font-display); font-size: 20px;
 }
+
+/* Phones run edge to edge: no title bar or large title over the portal (the
+   tab bar says where you are, and the theme lives in Settings), tighter
+   margins, and a slimmer tab bar. */
+@media (max-width: 768px) {
+  .app-titlebar, .app-page-head, .app-title-sentinel { display: none; }
+  .app-main { padding: calc(12px + var(--safe-top)) max(12px, var(--safe-right)) 24px max(12px, var(--safe-left)); }
+  .app-shell.has-tabs .app-main { padding-bottom: calc(76px + var(--safe-bottom)); }
+  .app-main .page { gap: 12px; grid-template-columns: minmax(0, 1fr); }
+}

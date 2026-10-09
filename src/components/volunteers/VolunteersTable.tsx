@@ -1,16 +1,20 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Copy, Download, Trash2 } from "lucide-react";
+import { Check, Copy, Download, Trash2, X } from "lucide-react";
+import { formatMinute } from "@/lib/planTime";
 import {
   COMMITMENTS,
+  freeSummary,
   INTERESTS,
+  isFreeAt,
   labelOf,
   PERIODS,
-  SLOTS,
-  slotLabel,
+  untilLabel,
+  weekdayShort,
   type Volunteer,
 } from "@/lib/volunteers";
+import { FreeTimeHeatmap, type FreeAt } from "./FreeTimeHeatmap";
 import "./volunteers.css";
 
 const ANY = "";
@@ -21,15 +25,15 @@ function csvCell(value: string): string {
 }
 
 function toCsv(rows: Volunteer[]): string {
-  const head = ["Name", "Email", "Course and year", "How often", "When in the year", "Free in the week", "Interests", "Notes", "Signed up"];
+  const head = ["Name", "Email", "Course and year", "How often", "Around until", "Free in the week", "Interests", "Notes", "Signed up"];
   const lines = rows.map((v) =>
     [
       v.name,
       v.email,
       v.study ?? "",
       labelOf(COMMITMENTS, v.commitment),
-      v.periods.map((p) => labelOf(PERIODS, p)).join("; "),
-      v.slots.map(slotLabel).join("; "),
+      untilText(v),
+      freeSummary(v.free_times).join("; "),
       v.interests.map((i) => labelOf(INTERESTS, i)).join("; "),
       v.notes ?? "",
       v.created_at.slice(0, 10),
@@ -40,32 +44,42 @@ function toCsv(rows: Volunteer[]): string {
   return [head.join(","), ...lines].join("\n");
 }
 
+/** The date they're around until, or the terms they ticked before there was one. */
+function untilText(v: Volunteer): string {
+  if (v.available_until) return untilLabel(v.available_until);
+  return v.periods.map((p) => labelOf(PERIODS, p)).join(", ");
+}
+
 /**
- * The register, filtered down to who fits: how often (at least), when in the
- * year, a time in the week, an interest, or a name. Copy emails and the CSV
+ * The register, filtered down to who fits: how often (at least), still around
+ * on a date, free at a half-hour picked on the heatmap, an interest, or a name. Copy emails and the CSV
  * take whoever the filters leave.
  */
 export function VolunteersTable({ initial }: { initial: Volunteer[] }) {
   const [volunteers, setVolunteers] = useState(initial);
   const [query, setQuery] = useState("");
   const [minCommitment, setMinCommitment] = useState(ANY);
-  const [period, setPeriod] = useState(ANY);
-  const [slot, setSlot] = useState(ANY);
+  const [onDate, setOnDate] = useState(ANY);
+  const [freeAt, setFreeAt] = useState<FreeAt | null>(null);
   const [interest, setInterest] = useState(ANY);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const shown = useMemo(() => {
+  // Everything but the half-hour: what the heatmap counts, so picking a time doesn't redraw it.
+  const matching = useMemo(() => {
     const q = query.trim().toLowerCase();
     return volunteers.filter(
       (v) =>
         (!q || `${v.name} ${v.email} ${v.study ?? ""} ${v.notes ?? ""}`.toLowerCase().includes(q)) &&
         (!minCommitment || commitmentRank(v.commitment) >= commitmentRank(minCommitment)) &&
-        (!period || v.periods.includes(period)) &&
-        (!slot || v.slots.includes(slot)) &&
+        (!onDate || !v.available_until || v.available_until >= onDate) &&
         (!interest || v.interests.includes(interest)),
     );
-  }, [volunteers, query, minCommitment, period, slot, interest]);
+  }, [volunteers, query, minCommitment, onDate, interest]);
+  const shown = useMemo(
+    () => (freeAt ? matching.filter((v) => isFreeAt(v.free_times, freeAt.weekday, freeAt.minute)) : matching),
+    [matching, freeAt],
+  );
 
   async function copyEmails() {
     try {
@@ -121,22 +135,14 @@ export function VolunteersTable({ initial }: { initial: Volunteer[] }) {
             </option>
           ))}
         </select>
-        <select className="input" aria-label="When in the year" value={period} onChange={(e) => setPeriod(e.target.value)}>
-          <option value={ANY}>Any time of year</option>
-          {PERIODS.map((p) => (
-            <option key={p.key} value={p.key}>
-              {p.label}
-            </option>
-          ))}
-        </select>
-        <select className="input" aria-label="Free in the week" value={slot} onChange={(e) => setSlot(e.target.value)}>
-          <option value={ANY}>Any day or time</option>
-          {SLOTS.map((s) => (
-            <option key={s} value={s}>
-              {slotLabel(s)}
-            </option>
-          ))}
-        </select>
+        <input
+          className="input"
+          type="date"
+          aria-label="Still around on"
+          title="Still around on"
+          value={onDate}
+          onChange={(e) => setOnDate(e.target.value)}
+        />
         <select className="input" aria-label="Interest" value={interest} onChange={(e) => setInterest(e.target.value)}>
           <option value={ANY}>Any interest</option>
           {INTERESTS.map((i) => (
@@ -147,9 +153,19 @@ export function VolunteersTable({ initial }: { initial: Volunteer[] }) {
         </select>
       </div>
 
+      <FreeTimeHeatmap volunteers={matching} selected={freeAt} onSelect={setFreeAt} />
+
       <div className="vol-toolbar">
-        <span className="micro-label">
-          {shown.length} of {volunteers.length}
+        <span className="vol-count">
+          <span className="micro-label">
+            {shown.length} of {volunteers.length}
+          </span>
+          {freeAt && (
+            <button type="button" className="tag vol-free-at" onClick={() => setFreeAt(null)}>
+              Free {weekdayShort(freeAt.weekday)} {formatMinute(freeAt.minute)}
+              <X size={12} aria-label="Clear" />
+            </button>
+          )}
         </span>
         <div className="vol-actions">
           <button type="button" className="button small" onClick={copyEmails} disabled={!shown.length}>
@@ -195,8 +211,14 @@ export function VolunteersTable({ initial }: { initial: Volunteer[] }) {
                 </td>
                 <td>{labelOf(COMMITMENTS, v.commitment)}</td>
                 <td className="small">
-                  {v.periods.length ? v.periods.map((p) => labelOf(PERIODS, p)).join(", ") : <span className="dim">—</span>}
-                  {v.slots.length > 0 && <div className="muted">{v.slots.map(slotLabel).join(", ")}</div>}
+                  {v.available_until ? `Until ${untilLabel(v.available_until)}` : untilText(v) || <span className="dim">No end date</span>}
+                  {v.free_times.length > 0 && (
+                    <ul className="vol-free muted">
+                      {freeSummary(v.free_times).map((line) => (
+                        <li key={line}>{line}</li>
+                      ))}
+                    </ul>
+                  )}
                 </td>
                 <td>
                   <div className="vol-tags">
