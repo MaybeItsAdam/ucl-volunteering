@@ -7,6 +7,7 @@ import {
   COMMITMENTS,
   freeSummary,
   INTERESTS,
+  RETIRED_INTERESTS,
   isFreeAt,
   labelOf,
   PERIODS,
@@ -34,7 +35,7 @@ function toCsv(rows: Volunteer[]): string {
       labelOf(COMMITMENTS, v.commitment),
       untilText(v),
       freeSummary(v.free_times).join("; "),
-      v.interests.map((i) => labelOf(INTERESTS, i)).join("; "),
+      v.interests.map((i) => labelOf([...INTERESTS, ...RETIRED_INTERESTS], i)).join("; "),
       v.notes ?? "",
       v.created_at.slice(0, 10),
     ]
@@ -224,7 +225,7 @@ export function VolunteersTable({ initial }: { initial: Volunteer[] }) {
                   <div className="vol-tags">
                     {v.interests.map((i) => (
                       <span key={i} className="tag">
-                        {labelOf(INTERESTS, i)}
+                        {labelOf([...INTERESTS, ...RETIRED_INTERESTS], i)}
                       </span>
                     ))}
                   </div>

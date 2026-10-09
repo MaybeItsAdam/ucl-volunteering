@@ -182,8 +182,8 @@ export function VolunteerForm({
       <label className="pub-choice pub-consent">
         <input type="checkbox" required checked={consent} onChange={(e) => setConsent(e.target.checked)} />
         <span>
-          VolSoc&apos;s committee can keep these details and email me about Volunteering. I can ask to be removed at any
-          time
+          I give VolSoc permission to keep these details and contact me with Volunteering opportunities until I
+          unsubscribe
         </span>
       </label>
 

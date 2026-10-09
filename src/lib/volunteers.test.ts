@@ -6,13 +6,13 @@ const base = { commitment: "monthly", consent: true };
 
 describe("volunteer sign-ups", () => {
   it("cleans a sign-up, keeping known interests once each in order", () => {
-    const parsed = parseVolunteer({ ...base, interests: ["food", 7, "food", "nonsense"], notes: "  " }, TODAY);
+    const parsed = parseVolunteer({ ...base, interests: ["medical", 7, "medical", "food", "nonsense"], notes: "  " }, TODAY);
     expect(parsed.value).toEqual({
       study: null,
       commitment: "monthly",
       free_times: [],
       available_until: null,
-      interests: ["food"],
+      interests: ["medical"],
       notes: null,
     });
   });
