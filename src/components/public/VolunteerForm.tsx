@@ -1,6 +1,19 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, type CSSProperties, type FormEvent } from "react";
+import {
+  Check,
+  Coffee,
+  Globe,
+  GraduationCap,
+  House,
+  Palette,
+  PawPrint,
+  Sprout,
+  Stethoscope,
+  ToyBrick,
+  type LucideIcon,
+} from "lucide-react";
 import { londonDayKey } from "@/lib/planTime";
 import { COMMITMENTS, INTERESTS, type FreeBlock, type Volunteer } from "@/lib/volunteers";
 import { FreeTimeGrid } from "./FreeTimeGrid";
@@ -16,24 +29,41 @@ function toggle(list: string[], key: string): string[] {
   return list.includes(key) ? list.filter((k) => k !== key) : [...list, key];
 }
 
-/** Ticks for a list of options, laid out as a wrapping grid of checkboxes. */
-function Choices({
-  options,
-  value,
-  onChange,
-}: {
-  options: readonly { key: string; label: string }[];
-  value: string[];
-  onChange: (next: string[]) => void;
-}) {
+/** Each interest's icon and hue, from the VolSoc palette, and the colour that reads on that hue. */
+const INTEREST_LOOK: Record<string, { icon: LucideIcon; colour: string; on: string }> = {
+  homelessness: { icon: House, colour: "var(--tomato)", on: "var(--prussian-blue)" },
+  environment: { icon: Sprout, colour: "var(--lime-moss)", on: "var(--prussian-blue)" },
+  education: { icon: GraduationCap, colour: "var(--golden-pollen)", on: "var(--prussian-blue)" },
+  children: { icon: ToyBrick, colour: "var(--baby-pink)", on: "var(--prussian-blue)" },
+  elderly: { icon: Coffee, colour: "var(--lavender-purple)", on: "#fff" },
+  refugees: { icon: Globe, colour: "var(--strong-cyan)", on: "var(--prussian-blue)" },
+  medical: { icon: Stethoscope, colour: "var(--brick-red)", on: "#fff" },
+  animals: { icon: PawPrint, colour: "color-mix(in srgb, var(--golden-pollen) 45%, var(--tomato))", on: "var(--prussian-blue)" },
+  creative: { icon: Palette, colour: "color-mix(in srgb, var(--strong-cyan) 55%, var(--prussian-blue))", on: "#fff" },
+};
+
+/**
+ * The interests as coloured tiles, each with its icon, that fill in when
+ * picked. Real checkboxes underneath, so the keyboard and screen readers
+ * work as for any other.
+ */
+function InterestTiles({ value, onChange }: { value: string[]; onChange: (next: string[]) => void }) {
   return (
-    <div className="pub-choices">
-      {options.map((o) => (
-        <label key={o.key} className="pub-choice">
-          <input type="checkbox" checked={value.includes(o.key)} onChange={() => onChange(toggle(value, o.key))} />
-          <span>{o.label}</span>
-        </label>
-      ))}
+    <div className="pub-interests">
+      {INTERESTS.map((o) => {
+        const look = INTEREST_LOOK[o.key];
+        const Icon = look?.icon ?? Check;
+        return (
+          <label key={o.key} className="pub-interest" style={{ "--hue": look?.colour ?? "var(--primary)", "--on-hue": look?.on ?? "#fff" } as CSSProperties}>
+            <input type="checkbox" checked={value.includes(o.key)} onChange={() => onChange(toggle(value, o.key))} />
+            <span className="pub-interest-icon" aria-hidden="true">
+              <Icon size={18} />
+            </span>
+            <span className="pub-interest-label">{o.label}</span>
+            <Check className="pub-interest-tick" size={16} aria-hidden="true" />
+          </label>
+        );
+      })}
     </div>
   );
 }
@@ -165,7 +195,7 @@ export function VolunteerForm({
 
       <fieldset>
         <legend className="micro-label">What would you like to do?</legend>
-        <Choices options={INTERESTS} value={interests} onChange={setInterests} />
+        <InterestTiles value={interests} onChange={setInterests} />
       </fieldset>
 
       <div className="field">

@@ -33,6 +33,7 @@ export const INTERESTS = [
   { key: "homelessness", label: "Homelessness and outreach" },
   { key: "environment", label: "Environment and gardening" },
   { key: "education", label: "Tutoring and mentoring" },
+  { key: "children", label: "Working with children" },
   { key: "elderly", label: "Befriending older people" },
   { key: "refugees", label: "Refugees and asylum seekers" },
   { key: "medical", label: "Helping in a hospital or medical setting" },
