@@ -13,7 +13,8 @@
  * is the belt to these braces, for DNS surprises.
  *
  * Link formats (checked October 2026):
- *  - UCL: the timetable's Subscribe button, `webcal://www.ucl.ac.uk/timetable/ics/<token>`.
+ *  - UCL: the timetable's Subscribe button, `webcal://www.ucl.ac.uk/timetable/ics/<token>`,
+ *    or the newer `https://timetable.apps.ucl.ac.uk/icalendar/<key>`.
  *  - Google: Settings → the calendar → Integrate calendar → "Secret address in
  *    iCal format", `https://calendar.google.com/calendar/ical/<id>/private-<hex>/basic.ics`
  *    (or `/public/basic.ics` for a public calendar).
@@ -148,7 +149,7 @@ export function isCalendarKind(value: unknown): value is CalendarKind {
 }
 
 /** Hosts a pasted UCL link may name. Path rules are in `normaliseTimetableUrl`. */
-export const ALLOWED_FEED_HOSTS = ["www.ucl.ac.uk", "timetable.ucl.ac.uk"] as const;
+export const ALLOWED_FEED_HOSTS = ["www.ucl.ac.uk", "timetable.ucl.ac.uk", "timetable.apps.ucl.ac.uk"] as const;
 
 const MAX_URL_LENGTH = 500;
 
@@ -211,7 +212,7 @@ function hasEncodedTraversal(path: string): boolean {
   return /%2e|%2f|%5c|\\/i.test(path);
 }
 
-const UCL_HOSTS = new Set(["www.ucl.ac.uk", "ucl.ac.uk", "timetable.ucl.ac.uk"]);
+const UCL_HOSTS = new Set(["www.ucl.ac.uk", "ucl.ac.uk", "timetable.ucl.ac.uk", "timetable.apps.ucl.ac.uk"]);
 const GOOGLE_HOSTS = new Set(["calendar.google.com", "www.google.com", "google.com"]);
 const OUTLOOK_HOSTS = new Set(["outlook.office365.com", "outlook.live.com"]);
 /** Outlook may also answer from here; it is allowed for redirects only, never pasted. */
@@ -231,8 +232,9 @@ export function providerForHost(host: string): CalendarKind | null {
 /**
  * A UCL timetable link → the canonical https URL, or what is wrong. Rules
  * unchanged from the timetable-only version: `ucl.ac.uk` gains its `www`, the
- * path must be `/timetable/ics/<token>` there, or name an ics endpoint on
- * timetable.ucl.ac.uk.
+ * path must be `/timetable/ics/<token>` there, `/icalendar/<key>` on
+ * timetable.apps.ucl.ac.uk (the newer Subscribe link, which redirects to
+ * timetable.mesh.ucl.ac.uk), or name an ics endpoint on timetable.ucl.ac.uk.
  */
 export function normaliseTimetableUrl(raw: string): NormalisedUrl {
   const parsed = parseLink(raw, "Paste your timetable's Subscribe link");
@@ -253,6 +255,10 @@ export function normaliseTimetableUrl(raw: string): NormalisedUrl {
     if (/^\/timetable\/ics\/[A-Za-z0-9_-]{6,}\/?$/.test(url.pathname)) return { ok: true, url: url.toString() };
     if (url.pathname.startsWith("/timetable")) return { ok: false, error: PAGE_NOT_LINK_ERROR };
     return { ok: false, error: NOT_UCL_ERROR };
+  }
+  if (host === "timetable.apps.ucl.ac.uk") {
+    if (/^\/icalendar\/[A-Za-z0-9_-]{6,}\/?$/.test(url.pathname)) return { ok: true, url: url.toString() };
+    return { ok: false, error: PAGE_NOT_LINK_ERROR };
   }
   if (host === "timetable.ucl.ac.uk") {
     // The feed path on this host is not documented; anything that names an

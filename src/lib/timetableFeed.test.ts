@@ -102,6 +102,15 @@ describe("normaliseTimetableUrl", () => {
     }
   });
 
+  it("accepts the newer timetable.apps.ucl.ac.uk Subscribe link", () => {
+    expect(normaliseTimetableUrl("webcal://timetable.apps.ucl.ac.uk/icalendar/2F164FABDDE52DD")).toEqual({
+      ok: true,
+      url: "https://timetable.apps.ucl.ac.uk/icalendar/2F164FABDDE52DD",
+    });
+    expect(normaliseTimetableUrl("https://timetable.apps.ucl.ac.uk/").ok).toBe(false);
+    expect(normaliseTimetableUrl("https://timetable.apps.ucl.ac.uk/icalendar/").ok).toBe(false);
+  });
+
   it("names the timetable page as the wrong thing to paste", () => {
     for (const raw of [
       "https://timetable.ucl.ac.uk/tt/homePage.do",
