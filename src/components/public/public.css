@@ -226,6 +226,28 @@
 .zfw-add:hover { background: color-mix(in srgb, var(--primary) 12%, transparent); }
 
 /* The add sheet. */
+/* Totals under the form: one big number, four facts, then each kind as a bar. */
+.zfw-totals { display: grid; gap: 14px; padding-top: 20px; border-top: 1px solid var(--line); }
+.zfw-totals h2 { margin: 0; }
+.zfw-totals-items { display: flex; align-items: baseline; gap: 10px; margin: 0; }
+.zfw-totals-big { font-family: var(--font-display); font-size: 44px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.zfw-totals-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--raised); }
+.zfw-totals-facts > div { display: grid; gap: 4px; padding: 10px 12px; min-width: 0; }
+.zfw-totals-facts > div + div { border-left: 1px solid var(--line-muted); }
+.zfw-totals-facts dd { margin: 0; font-family: var(--font-display); font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.zfw-totals-kinds { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.zfw-totals-kinds li { display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr) 3.5rem; align-items: center; gap: 10px; font-size: 14px; }
+.zfw-totals-kind { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.zfw-totals-bar { height: 8px; border-radius: 2px; background: var(--well); overflow: hidden; }
+.zfw-totals-bar > span { display: block; height: 100%; background: var(--primary); }
+.zfw-totals-n { text-align: right; font-weight: 700; }
+@media (max-width: 768px) {
+  .zfw-totals-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .zfw-totals-facts > div:nth-child(3) { border-left: 0; }
+  .zfw-totals-facts > div:nth-child(n + 3) { border-top: 1px solid var(--line-muted); }
+  .zfw-totals-kinds li { grid-template-columns: minmax(0, 10.5rem) minmax(0, 1fr) 2.75rem; gap: 8px; }
+}
+
 .zfw-sheet { display: grid; gap: 18px; padding: 4px 2px 2px; }
 .zfw-sheet h2 { font-size: 20px; }
 .zfw-sheet fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }

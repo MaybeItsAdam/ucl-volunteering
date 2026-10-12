@@ -126,3 +126,38 @@ export function toZfwRow(entry: ZfwEntry): ZfwRow {
   values.Incentives = entry.incentives ?? "";
   return { date: entry.date, values };
 }
+
+/** Everything logged so far, summed by the Apps Script over the whole sheet. */
+export interface ZfwStats {
+  items: number;
+  /** Rows: one outlet on one shift. */
+  collections: number;
+  /** Days with at least one collection. */
+  shifts: number;
+  outlets: number;
+  incentives: number;
+  /** The first day logged, YYYY-MM-DD, or null on an empty sheet. */
+  since: string | null;
+  counts: Record<CountKey, number>;
+}
+
+const tally = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) : 0);
+
+/** The script's stats, checked: anything missing or odd counts as nothing. Null if it isn't stats at all. */
+export function parseZfwStats(body: unknown): ZfwStats | null {
+  const b = (body && typeof body === "object" ? body : null) as Record<string, unknown> | null;
+  const raw = (b?.stats && typeof b.stats === "object" ? b.stats : null) as Record<string, unknown> | null;
+  if (!b?.ok || !raw) return null;
+  const byHeader = (raw.counts && typeof raw.counts === "object" ? raw.counts : {}) as Record<string, unknown>;
+  const counts = {} as Record<CountKey, number>;
+  for (const { key, header } of COUNTS) counts[key] = tally(byHeader[header]);
+  return {
+    items: tally(raw.items),
+    collections: tally(raw.collections),
+    shifts: tally(raw.shifts),
+    outlets: tally(raw.outlets),
+    incentives: tally(raw.incentives),
+    since: typeof raw.since === "string" && isDayKey(raw.since) ? raw.since : null,
+    counts,
+  };
+}

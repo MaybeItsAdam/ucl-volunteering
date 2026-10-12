@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { readJson } from "@/app/api/plan/http";
 import { londonDayKey } from "@/lib/planTime";
-import { parseZfwEntry, toZfwRow } from "@/lib/zeroFoodWaste";
+import { parseZfwEntry, parseZfwStats, toZfwRow } from "@/lib/zeroFoodWaste";
 
 /**
  * A shift from /zero-food-waste, passed to the Apps Script that appends it to
@@ -37,4 +37,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "The sheet didn't save that — try again in a minute" }, { status: 502 });
   }
   return NextResponse.json({ ok: true, total: parsed.value.total });
+}
+
+/**
+ * Everything logged so far → `{ stats }`, for the totals under the form. The
+ * script reads the whole sheet, so the CDN keeps an answer for five minutes.
+ * `?fresh` (sent after logging a shift) skips it.
+ */
+export async function GET(request: Request) {
+  const url = process.env.ZFW_SHEET_WEBHOOK_URL;
+  const secret = process.env.ZFW_SHEET_SECRET;
+  if (!url || !secret) return NextResponse.json({ error: "The log isn't connected to the sheet yet" }, { status: 503 });
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ secret, action: "stats" }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+    const stats = parseZfwStats(await res.json().catch(() => null));
+    if (!res.ok || !stats) throw new Error(`HTTP ${res.status}`);
+    const fresh = new URL(request.url).searchParams.has("fresh");
+    return NextResponse.json(
+      { stats },
+      { headers: { "Cache-Control": fresh ? "no-store" : "public, s-maxage=300, stale-while-revalidate=3600" } },
+    );
+  } catch (e) {
+    console.error(`[zero-food-waste] couldn't read the totals: ${e instanceof Error ? e.message : e}`);
+    return NextResponse.json({ error: "The totals aren't available right now" }, { status: 502 });
+  }
 }
