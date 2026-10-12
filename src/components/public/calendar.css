@@ -233,53 +233,102 @@
 .cal-sheet .details a { display: inline-flex; align-items: center; gap: 4px; }
 .cal-sheet-about { margin: 0; white-space: pre-line; overflow-wrap: anywhere; font-size: 14px; line-height: 1.5; max-height: 12lh; overflow-y: auto; }
 .cal-sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+.cal-sheet-ticketed { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
 
-/* ── Phones ─────────────────────────────────────────────────────────────── */
+/* The phone's day column and its bits of bar: phones only. */
+.cal-phone, .cal-phone-only, .cal-totop { display: none; }
+
+/* ── Phones ─────────────────────────────────────────────────────────────
+
+   One column of days, as on Adam's Campus Toolbox: the page itself scrolls,
+   the bar sticks to the top (under the status bar, which it paints behind),
+   and each day's band sticks under the bar while its day is on screen. The
+   column runs edge to edge between the bar and the tab bar. */
 
 @media (max-width: 768px) {
-  /* A busy day is most of the screen; swipe for the next. */
   .cal {
     --cal-gutter: 44px;
-    --cal-min: calc(100vw - 2 * max(16px, var(--safe-left)) - var(--cal-gutter) - 46px);
-    --cal-empty: 40px;
-  }
-  /* Scrolled to the top of the page's content, the grid fills the screen
-     between the top bar and the tab bar. */
-  /* Edge to edge, down to the tab bar: two rows of bar above it. */
-  .cal { gap: 8px; }
-  .cal-scroller {
-    scroll-snap-type: x mandatory;
-    height: calc(100dvh - var(--safe-top) - 8px - 40px - 8px - 36px - 6px - 16px - 8px - 64px - var(--safe-bottom));
-    min-height: 320px;
+    /* The bar's own height, under the status bar. Day bands stick below it. */
+    --cal-bar-h: 52px;
+    gap: 0;
+    /* Edge to edge: out over the page's side padding. */
     margin: 0 calc(-1 * max(12px, var(--safe-right))) 0 calc(-1 * max(12px, var(--safe-left)));
-    border-radius: 0; border-left: 0; border-right: 0; border-bottom: 0;
   }
-  .cal-agenda {
-    margin: 0 calc(-1 * max(12px, var(--safe-right))) 0 calc(-1 * max(12px, var(--safe-left)));
-    border-radius: 0; border-left: 0; border-right: 0;
+
+  .cal-scroller, .cal-wide-only, .cal-weeknav, .cal-ticketed, .cal-toolbox { display: none; }
+  .cal-phone-only { display: inline; }
+  .cal-totop { display: inline-flex; gap: 4px; }
+
+  .cal-bar {
+    position: sticky; top: 0; z-index: 30;
+    display: block;
+    padding: var(--safe-top) max(12px, var(--safe-right)) 0 max(12px, var(--safe-left));
+    background: var(--raised); border-bottom: 1px solid var(--line);
   }
+  .cal-tools { height: var(--cal-bar-h); gap: 6px; flex-wrap: nowrap; }
+  .cal-tools > * { flex-shrink: 0; }
+  .cal-search { flex: 1 1 auto; flex-shrink: 1; width: auto; min-width: 0; min-height: 38px; }
+  /* 16px or iOS zooms in on focus and never zooms back out. */
+  .cal-search input { width: 0; font-size: 16px; }
+  .cal-filter, .cal-tools > .button.small, .cal-tools .calendar-links-open { min-height: 38px; min-width: 38px; padding: 0 9px; justify-content: center; }
+  .cal-filter-label, .cal-tools .calendar-links-label { display: none; }
+  .cal-views { flex-wrap: nowrap; flex: none; }
+  .cal-views button { min-height: 32px; padding: 0 10px; }
+  /* Every control a full 44px target, without drawing it any bigger. */
+  .cal-tools :is(button, a, label) { position: relative; }
+  .cal-tools :is(.button, .icon-button, .cal-views button)::after { content: ""; position: absolute; inset: -3px; }
+
+  /* The column */
+  .cal-phone { display: block; }
+  .cal-phone-empty { margin: 0; padding: 14px max(12px, var(--safe-left)); border-bottom: 1px solid var(--line); text-align: center; }
+  .cal-phone-day, .cal-phone-quiet { scroll-margin-top: calc(var(--safe-top) + var(--cal-bar-h)); }
+  .cal-phone-day { border-bottom: 1px solid var(--line); background: var(--raised); }
+  .cal-phone-head {
+    position: sticky; top: calc(var(--safe-top) + var(--cal-bar-h)); z-index: 20;
+    display: flex; align-items: baseline; gap: 8px;
+    min-height: 38px; padding: 8px max(12px, var(--safe-right)) 7px max(12px, var(--safe-left));
+    background: var(--alt); border-bottom: 1px solid var(--line-muted);
+  }
+  .cal-phone-head .micro-label { min-width: 30px; }
+  .cal-phone-date { font-family: var(--font-display); font-size: 17px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .cal-phone-today { align-self: center; }
+  .cal-phone-count { margin-left: auto; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .cal-phone-day[data-today] .cal-phone-head .micro-label, .cal-phone-day[data-today] .cal-phone-date { color: var(--info-text); }
+
+  .cal-phone-allday { display: grid; gap: 4px; padding: 6px max(12px, var(--safe-right)) 6px calc(var(--cal-gutter) + max(0px, var(--safe-left))); }
+  .cal-phone-allday .cal-chipevent { margin: 0; min-height: 30px; font-size: 13px; }
+  .cal-phone-allday + .cal-phone-grid { border-top: 1px solid var(--line-muted); }
+
+  .cal-phone-grid {
+    display: grid; grid-template-columns: calc(var(--cal-gutter) + var(--safe-left)) minmax(0, 1fr);
+    padding-right: max(4px, var(--safe-right));
+    box-sizing: content-box; padding-block: 8px;
+  }
+  .cal-phone-hours { position: relative; }
+  .cal-phone-hours .cal-hour:first-child { transform: translateY(-50%); top: 0 !important; }
+  .cal-phone-col { position: relative; border-left: 1px solid var(--line-muted); }
+  .cal-phone-day[data-today] .cal-phone-col { background: color-mix(in srgb, var(--primary) 4%, transparent); }
+
+  .cal-phone-quiet {
+    display: flex; align-items: baseline; gap: 10px;
+    min-height: 36px; padding: 9px max(12px, var(--safe-right)) 8px max(12px, var(--safe-left));
+    border-bottom: 1px solid var(--line); background: var(--alt);
+    font-size: 13px;
+  }
+  .cal-phone-quiet-days { font-weight: 700; }
+  .cal-phone-quiet .muted { margin-left: auto; font-size: 12px; }
+
+  .cal-phone-foot { display: grid; justify-items: center; gap: 10px; padding: 18px max(12px, var(--safe-left)) 8px; }
+  .cal-phone-foot p { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+
+  .cal-event-title { font-size: 13px; }
+
+  /* The list, edge to edge under the same bar. */
+  .cal-agenda { border-radius: 0; border-left: 0; border-right: 0; border-top: 0; }
+  .cal-agenda-head { top: calc(var(--safe-top) + var(--cal-bar-h)); padding: 8px 12px; }
   .cal-agenda-row { grid-template-columns: 84px 10px minmax(0, 1fr); gap: 10px; padding: 10px 12px; }
-  .cal-agenda-head { padding: 8px 12px; }
   .cal-agenda-time { font-size: 12px; }
 
-  .cal-bar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
-  .cal-weeknav { gap: 4px; }
-  .cal-weeknav .icon-button { width: 40px; height: 40px; flex: none; }
-  .cal-range { flex: 1; min-width: 0; font-size: 19px; overflow: hidden; text-overflow: ellipsis; }
-  .cal-today { flex: none; min-height: 34px; }
-  .cal-tools { gap: 6px; flex-wrap: wrap; }
-  /* The ticket note runs along under the tools. */
-  .cal-ticketed { order: 1; flex-basis: 100%; font-size: 12px; }
-  .cal-search { flex: 1; width: auto; min-width: 0; min-height: 36px; }
-  .cal-search input { width: 0; }
-  .cal-search input { font-size: 16px; }
-  .cal-filter, .cal-tools > .button.small { min-height: 36px; padding: 0 9px; }
-  .cal-filter-label, .cal-tools .calendar-links-label, .cal-toolbox-short { display: none; }
-  .cal-views { flex-wrap: nowrap; flex: none; }
-  .cal-views button { min-height: 30px; padding: 0 9px; }
-  .cal-tools > * { flex-shrink: 0; }
-  .cal-tools > .cal-search { flex-shrink: 1; }
-  .cal-event-title { font-size: 13px; }
   .cal-sheet-actions .button { flex: 1 1 0; min-height: 44px; padding: 0 8px; white-space: nowrap; }
   .cal-sheet-actions .button.primary { flex-basis: 100%; }
 }

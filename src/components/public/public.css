@@ -317,7 +317,8 @@
 .pub-main:has(> .cal-page) { padding-top: 12px; padding-bottom: 12px; }
 .pub-main > .cal-page { max-width: none; }
 @media (max-width: 768px) {
-  .pub-main:has(> .cal-page) { padding-top: calc(8px + var(--safe-top)); padding-bottom: calc(64px + var(--safe-bottom)); }
+  /* Nothing above the calendar's bar, which carries the status bar inset itself. */
+  .pub-main:has(> .cal-page) { padding-top: 0; padding-bottom: calc(64px + var(--safe-bottom)); }
 }
 .segmented a {
   display: inline-flex; align-items: center; min-height: 34px; padding: 0 14px;

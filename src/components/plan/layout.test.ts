@@ -3,6 +3,7 @@ import { londonDateAt, londonWeek } from "@/lib/planTime";
 import type { PlanEvent } from "@/lib/types";
 import {
   clampToWindow,
+  dayWindow,
   peakOverlap,
   dragStartMinute,
   eventDaySpan,
@@ -235,5 +236,26 @@ describe("peakOverlap", () => {
     expect(peakOverlap([])).toBe(0);
     expect(peakOverlap([{ top: 600, bottom: 660 }, { top: 660, bottom: 720 }])).toBe(1);
     expect(peakOverlap([{ top: 600, bottom: 720 }, { top: 630, bottom: 700 }, { top: 640, bottom: 650 }, { top: 710, bottom: 800 }])).toBe(3);
+  });
+});
+
+describe("dayWindow", () => {
+  it("is two hours from ten when there's nothing to show", () => {
+    expect(dayWindow([])).toEqual({ start: 10 * 60, end: 12 * 60 });
+  });
+  it("is whole hours round what's on", () => {
+    expect(dayWindow([{ top: 9 * 60 + 15, bottom: 19 * 60 + 10 }])).toEqual({ start: 9 * 60, end: 20 * 60 });
+  });
+  it("keeps now in view", () => {
+    expect(dayWindow([{ top: 18 * 60, bottom: 19 * 60 + 30 }], [14 * 60 + 30])).toEqual({ start: 14 * 60, end: 20 * 60 });
+  });
+  it("is at least two hours tall", () => {
+    expect(dayWindow([{ top: 18 * 60, bottom: 18 * 60 + 30 }])).toEqual({ start: 18 * 60, end: 20 * 60 });
+  });
+  it("grows upwards at the end of the window", () => {
+    expect(dayWindow([{ top: WINDOW_END - 30, bottom: WINDOW_END }])).toEqual({ start: WINDOW_END - 120, end: WINDOW_END });
+  });
+  it("stays inside the grid's window", () => {
+    expect(dayWindow([{ top: WINDOW_START, bottom: WINDOW_END }])).toEqual({ start: WINDOW_START, end: WINDOW_END });
   });
 });

@@ -67,7 +67,10 @@
 
 /* ── Overlay legend + toolbar ───────────────────────────────────────────── */
 
-.plan-planner { display: grid; gap: 12px; }
+.plan-planner { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+.plan-planner > * { grid-column: 1 / -1; }
+.plan-planner > .plan-controls { grid-column: 1; }
+.plan-planner > .plan-toolbar { grid-column: 2; grid-row: 1; align-self: start; }
 .plan-overlay-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
 .plan-overlay-members { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .plan-member-toggle {
@@ -196,6 +199,20 @@
   color: color-mix(in srgb, var(--hue, var(--muted)) 70%, var(--ink));
 }
 
+/* Everyone's availability at once: a shade down the column's right edge,
+   deeper the more of the committee is busy, with who (or how many). */
+.plan-busy {
+  position: absolute; left: 0; right: 0; z-index: 1; pointer-events: none;
+  border-right: 3px solid color-mix(in srgb, var(--danger) calc(25% + var(--busy) * 55%), transparent);
+  background: color-mix(in srgb, var(--danger) calc(var(--busy) * 16%), transparent);
+}
+.plan-busy-label {
+  position: absolute; right: 6px; top: 2px; max-width: calc(100% - 10px);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--danger-text);
+}
+
 /* Event cards */
 .plan-event {
   position: absolute; z-index: 2; overflow: hidden;
@@ -286,40 +303,75 @@
 
 /* ── Mobile: one day at a time ──────────────────────────────────────────── */
 
+/* Phones: the week bar in one row, its arrows close together. */
 @media (max-width: 719px) {
-  .plan-page { --plan-gutter: 52px; }
-  /* Planned and New event share a row, the availability scrolls under them,
-     then the days; the week's arrows in the bar do what the day stepper did. */
-  .plan-toolbar { display: contents; }
-  .plan-planned { order: 1; }
-  .plan-new { order: 2; margin-left: auto; min-width: 40px; justify-content: center; }
+  .plan-bar { display: flex; flex-wrap: nowrap; gap: 6px; }
+  .plan-bar-week { flex: none; gap: 4px; }
+  .plan-bar-week .icon-button { width: 36px; height: 36px; }
+  .plan-bar-week .button.small { display: none; }
+  .plan-range { font-size: 17px; margin-left: 2px; }
+  .plan-range-term { display: none; }
+  .plan-bar-tools { flex: 1; min-width: 0; }
+  .plan-subnav-long { display: none; }
+}
+.plan-subnav-short { display: none; }
+@media (max-width: 719px) { .plan-subnav-short { display: inline; } }
+
+/* Phones: one thing, edge to edge. The week bar, then a single row of
+   toggles that scrolls sideways, then the days as tabs stuck to the top of
+   the screen over a day's grid; swipe the grid sideways for the next day. */
+@media (max-width: 719px) {
+  .plan-page { --plan-gutter: 48px; --plan-edge-l: max(12px, var(--safe-left)); --plan-edge-r: max(12px, var(--safe-right)); }
+  .plan-planner { grid-template-columns: minmax(0, 1fr); gap: 0; margin: 0 calc(-1 * var(--plan-edge-r)) 0 calc(-1 * var(--plan-edge-l)); }
+  .plan-planner > .plan-controls, .plan-planner > .plan-toolbar { grid-column: 1; grid-row: auto; }
+
+  .plan-controls {
+    flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+    padding: 0 var(--plan-edge-r) 8px var(--plan-edge-l);
+  }
+  .plan-controls::-webkit-scrollbar { display: none; }
+  .plan-controls > * { flex: none; }
+  .plan-overlay-legend, .plan-overlay-members { display: contents; }
+  .plan-overlay-legend > .micro-label { display: none; }
+  .plan-controls :is(.button.small, .plan-member-toggle) { min-height: 34px; white-space: nowrap; }
+
+  .plan-toolbar {
+    position: sticky; top: 0; z-index: 25;
+    display: flex; align-items: center; justify-content: stretch; gap: 6px; margin-left: 0;
+    padding: calc(6px + var(--safe-top)) var(--plan-edge-r) 6px var(--plan-edge-l);
+    margin-top: calc(-1 * var(--safe-top));
+    background: var(--paper); border-bottom: 1px solid var(--line);
+  }
+  .plan-new { flex: none; width: 44px; min-height: 44px; padding: 0; justify-content: center; }
   .plan-new-label { display: none; }
-  .plan-overlay-legend { order: 3; }
-  .plan-daytabs { order: 4; }
   .plan-daystep { display: none; }
-  .plan-allday-label { font-size: 8px; letter-spacing: .08em; padding-left: 4px; }
   .plan-daytabs {
-    display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; width: 100%;
+    flex: 1; min-width: 0;
+    display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;
     padding: 2px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--well);
   }
   .plan-daytab {
-    display: grid; justify-items: center; gap: 0; min-height: 44px; padding: 4px 0;
+    display: grid; justify-items: center; gap: 0; min-height: 40px; padding: 3px 0;
     border: 1px solid transparent; border-radius: 5px; background: none; color: var(--muted); cursor: pointer;
   }
   .plan-daytab[aria-selected="true"] { background: var(--raised); border-color: var(--line); color: var(--ink); }
   .plan-daytab[data-today] .plan-daytab-date { color: var(--info-text); }
   .plan-daytab-name { font-size: 10px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; }
   .plan-daytab-date { font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; }
-  .plan-daystep .icon-button { border-color: var(--line); }
-  .plan-daystep-label { min-width: 92px; text-align: center; font-weight: 700; }
 
-  .plan-head, .plan-allday--wide { grid-template-columns: var(--plan-gutter) minmax(0, 1fr); }
-  .plan-columns { grid-template-columns: minmax(0, 1fr); }
-  .plan-dayhead:not([data-active]), .plan-col:not([data-active]) { display: none; }
+  .plan-marking-hint, .plan-error { margin: 8px var(--plan-edge-r) 0 var(--plan-edge-l); }
+
+  /* The grid runs edge to edge; the tabs already name the day, so no head. */
+  .plan-grid { border-radius: 0; border-left: 0; border-right: 0; border-top: 0; }
+  .plan-head { display: none; }
+  .plan-allday-label { font-size: 8px; letter-spacing: .08em; padding-left: 4px; }
   .plan-allday--wide { display: none; }
   .plan-allday--narrow { display: grid; grid-template-columns: var(--plan-gutter) minmax(0, 1fr); grid-auto-rows: 30px; }
-  .plan-allday--narrow .plan-chip { grid-column: 2; }
+  .plan-allday--narrow .plan-chip { grid-column: 2; margin-right: 4px; }
   .plan-allday--narrow .plan-allday-label { grid-row: 1; }
+  .plan-body { padding-left: var(--safe-left); padding-right: var(--safe-right); }
+  .plan-columns { grid-template-columns: minmax(0, 1fr); }
+  .plan-col:not([data-active]) { display: none; }
   .plan-event { font-size: 13px; }
 }
 
@@ -468,3 +520,14 @@
 }
 .plan-ghost[data-mode="busy"] .plan-ghost-time { background: var(--danger); color: #fff; }
 .plan-ghost[data-mode="busy"] .plan-ghost-title { color: var(--danger-text); }
+
+/* Another organiser's event (USSI's) on our plan: ours to attend, not to run.
+   Drawn in neutral ink, never in VolSoc's category colours, always solid
+   (it isn't provisional to us) and named for who runs it. */
+.plan-event[data-theirs], .plan-chip[data-theirs] {
+  --cat: var(--muted);
+  border-style: solid;
+  background: var(--alt);
+}
+.plan-event[data-theirs]:hover, .plan-chip[data-theirs]:hover { background: var(--hover); }
+.plan-event[data-theirs] .plan-event-cat { color: var(--muted); }

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { League_Spartan, Work_Sans } from "next/font/google";
 import { NativeAuthBridge } from "@/components/NativeAuthBridge";
+import { NativeSystemBars } from "@/components/NativeSystemBars";
 import { themeScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -33,6 +34,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body>
         {children}
         <NativeAuthBridge />
+        <NativeSystemBars />
       </body>
     </html>
   );

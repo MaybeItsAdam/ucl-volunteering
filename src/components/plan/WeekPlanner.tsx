@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, CalendarOff, ChevronLeft, ChevronRight, Eye, EyeOff, Paintbrush, Plus, Users } from "lucide-react";
+import { CalendarClock, CalendarOff, ChevronLeft, ChevronRight, Eye, EyeOff, Paintbrush, Plus, UserCheck, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -14,6 +14,7 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
+  type TouchEvent as ReactTouchEvent,
 } from "react";
 import {
   formatMinute,
@@ -34,10 +35,10 @@ import {
 import type { CalendarLinksState } from "@/lib/calendarLinks";
 import { AvailabilitySheet } from "@/components/availability/AvailabilitySheet";
 import { MyCalendarsSheet } from "@/components/availability/MyCalendarsSheet";
-import { applyPaint, blocksToCells, cellKey, cellsToBlocks, modeFor, SLOT_MINUTES, type PaintMode } from "@/components/availability/grid";
+import { applyPaint, blocksToCells, cellKey, cellsToBlocks, daySpans, modeFor, overlay as absences, SLOT_MINUTES, type PaintMode } from "@/components/availability/grid";
 import { patchEvent } from "./api";
 import { CreateEventSheet, type CreateDraft } from "./CreateEventSheet";
-import { dayLabel, hourLabel, myResponse, SOURCE_LABELS, timeRange, WEEKDAYS_SHORT } from "./format";
+import { dayLabel, hourLabel, isOurs, myResponse, ORGANISER_LABELS, SOURCE_LABELS, timeRange, WEEKDAYS_SHORT } from "./format";
 import {
   clampToWindow,
   dragStartMinute,
@@ -162,9 +163,13 @@ export interface WeekPlannerProps {
   others: OtherSocietyEvent[];
 }
 
-/** Where "Planned" and "Other societies" are remembered, on the device. */
+/** Where "Planned", "Availability" and "Other societies" are remembered, on the device. */
 const PLANNED_KEY = "volsoc.plan.planned";
+const AVAILABILITY_KEY = "volsoc.plan.availability";
 const OTHERS_KEY = "volsoc.plan.others";
+
+/** VolSoc's own events still being planned: what "Planned" shows and hides. */
+const isPlanning = (event: PlanEvent) => event.status === "provisional" && isOurs(event.source);
 
 export function WeekPlanner({
   days,
@@ -197,19 +202,33 @@ export function WeekPlanner({
     setSeenEvents(events);
     setOverrides({});
   }
-  // "Planned" shows everything the committee is working on: provisional
-  // events (synced and new events start that way) and everyone's
-  // availability. On unless switched off; off, the week is only what's confirmed.
+  // "Planned" shows VolSoc's own events still being planned (new events start
+  // provisional). On unless switched off; off, our week is only what's
+  // confirmed. Other organisers' events (USSI's) aren't ours to plan, so they
+  // stay either way.
   const [planned, setPlanned] = useState(true);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- storage is only readable after hydration
-    if (window.localStorage.getItem(PLANNED_KEY) === "0" && !editAvailability) setPlanned(false);
-  }, [editAvailability]);
+    if (window.localStorage.getItem(PLANNED_KEY) === "0") setPlanned(false);
+  }, []);
   function togglePlanned() {
-    const next = !planned;
-    setPlanned(next);
+    setPlanned(!planned);
+    remember(PLANNED_KEY, !planned);
+  }
+
+  // The committee's availability over the week: on unless switched off.
+  // With nobody picked it's everyone at once, shaded by how many are busy;
+  // pick people to see just theirs.
+  const [showAvailability, setShowAvailability] = useState(true);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- storage is only readable after hydration
+    if (window.localStorage.getItem(AVAILABILITY_KEY) === "0" && !editAvailability) setShowAvailability(false);
+  }, [editAvailability]);
+  function toggleAvailability() {
+    const next = !showAvailability;
+    setShowAvailability(next);
     if (!next) setMarking(false);
-    remember(PLANNED_KEY, next);
+    remember(AVAILABILITY_KEY, next);
   }
 
   // Other societies' events, read only, beside the committee's. Off unless switched on.
@@ -233,11 +252,11 @@ export function WeekPlanner({
     setMyBlocks(blocks.filter((b) => b.memberId === me.id));
   }
   const allBlocks = useMemo(() => [...blocks.filter((b) => b.memberId !== me.id), ...myBlocks], [blocks, myBlocks, me.id]);
-  const hiddenCount = events.filter((e) => e.status === "provisional").length;
+  const hiddenCount = events.filter(isPlanning).length;
   const shown = useMemo(
     () =>
       events
-        .filter((e) => planned || e.status !== "provisional")
+        .filter((e) => planned || !isPlanning(e))
         .map((e) => (overrides[e.id] ? { ...e, ...overrides[e.id] } : e)),
     [events, overrides, planned],
   );
@@ -499,15 +518,31 @@ export function WeekPlanner({
   // ── Render helpers ──
 
   const memberById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
+  // Picked people's busy times, one hatch each; and your own while marking.
   const overlayBlocks = useMemo(
     () =>
-      planned
+      showAvailability
         ? [...allBlocks, ...calendarBlocks].filter(
             (b) => overlay.includes(b.memberId) || (marking && b.memberId === me.id),
           )
         : [],
-    [allBlocks, calendarBlocks, overlay, planned, marking, me.id],
+    [allBlocks, calendarBlocks, overlay, showAvailability, marking, me.id],
   );
+  // Nobody picked: everyone's at once, as runs of how many are busy.
+  const busySpans = useMemo(() => {
+    if (!showAvailability || overlay.length > 0 || marking || !members.length) return new Map<number, ReturnType<typeof daySpans>>();
+    const ids = members.map((m) => m.id);
+    const cells = absences(
+      [...allBlocks, ...calendarBlocks].map((b) => ({ ...b, note: null })),
+      ids,
+    );
+    return new Map(
+      [1, 2, 3, 4, 5, 6, 7].map((weekday) => [
+        weekday,
+        daySpans(cells, weekday, { start: WINDOW_START, end: WINDOW_END }).filter((span) => span.absent.length > 0),
+      ]),
+    );
+  }, [showAvailability, overlay, marking, members, allBlocks, calendarBlocks]);
 
   function closeAvailability() {
     setAvailabilityOpen(false);
@@ -525,6 +560,26 @@ export function WeekPlanner({
     setDraft({ day: days[dayIndex], start, end: start + 60 });
   }
 
+  // A phone shows a day at a time: a sideways swipe on it steps a day, and
+  // past either end of the week into the next or last.
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+  function stepDay(by: -1 | 1) {
+    const next = mobileDay + by;
+    if (next < 0) router.push(`/portal/calendar?week=${prevWeek}&day=6`);
+    else if (next > 6) router.push(`/portal/calendar?week=${nextWeek}&day=0`);
+    else setMobileDay(next);
+  }
+  function onSwipeEnd(e: ReactTouchEvent) {
+    const start = swipe.current;
+    swipe.current = null;
+    // Not while dragging an event or marking busy, and only where a day is all there is.
+    if (!start || gesture.current?.active || marking || !window.matchMedia("(max-width: 719px)").matches) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > 1.5 * Math.abs(dy)) stepDay(dx < 0 ? 1 : -1);
+  }
+
   const allDayForMobile = layout.allDay.filter((a) => a.firstDay <= mobileDay && a.lastDay >= mobileDay);
   const allDayRows = layout.allDay.reduce((n, a) => Math.max(n, a.row + 1), 0);
 
@@ -536,7 +591,7 @@ export function WeekPlanner({
           className="button small plan-planned"
           aria-pressed={planned}
           onClick={togglePlanned}
-          title={planned ? "Hide provisional events and availability" : "Show provisional events and availability"}
+          title={planned ? "Hide VolSoc's provisional events" : "Show VolSoc's provisional events"}
         >
           {planned ? <Eye size={14} aria-hidden="true" /> : <EyeOff size={14} aria-hidden="true" />}
           Planned
@@ -555,10 +610,20 @@ export function WeekPlanner({
             {!showOthers && <span className="plan-planned-count">{others.length}</span>}
           </button>
         )}
+        <button
+          type="button"
+          className="button small plan-planned"
+          aria-pressed={showAvailability}
+          onClick={toggleAvailability}
+          title={showAvailability ? "Hide the committee's availability" : "Show when the committee is busy"}
+        >
+          <UserCheck size={14} aria-hidden="true" />
+          Availability
+        </button>
         {/* Availability: whose unavailable times to lay over the week, and your own to edit */}
-        {planned && (
+        {showAvailability && (
           <div className="plan-overlay-legend" role="group" aria-label="Availability">
-            <span className="micro-label">Availability</span>
+            <span className="micro-label">{overlay.length ? "Showing" : "Everyone · pick to filter"}</span>
             <div className="plan-overlay-members" role="group" aria-label="Show when committee members are unavailable">
               {members.map((m) => {
                 const on = overlay.includes(m.id);
@@ -603,23 +668,25 @@ export function WeekPlanner({
             </button>
           </div>
         )}
+      </div>
 
-        <div className="plan-toolbar">
-          <div className="plan-daytabs" role="tablist" aria-label="Day">
-            {days.map((day, i) => (
-              <button
-                key={day}
-                type="button"
-                role="tab"
-                aria-selected={i === mobileDay}
-                className="plan-daytab"
-                data-today={day === today ? "" : undefined}
-                onClick={() => setMobileDay(i)}
-              >
-                <span className="plan-daytab-name">{WEEKDAYS_SHORT[i][0]}</span>
-                <span className="plan-daytab-date">{Number(day.slice(8))}</span>
-              </button>
-            ))}
+      {/* The days (a phone's tabs, stuck to the top) and New event. */}
+      <div className="plan-toolbar">
+        <div className="plan-daytabs" role="tablist" aria-label="Day">
+          {days.map((day, i) => (
+            <button
+              key={day}
+              type="button"
+              role="tab"
+              aria-selected={i === mobileDay}
+              className="plan-daytab"
+              data-today={day === today ? "" : undefined}
+              onClick={() => setMobileDay(i)}
+            >
+              <span className="plan-daytab-name">{WEEKDAYS_SHORT[i][0]}</span>
+              <span className="plan-daytab-date">{Number(day.slice(8))}</span>
+            </button>
+          ))}
           </div>
           <div className="plan-daystep">
             {mobileDay > 0 ? (
@@ -648,7 +715,6 @@ export function WeekPlanner({
               <span className="plan-new-label">New event</span>
             </button>
           )}
-        </div>
       </div>
 
       {marking && (
@@ -667,7 +733,15 @@ export function WeekPlanner({
         </div>
       )}
 
-      <div className="plan-grid" data-mobile-day={mobileDay} style={{ "--plan-grid-height": `${GRID_HEIGHT}px` } as CSSProperties}>
+      <div
+        className="plan-grid"
+        data-mobile-day={mobileDay}
+        style={{ "--plan-grid-height": `${GRID_HEIGHT}px` } as CSSProperties}
+        onTouchStart={(e) => {
+          swipe.current = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+        }}
+        onTouchEnd={onSwipeEnd}
+      >
         {/* Day headers */}
         <div className="plan-head">
           <div className="plan-gutter-head" aria-hidden="true" />
@@ -751,6 +825,29 @@ export function WeekPlanner({
                   aria-label={dayLabel(day)}
                   role="group"
                 >
+                  {(busySpans.get(weekday) ?? [])
+                    .filter((span) => span.endMinute > WINDOW_START && span.startMinute < WINDOW_END)
+                    .map((span) => {
+                      const names = span.absent.map((a) => memberById.get(a.memberId)?.name.split(" ")[0] ?? "Someone");
+                      const label = names.length <= 2 ? names.join(", ") : `${names.length} busy`;
+                      return (
+                        <div
+                          key={`busy-${span.startMinute}`}
+                          className="plan-busy"
+                          style={
+                            {
+                              top: (span.startMinute - WINDOW_START) * PX_PER_MINUTE,
+                              height: (span.endMinute - span.startMinute) * PX_PER_MINUTE,
+                              "--busy": Math.min(1, span.absent.length / members.length),
+                            } as CSSProperties
+                          }
+                          title={`${formatMinute(span.startMinute)}–${formatMinute(span.endMinute)}: ${names.join(", ")} busy`}
+                        >
+                          <span className="plan-busy-label">{label}</span>
+                        </div>
+                      );
+                    })}
+
                   {overlayBlocks
                     .filter((b) => b.weekday === weekday && b.endMinute > WINDOW_START && b.startMinute < WINDOW_END)
                     .map((b) => {
@@ -867,9 +964,9 @@ function eventLabel(event: PlanEvent) {
   return [
     event.title,
     `${dayLabel(day)}, ${timeRange(event)}`,
-    CATEGORY_LABELS[event.category],
-    STATUS_LABELS[event.status],
-    SOURCE_LABELS[event.source],
+    isOurs(event.source) ? CATEGORY_LABELS[event.category] : `Run by ${SOURCE_LABELS[event.source]}`,
+    isOurs(event.source) ? STATUS_LABELS[event.status] : null,
+    isOurs(event.source) ? SOURCE_LABELS[event.source] : null,
     event.location,
   ]
     .filter(Boolean)
@@ -908,6 +1005,7 @@ function EventCard({
       data-category={event.category}
       data-status={event.status}
       data-source={event.source}
+      data-theirs={isOurs(event.source) ? undefined : ""}
       data-size={size}
       data-draggable={draggable ? "" : undefined}
       data-dragging={dragging ? "" : undefined}
@@ -927,7 +1025,7 @@ function EventCard({
       )}
       {size === "md" && (
         <span className="plan-event-top">
-          <span className="plan-event-cat">{CATEGORY_LABELS[event.category]}</span>
+          <span className="plan-event-cat">{isOurs(event.source) ? CATEGORY_LABELS[event.category] : `Run by ${ORGANISER_LABELS[event.source]}`}</span>
           <ResponseDot event={event} myId={myId} />
         </span>
       )}
@@ -937,7 +1035,7 @@ function EventCard({
         {size !== "md" && <ResponseDot event={event} myId={myId} />}
       </span>
       {size === "md" && event.location && <span className="plan-event-loc">{event.location}</span>}
-      {size === "md" && height >= 96 && (
+      {size === "md" && height >= 96 && isOurs(event.source) && (
         <span className="plan-event-source" data-source={event.source}>
           {SOURCE_LABELS[event.source]}
         </span>
@@ -969,6 +1067,7 @@ function EventChip({ event, myId, style }: { event: PlanEvent; myId: string; sty
       className="plan-chip category-block"
       data-category={event.category}
       data-status={event.status}
+      data-theirs={isOurs(event.source) ? undefined : ""}
       style={style}
       aria-label={eventLabel(event)}
     >

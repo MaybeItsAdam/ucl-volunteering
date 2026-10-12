@@ -273,6 +273,30 @@ export function peakOverlap(segments: readonly { top: number; bottom: number }[]
   return peak;
 }
 
+/**
+ * The hours a phone's day block shows: whole hours round what's drawn in it
+ * (`spans`, as drawn tops and bottoms) and any minute that must be in view
+ * (`keep`, now on today), at least `least` minutes tall, inside the grid's
+ * window. A day on a phone is only as tall as its day, so a quiet afternoon
+ * doesn't cost a screen of empty hours.
+ */
+export function dayWindow(
+  spans: readonly { top: number; bottom: number }[],
+  keep: readonly number[] = [],
+  least = 120,
+): { start: number; end: number } {
+  const marks = [...spans.flatMap((s) => [s.top, s.bottom]), ...keep];
+  if (!marks.length) return { start: 10 * 60, end: 10 * 60 + least };
+  let start = Math.max(WINDOW_START, Math.floor(Math.min(...marks) / 60) * 60);
+  let end = Math.min(WINDOW_END, Math.ceil(Math.max(...marks) / 60) * 60);
+  // Too short: grow downwards, then up if the window's end is in the way.
+  if (end - start < least) {
+    end = Math.min(WINDOW_END, start + least);
+    start = Math.max(WINDOW_START, end - least);
+  }
+  return { start, end };
+}
+
 // ── Drag arithmetic ──────────────────────────────────────────────────────
 
 /** A dragged event's new start: snapped, kept on its day and inside the window. */
