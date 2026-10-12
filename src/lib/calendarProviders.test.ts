@@ -198,6 +198,7 @@ describe("providerForHost", () => {
     expect(providerForHost("outlook.live.com")).toBe("outlook");
     expect(providerForHost("p07-caldav.icloud.com")).toBe("icloud");
     expect(providerForHost("timetable.ucl.ac.uk")).toBe("ucl_timetable");
+    expect(providerForHost("timetable.apps.ucl.ac.uk")).toBe("ucl_timetable");
     expect(providerForHost("google.com.evil.example")).toBeNull();
     expect(providerForHost("caldav.icloud.com")).toBeNull();
   });
