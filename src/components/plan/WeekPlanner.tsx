@@ -624,6 +624,13 @@ export function WeekPlanner({
         {showAvailability && (
           <div className="plan-overlay-legend" role="group" aria-label="Availability">
             <span className="micro-label">{overlay.length ? "Showing" : "Everyone · pick to filter"}</span>
+            {!allBlocks.length && !calendarBlocks.length && (
+              <span className="plan-overlay-empty small muted" role="status">
+                {members.length <= 1
+                  ? "Only you are on the committee here so far: give the others the Committee role under Members"
+                  : "Nobody has marked when they're busy yet"}
+              </span>
+            )}
             <div className="plan-overlay-members" role="group" aria-label="Show when committee members are unavailable">
               {members.map((m) => {
                 const on = overlay.includes(m.id);
