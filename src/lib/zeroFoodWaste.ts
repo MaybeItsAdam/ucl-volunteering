@@ -143,7 +143,12 @@ export interface ZfwStats {
 
 const tally = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.round(value) : 0);
 
-/** The script's stats, checked: anything missing or odd counts as nothing. Null if it isn't stats at all. */
+/**
+ * The script's stats, checked: anything missing or odd counts as nothing. Null
+ * if it isn't stats at all. The headline is the kinds added up, not the sheet's
+ * Total column (some rows' hand-typed Totals don't match their kinds), so it
+ * always agrees with the breakdown under it.
+ */
 export function parseZfwStats(body: unknown): ZfwStats | null {
   const b = (body && typeof body === "object" ? body : null) as Record<string, unknown> | null;
   const raw = (b?.stats && typeof b.stats === "object" ? b.stats : null) as Record<string, unknown> | null;
@@ -152,7 +157,7 @@ export function parseZfwStats(body: unknown): ZfwStats | null {
   const counts = {} as Record<CountKey, number>;
   for (const { key, header } of COUNTS) counts[key] = tally(byHeader[header]);
   return {
-    items: tally(raw.items),
+    items: Object.values(counts).reduce((a, n) => a + n, 0),
     collections: tally(raw.collections),
     shifts: tally(raw.shifts),
     outlets: tally(raw.outlets),

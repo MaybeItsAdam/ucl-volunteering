@@ -54,7 +54,8 @@ describe("Zero Food Waste stats", () => {
       ok: true,
       stats: { items: 412, collections: 30, shifts: 9, outlets: 7, incentives: 15, since: "2026-09-29", counts: { Main: 200, Snacks: 12 } },
     });
-    expect(stats).toMatchObject({ items: 412, collections: 30, shifts: 9, outlets: 7, incentives: 15, since: "2026-09-29" });
+    // The kinds added up, whatever the sheet's Total says.
+    expect(stats).toMatchObject({ items: 212, collections: 30, shifts: 9, outlets: 7, incentives: 15, since: "2026-09-29" });
     expect(stats?.counts).toEqual({ main: 200, pots: 0, pastries: 0, baked: 0, snacks: 12, fruit: 0, others: 0 });
   });
   it("counts anything odd as nothing", () => {
