@@ -14,9 +14,11 @@ const config: CapacitorConfig = {
   appendUserAgent: "VolSocApp",
   backgroundColor: "#feefe5",
   android: {
-    // Pad the web view clear of the status and navigation bars when Android
-    // draws edge to edge, so the site needs no Android-only insets.
-    adjustMarginsForEdgeToEdge: "auto",
+    // Edge to edge: the page runs under the status and navigation bars and
+    // pads itself with env(safe-area-inset-*), as on iOS. Capacitor's own
+    // margins would fight @capacitor-community/safe-area, which pads the web
+    // view only on the older WebViews (Chromium < 140) that report 0 insets.
+    adjustMarginsForEdgeToEdge: "disable",
   },
   ios: {
     // The site pads itself with env(safe-area-inset-*) (viewportFit: cover).

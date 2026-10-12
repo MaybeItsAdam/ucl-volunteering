@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Renders every native app icon, splash screen and store icon from the two SVG
-# masters in branding/app_icons. Needs rsvg-convert and ImageMagick 7 (magick)
+# Renders every native app icon, splash screen and store icon from the SVG
+# masters in branding/app_icons: the four-colour icon, and for Android's
+# adaptive icon its quartered background and haloed mark as separate layers.
+# Needs rsvg-convert and ImageMagick 7 (magick)
 #
 #   bash scripts/generate-app-icons.sh
 set -euo pipefail
@@ -8,6 +10,7 @@ set -euo pipefail
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 master="$root/branding/app_icons/app-icon.svg"
 foreground="$root/branding/app_icons/app-icon-foreground.svg"
+background="$root/branding/app_icons/app-icon-background.svg"
 mark="$root/branding/logo/volsoc-hand-mark.svg"
 linen='#FEEFE5'
 work=$(mktemp -d)
@@ -62,7 +65,7 @@ cp "$root/assets/store/google-play-icon.png" "$root/branding/app_icons/android/p
 render "$master" 1024 "$root/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png"
 
 # Android launcher icons. Adaptive foregrounds keep the mark in the safe zone;
-# the linen background colour lives in values/ic_launcher_background.xml
+# the quartered background is its own layer
 for spec in 'mdpi:48:108' 'hdpi:72:162' 'xhdpi:96:216' 'xxhdpi:144:324' 'xxxhdpi:192:432'
 do
   density=${spec%%:*}
@@ -73,14 +76,20 @@ do
   render "$master" "$legacy" "$dir/ic_launcher.png"
   render_round "$master" "$legacy" "$dir/ic_launcher_round.png"
   render_alpha "$foreground" "$adaptive" "$dir/ic_launcher_foreground.png"
+  render "$background" "$adaptive" "$dir/ic_launcher_background.png"
 done
 
-cat > "$root/android/app/src/main/res/values/ic_launcher_background.xml" <<XML
+# The adaptive icon's background is the quartered image, not a flat colour
+for name in ic_launcher ic_launcher_round
+do
+  cat > "$root/android/app/src/main/res/mipmap-anydpi-v26/$name.xml" <<XML
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <color name="ic_launcher_background">$linen</color>
-</resources>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@mipmap/ic_launcher_background"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
 XML
+done
 
 # Splash screens, each re-rendered at its existing pixel size
 for f in "$root"/android/app/src/main/res/drawable*/splash.png \
@@ -92,7 +101,8 @@ done
 # Previews: iOS square and the Android adaptive icon as a circle and squircle
 render "$master" 1024 "$root/branding/app_icons/previews/ios_preview.png"
 rsvg-convert -w 1024 -h 1024 "$foreground" -o "$work/fg.png"
-magick -size 1024x1024 "xc:$linen" "$work/fg.png" -compose Over -composite \
+rsvg-convert -w 1024 -h 1024 "$background" -o "$work/bg.png"
+magick "$work/bg.png" "$work/fg.png" -compose Over -composite \
   -crop 682x682+171+171 +repage -resize 1024x1024 "$work/visible.png"
 magick "$work/visible.png" -alpha on \
   \( -size 1024x1024 xc:black -fill white -draw 'circle 512,512 512,0' -alpha off \) \

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type Ref } from "react";
 import {
+  ArrowUp,
   CalendarPlus,
   ChevronLeft,
   ChevronRight,
@@ -16,10 +17,10 @@ import {
 import { Sheet } from "@/components/Sheet";
 import { CalendarLinks } from "@/components/plan/CalendarLinks";
 import { dayLabel, googleAddUrl, hourLabel, timeRange, WEEKDAYS_SHORT, weekRange } from "@/components/plan/format";
-import { eventDaySpan, layoutWeek, peakOverlap, PX_PER_MINUTE, WINDOW_END, WINDOW_START, type DaySegment } from "@/components/plan/layout";
+import { dayWindow, eventDaySpan, layoutWeek, peakOverlap, PX_PER_MINUTE, WINDOW_END, WINDOW_START, type DaySegment, type WeekLayout } from "@/components/plan/layout";
 import { groupByDay, societyLabel } from "@/components/whatson/view";
 import type { CommunityEvent, CommunitySociety } from "@/lib/communityEvents";
-import { formatMinute, londonDayKey, londonMinuteOfDay, mondayOf, shiftDayKey } from "@/lib/planTime";
+import { formatMinute, isoWeekday, londonDayKey, londonMinuteOfDay, mondayOf, shiftDayKey, shortDate } from "@/lib/planTime";
 import { matchesQuery } from "./calendarSearch";
 import "./calendar.css";
 
@@ -34,6 +35,10 @@ const MAX_LANES = 4;
 const EMPTY_WEIGHT = 0.35;
 /** Where the societies someone has hidden are remembered, on their device. */
 const HIDDEN_KEY = "volsoc.calendar.hidden";
+/** A phone's day column runs at least this many days, however quiet. */
+const MIN_PHONE_DAYS = 14;
+/** Phones get the day column; wider screens the week grid. Matches calendar.css. */
+const PHONE_QUERY = "(max-width: 768px)";
 
 /** The society's own colours as the card's hue, light and dark. */
 function societyStyle(society: CommunitySociety | undefined): CSSProperties {
@@ -84,6 +89,11 @@ const isOwnLink = (url: string) => /\/calendar\?event=/.test(url);
  * view, the search and an open event live in the URL, so any of them can be
  * shared.
  *
+ * On a phone the week becomes one column of days, as on Adam's Campus
+ * Toolbox: every day from today on, stacked and scrolling as one, each with
+ * its date band stuck under the bar while it's in view and only as many hours
+ * as it has on. A run of quiet days folds to a single line.
+ *
  * Read only: an event opens a sheet with its details and links out.
  */
 export function PublicCalendar({
@@ -129,6 +139,9 @@ export function PublicCalendar({
   const [copied, setCopied] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const search = useRef<HTMLInputElement>(null);
+  const phoneColumn = useRef<HTMLDivElement>(null);
+  /** Phone: scrolled away from today, so the bar offers the way back. */
+  const [away, setAway] = useState(false);
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 60_000);
@@ -180,6 +193,19 @@ export function PublicCalendar({
   const upcoming = useMemo(() => matching.filter((e) => Date.parse(e.endsAt) >= now.getTime()), [matching, now]);
   const groups = useMemo(() => groupByDay(upcoming, now), [upcoming, now]);
 
+  // The phone's column: today to the last day anything is on, as one layout.
+  const phoneDays = useMemo(() => {
+    const lastEvent = matching.reduce((last, e) => {
+      const day = eventDaySpan(e).last;
+      return day > last ? day : last;
+    }, today);
+    const until = lastEvent > shiftDayKey(today, MIN_PHONE_DAYS - 1) ? lastEvent : shiftDayKey(today, MIN_PHONE_DAYS - 1);
+    const list: string[] = [];
+    for (let d = today; d <= until; d = shiftDayKey(d, 1)) list.push(d);
+    return list;
+  }, [matching, today]);
+  const phoneLayout = useMemo(() => layoutWeek(matching, phoneDays), [matching, phoneDays]);
+
   // Each day's share of the width: wider for every card side by side, a strip when empty.
   const columns = days
     .map((day) => {
@@ -210,6 +236,25 @@ export function PublicCalendar({
     // Only when the week or view changes; filtering shouldn't jump the view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [week, view]);
+
+  // Phone: open at a shared event's day, or a shared week's first day with
+  // something on; otherwise at the top, which is today.
+  useLayoutEffect(() => {
+    if (!window.matchMedia(PHONE_QUERY).matches) return;
+    const target = linked ? londonDayKey(new Date(linked.startsAt)) : initialWeek !== thisWeek ? initialWeek : null;
+    if (!target || target <= today) return;
+    const blocks = phoneColumn.current?.querySelectorAll<HTMLElement>("[data-phone-day]") ?? [];
+    const block = [...blocks].find((b) => (b.dataset.phoneLast ?? b.dataset.phoneDay!) >= target);
+    block?.scrollIntoView({ block: "start" });
+    // Only on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    const onScroll = () => setAway(window.scrollY > 240);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   // The state worth sharing, in the URL.
   useEffect(() => {
@@ -346,7 +391,8 @@ export function PublicCalendar({
           )}
           <div className="segmented cal-views" role="group" aria-label="View">
             <button type="button" className={view === "week" ? "active" : undefined} aria-pressed={view === "week"} onClick={() => setView("week")}>
-              Week
+              <span className="cal-wide-only">Week</span>
+              <span className="cal-phone-only">Days</span>
             </button>
             <button type="button" className={view === "list" ? "active" : undefined} aria-pressed={view === "list"} onClick={() => setView("list")}>
               List
@@ -367,9 +413,33 @@ export function PublicCalendar({
             <span className="cal-toolbox-label">See all on Adam&apos;s Campus Toolbox</span>
             <span className="cal-toolbox-short">Toolbox</span>
           </a>
+          {away && (
+            <button
+              type="button"
+              className="button small cal-totop"
+              aria-label={view === "week" ? "Back to today" : "Back to the top"}
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            >
+              <ArrowUp size={15} aria-hidden="true" />
+              <span>{view === "week" ? "Today" : "Top"}</span>
+            </button>
+          )}
         </div>
       </div>
 
+      {view === "week" && (
+        <PhoneDays
+          ref={phoneColumn}
+          days={phoneDays}
+          layout={phoneLayout}
+          today={today}
+          nowMinute={londonMinuteOfDay(now)}
+          societyOf={(event) => bySociety.get(event.societyId)}
+          onOpen={setOpen}
+          emptyMessage={matching.length ? null : query ? `Nothing coming up matching “${query.trim()}”` : hiddenActive ? "Nothing coming up from the societies you've picked" : "Nothing coming up"}
+          toolboxCalendarUrl={toolboxCalendarUrl}
+        />
+      )}
       {view === "week" ? (
         <div className="cal-scroller" ref={scroller}>
           <div
@@ -558,6 +628,11 @@ export function PublicCalendar({
               )}
             </dl>
             {open.description && <p className="cal-sheet-about">{open.description}</p>}
+            {!isOwnLink(open.url) && (
+              <p className="cal-sheet-ticketed muted small">
+                <Ticket size={13} aria-hidden="true" /> Some events are ticketed: book through the society&apos;s page
+              </p>
+            )}
             <div className="cal-sheet-actions">
               {!isOwnLink(open.url) && (
                 <a className="button primary" href={open.url} target="_blank" rel="noopener noreferrer">
@@ -585,10 +660,13 @@ function EventCard({
   segment,
   society,
   onOpen,
+  windowStart = WINDOW_START,
 }: {
   segment: DaySegment<CommunityEvent>;
   society: CommunitySociety | undefined;
   onOpen: () => void;
+  /** The minute the column's top stands for. */
+  windowStart?: number;
 }) {
   const { event } = segment;
   const height = (segment.bottom - segment.top) * PX_PER_MINUTE;
@@ -604,7 +682,7 @@ function EventCard({
       data-cancelled={event.cancelled ? "" : undefined}
       style={{
         ...societyStyle(society),
-        top: (segment.top - WINDOW_START) * PX_PER_MINUTE,
+        top: (segment.top - windowStart) * PX_PER_MINUTE,
         height,
         left: `calc(${segment.left * 100}% + 2px)`,
         width: `calc(${segment.width * 100}% - 4px)`,
@@ -616,10 +694,139 @@ function EventCard({
     >
       <span className="cal-event-title">{event.title}</span>
       <span className="cal-event-time">
-        {segment.clippedStart && segment.start < WINDOW_START ? "↑ " : ""}
+        {segment.clippedStart && segment.start < windowStart ? "↑ " : ""}
         {time}
       </span>
       {size === "md" && host && <span className="cal-event-host">{host}</span>}
     </button>
+  );
+}
+
+/** A phone's day column, in blocks: a day with something on, or a run of quiet ones. */
+type PhoneBlock = { kind: "day"; day: string; index: number } | { kind: "quiet"; first: string; last: string };
+
+function phoneBlocks(days: readonly string[], counts: Record<string, number>, today: string): PhoneBlock[] {
+  const blocks: PhoneBlock[] = [];
+  days.forEach((day, index) => {
+    // Today always gets its own block, so the column starts with it.
+    if (counts[day] || day === today) {
+      blocks.push({ kind: "day", day, index });
+      return;
+    }
+    const prev = blocks[blocks.length - 1];
+    if (prev?.kind === "quiet") prev.last = day;
+    else blocks.push({ kind: "quiet", first: day, last: day });
+  });
+  return blocks;
+}
+
+/**
+ * The week on a phone: every day from today, stacked and scrolling with the
+ * page. A day's band sticks under the bar while the day is on screen, its
+ * all-day events sit under the band, and its hours run only as far as its
+ * events do. Quiet days fold into one line.
+ */
+function PhoneDays({
+  ref,
+  days,
+  layout,
+  today,
+  nowMinute,
+  societyOf,
+  onOpen,
+  emptyMessage,
+  toolboxCalendarUrl,
+}: {
+  ref: Ref<HTMLDivElement>;
+  days: string[];
+  layout: WeekLayout<CommunityEvent>;
+  today: string;
+  nowMinute: number;
+  societyOf: (event: CommunityEvent) => CommunitySociety | undefined;
+  onOpen: (event: CommunityEvent) => void;
+  /** Shown above the column when nothing at all matches. */
+  emptyMessage: string | null;
+  toolboxCalendarUrl: string;
+}) {
+  const blocks = phoneBlocks(days, layout.counts, today);
+  return (
+    <div className="cal-phone" ref={ref}>
+      {emptyMessage && <p className="cal-phone-empty muted small">{emptyMessage}</p>}
+      {blocks.map((block) => {
+        if (block.kind === "quiet") {
+          const label = block.first === block.last ? dayLabel(block.first) : `${dayLabel(block.first)} – ${dayLabel(block.last)}`;
+          return (
+            <div key={block.first} className="cal-phone-quiet" data-phone-day={block.first} data-phone-last={block.last}>
+              <span className="cal-phone-quiet-days">{label}</span>
+              <span className="muted">Nothing on</span>
+            </div>
+          );
+        }
+        const { day, index } = block;
+        const segments = layout.days[day];
+        const allDay = layout.allDay.filter((a) => a.firstDay <= index && a.lastDay >= index);
+        const isToday = day === today;
+        const win = dayWindow(segments, isToday && nowMinute >= WINDOW_START && nowMinute <= WINDOW_END ? [nowMinute] : []);
+        const hours = Array.from({ length: (win.end - win.start) / 60 + 1 }, (_, i) => win.start / 60 + i);
+        const count = layout.counts[day];
+        return (
+          <section key={day} className="cal-phone-day" data-phone-day={day} data-today={isToday ? "" : undefined} aria-label={dayLabel(day)}>
+            <header className="cal-phone-head">
+              <span className="micro-label">{WEEKDAYS_SHORT[isoWeekday(day) - 1]}</span>
+              <span className="cal-phone-date">{shortDate(day)}</span>
+              {isToday && <span className="tag info cal-phone-today">Today</span>}
+              <span className="cal-phone-count muted">{count ? (count === 1 ? "1 event" : `${count} events`) : "Nothing on yet"}</span>
+            </header>
+            {allDay.length > 0 && (
+              <div className="cal-phone-allday">
+                {allDay.map((a) => (
+                  <button
+                    key={a.event.id}
+                    type="button"
+                    className="cal-chipevent"
+                    data-cancelled={a.event.cancelled ? "" : undefined}
+                    style={societyStyle(societyOf(a.event))}
+                    onClick={() => onOpen(a.event)}
+                  >
+                    {a.event.title}
+                  </button>
+                ))}
+              </div>
+            )}
+            {(segments.length > 0 || allDay.length === 0) && (
+              <div className="cal-phone-grid" style={{ height: (win.end - win.start) * PX_PER_MINUTE }}>
+                <div className="cal-phone-hours" aria-hidden="true">
+                  {hours.slice(0, -1).map((h) => (
+                    <span key={h} className="cal-hour" style={{ top: (h * 60 - win.start) * PX_PER_MINUTE }}>
+                      {hourLabel(h)}
+                    </span>
+                  ))}
+                </div>
+                <div className="cal-phone-col">
+                  {hours.slice(1, -1).map((h) => (
+                    <div key={h} className="cal-line" style={{ top: (h * 60 - win.start) * PX_PER_MINUTE }} aria-hidden="true" />
+                  ))}
+                  {segments.map((s) => (
+                    <EventCard key={s.event.id} segment={s} society={societyOf(s.event)} onOpen={() => onOpen(s.event)} windowStart={win.start} />
+                  ))}
+                  {isToday && nowMinute >= win.start && nowMinute <= win.end && (
+                    <div className="cal-now" style={{ top: (nowMinute - win.start) * PX_PER_MINUTE }} aria-hidden="true" />
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
+        );
+      })}
+      <footer className="cal-phone-foot">
+        <p className="muted small">
+          <Ticket size={13} aria-hidden="true" /> Some events may be ticketed
+        </p>
+        <a className="button small" href={toolboxCalendarUrl} target="_blank" rel="noopener noreferrer">
+          <ExternalLink size={14} aria-hidden="true" />
+          Every society on Adam&apos;s Campus Toolbox
+        </a>
+      </footer>
+    </div>
   );
 }

@@ -8,9 +8,23 @@ export const WEEKDAYS_SHORT = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 export const SOURCE_LABELS: Record<EventSource, string> = {
   volsoc: "VolSoc",
-  social_impact: "Social Impact",
+  social_impact: "Student Social Impact",
   volsoc_toolbox: "VolSoc on the Toolbox",
 };
+
+/**
+ * Who runs it. VolSoc's own events (typed in here or synced from VolSoc's
+ * Toolbox page) are ours; Student Social Impact's (USSI's) are on the plan so
+ * the committee can see them and say who's going, but they're USSI's.
+ */
+export const ORGANISER_LABELS: Record<EventSource, string> = {
+  volsoc: "VolSoc",
+  social_impact: "USSI",
+  volsoc_toolbox: "VolSoc",
+};
+
+/** Whether the event is UCL Volunteering Society's own. */
+export const isOurs = (source: EventSource) => source !== "social_impact";
 
 /** "Wed 30 Sep" */
 export function dayLabel(key: string): string {

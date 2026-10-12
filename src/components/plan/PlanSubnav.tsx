@@ -9,10 +9,10 @@ export type PlanSection = "week" | "list" | "feeds";
  * lands where you were.
  */
 export function PlanSubnav({ active, week }: { active: PlanSection; week?: string }) {
-  const items: { key: PlanSection; href: string; label: string }[] = [
+  const items: { key: PlanSection; href: string; label: string; short?: string }[] = [
     { key: "week", href: week ? `/portal/calendar?week=${week}` : "/portal/calendar", label: "Week" },
     { key: "list", href: "/portal/calendar/list", label: "List" },
-    { key: "feeds", href: "/portal/calendar/feeds", label: "Public calendar" },
+    { key: "feeds", href: "/portal/calendar/feeds", label: "Public calendar", short: "Public" },
   ];
   return (
     <nav className="segmented plan-subnav" aria-label="Schedule">
@@ -23,7 +23,14 @@ export function PlanSubnav({ active, week }: { active: PlanSection; week?: strin
           className={item.key === active ? "active" : undefined}
           aria-current={item.key === active ? "page" : undefined}
         >
-          {item.label}
+          {item.short ? (
+            <>
+              <span className="plan-subnav-long">{item.label}</span>
+              <span className="plan-subnav-short">{item.short}</span>
+            </>
+          ) : (
+            item.label
+          )}
         </Link>
       ))}
     </nav>
