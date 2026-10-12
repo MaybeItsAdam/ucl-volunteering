@@ -1,6 +1,7 @@
 /**
  * Zero Food Waste log — appends a shift from uclvolunteering.org/zero-food-waste
- * to the team's tracking sheet.
+ * to the team's tracking sheet, and sums the sheet for the totals under the form
+ * (`{ secret, action: "stats" }`, see stats_).
  *
  * The web app (src/app/api/zero-food-waste) POSTs
  *   { secret, row: { date: "YYYY-MM-DD", values: { "<column heading>": value } } }
@@ -63,6 +64,55 @@ function checkSetup() {
   Logger.log(secret_() ? 'Secret: set' : 'Secret: NOT set — add ZFW_SECRET under Project Settings → Script Properties');
 }
 
+const COUNT_HEADINGS_ = ['Main', 'Fruit pots & Yogurt pots', 'Pastries / Pasties', 'Other baked goods', 'Snacks', 'Fruit', 'Others'];
+
+const number_ = (value) => (typeof value === 'number' && isFinite(value) ? value : Number(value) || 0);
+
+/**
+ * Everything logged so far, summed: `{ action: "stats" }` →
+ * { ok, stats: { items, collections, shifts, outlets, incentives, since, counts: { "<heading>": n } } }.
+ * A row counts once it has a date. Its items are its Total, or its counts
+ * added up where the team left Total blank.
+ */
+function stats_(sheet) {
+  const width = sheet.getLastColumn();
+  const headings = sheet.getRange(ZFW.HEADER_ROW, 1, 1, width).getValues()[0].map(normaliseHeading_);
+  const columnOf = (heading) => headings.indexOf(normaliseHeading_(heading));
+  const dateCol = columnOf(ZFW.DATE_HEADER);
+  const outletCol = columnOf('Outlet');
+  const totalCol = columnOf('Total');
+  const incentivesCol = columnOf('Incentives');
+  const countCols = COUNT_HEADINGS_.map((h) => [h, columnOf(h)]).filter(([, col]) => col !== -1);
+
+  const out = { items: 0, collections: 0, shifts: 0, outlets: 0, incentives: 0, since: null, counts: {} };
+  countCols.forEach(([h]) => { out.counts[h] = 0; });
+  const rows = sheet.getLastRow() - ZFW.HEADER_ROW;
+  if (dateCol === -1 || rows < 1) return out;
+
+  const days = {};
+  const outlets = {};
+  sheet.getRange(ZFW.HEADER_ROW + 1, 1, rows, width).getValues().forEach((row) => {
+    const date = row[dateCol];
+    if (!(date instanceof Date) || isNaN(date)) return;
+    let counted = 0;
+    countCols.forEach(([h, col]) => {
+      const n = number_(row[col]);
+      out.counts[h] += n;
+      counted += n;
+    });
+    out.items += totalCol !== -1 && number_(row[totalCol]) > 0 ? number_(row[totalCol]) : counted;
+    if (incentivesCol !== -1) out.incentives += number_(row[incentivesCol]);
+    out.collections += 1;
+    const day = Utilities.formatDate(date, 'Europe/London', 'yyyy-MM-dd');
+    days[day] = true;
+    if (outletCol !== -1 && String(row[outletCol]).trim()) outlets[String(row[outletCol]).trim().toLowerCase()] = true;
+    if (!out.since || day < out.since) out.since = day;
+  });
+  out.shifts = Object.keys(days).length;
+  out.outlets = Object.keys(outlets).length;
+  return out;
+}
+
 function doPost(e) {
   let body;
   try {
@@ -72,6 +122,13 @@ function doPost(e) {
   }
   const secret = secret_();
   if (!secret || body.secret !== secret) return json_({ ok: false, error: 'Not allowed' });
+
+  if (body.action === 'stats') {
+    const ss = SpreadsheetApp.openById(ZFW.SPREADSHEET_ID);
+    const sheet = ZFW.SHEET_NAME ? ss.getSheetByName(ZFW.SHEET_NAME) : ss.getSheets()[0];
+    if (!sheet) return json_({ ok: false, error: 'No tab called ' + ZFW.SHEET_NAME });
+    return json_({ ok: true, stats: stats_(sheet) });
+  }
 
   const row = body.row || {};
   const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(row.date || '');

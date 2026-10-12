@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanPeople, OUTLETS, parseZfwEntry, toZfwRow } from "./zeroFoodWaste";
+import { cleanPeople, OUTLETS, parseZfwEntry, parseZfwStats, toZfwRow } from "./zeroFoodWaste";
 
 const base = { date: "2026-10-08", outlet: "Cruciform Cafe", people: ["Raem", " chloe "], counts: { main: "10", pastries: 2, fruit: "5" } };
 
@@ -45,5 +45,25 @@ describe("Zero Food Waste entries", () => {
         Incentives: 1,
       },
     });
+  });
+});
+
+describe("Zero Food Waste stats", () => {
+  it("reads the script's totals, by the sheet's headings", () => {
+    const stats = parseZfwStats({
+      ok: true,
+      stats: { items: 412, collections: 30, shifts: 9, outlets: 7, incentives: 15, since: "2026-09-29", counts: { Main: 200, Snacks: 12 } },
+    });
+    expect(stats).toMatchObject({ items: 412, collections: 30, shifts: 9, outlets: 7, incentives: 15, since: "2026-09-29" });
+    expect(stats?.counts).toEqual({ main: 200, pots: 0, pastries: 0, baked: 0, snacks: 12, fruit: 0, others: 0 });
+  });
+  it("counts anything odd as nothing", () => {
+    const stats = parseZfwStats({ ok: true, stats: { items: "lots", shifts: -2, since: "29 Sept" } });
+    expect(stats).toMatchObject({ items: 0, shifts: 0, since: null });
+  });
+  it("is null for a failure or no stats", () => {
+    expect(parseZfwStats({ ok: false, error: "Not allowed" })).toBeNull();
+    expect(parseZfwStats({ ok: true })).toBeNull();
+    expect(parseZfwStats(null)).toBeNull();
   });
 });

@@ -1,9 +1,10 @@
 "use client";
 
-import { useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
 import { ChevronDown, ChevronUp, Minus, Pencil, Plus, X } from "lucide-react";
 import { Sheet } from "@/components/Sheet";
-import { cleanPeople, COUNTS, MAX_PEOPLE, OUTLETS, type CountKey } from "@/lib/zeroFoodWaste";
+import { shortDate } from "@/lib/planTime";
+import { cleanPeople, COUNTS, MAX_PEOPLE, OUTLETS, type CountKey, type ZfwStats } from "@/lib/zeroFoodWaste";
 
 type Status =
   | { kind: "idle" }
@@ -25,6 +26,80 @@ const MAX_AMOUNT = 2000;
 
 /** Lower case, accents off, so "cafe" finds "Café" and "obs" finds "North Observatory". */
 const fold = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-GB")} ${n === 1 ? one : many}`;
+
+/**
+ * Everything the team has logged, from the sheet, under the form. Loads after
+ * the page (the sheet is slow to sum) and again, fresh, after each log; says
+ * nothing if the sheet can't be read, so the form never waits on it.
+ */
+function ZfwTotals({ logged }: { logged: number }) {
+  const [stats, setStats] = useState<ZfwStats | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    fetch(logged ? "/api/zero-food-waste?fresh" : "/api/zero-food-waste")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { stats?: ZfwStats } | null) => {
+        if (live && data?.stats) setStats(data.stats);
+      })
+      .catch(() => {
+        // No totals this time; the form doesn't need them.
+      });
+    return () => {
+      live = false;
+    };
+  }, [logged]);
+
+  if (!stats || stats.collections === 0) return null;
+  const breakdown = COUNTS.filter((c) => stats.counts[c.key] > 0).sort((a, b) => stats.counts[b.key] - stats.counts[a.key]);
+  const top = breakdown.length ? stats.counts[breakdown[0].key] : 0;
+  return (
+    <section className="zfw-totals" aria-labelledby="zfw-totals-title">
+      <h2 id="zfw-totals-title" className="micro-label">
+        Saved so far{stats.since ? ` · since ${shortDate(stats.since)}` : ""}
+      </h2>
+      <p className="zfw-totals-items">
+        <span className="zfw-totals-big">{stats.items.toLocaleString("en-GB")}</span>
+        <span className="muted">{stats.items === 1 ? "item" : "items"} rescued</span>
+      </p>
+      <dl className="zfw-totals-facts">
+        <div>
+          <dt className="micro-label">Shifts</dt>
+          <dd>{stats.shifts.toLocaleString("en-GB")}</dd>
+        </div>
+        <div>
+          <dt className="micro-label">Collections</dt>
+          <dd>{stats.collections.toLocaleString("en-GB")}</dd>
+        </div>
+        <div>
+          <dt className="micro-label">Outlets</dt>
+          <dd>{stats.outlets.toLocaleString("en-GB")}</dd>
+        </div>
+        <div>
+          <dt className="micro-label">Incentives</dt>
+          <dd>{stats.incentives.toLocaleString("en-GB")}</dd>
+        </div>
+      </dl>
+      {breakdown.length > 0 && (
+        <ul className="zfw-totals-kinds" aria-label="By kind">
+          {breakdown.map((c) => (
+            <li key={c.key}>
+              <span className="zfw-totals-kind">{c.label}</span>
+              <span className="zfw-totals-bar" aria-hidden="true">
+                <span style={{ width: `${(stats.counts[c.key] / top) * 100}%` }} />
+              </span>
+              <span className="zfw-totals-n mono" aria-label={plural(stats.counts[c.key], "item")}>
+                {stats.counts[c.key].toLocaleString("en-GB")}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
 
 /**
  * Everyone on the shift, as tags: type a name, then Enter or a comma. A name
@@ -287,6 +362,8 @@ export function ZeroFoodWasteForm({ today }: { today: string }) {
   const [adding, setAdding] = useState<{ start: Kind | null } | null>(null);
   const [website, setWebsite] = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
+  // Bumped by each log, so the totals reload with it counted.
+  const [logged, setLogged] = useState(0);
 
   const lines = KINDS.filter((k) => amounts[k.key] !== undefined);
   const total = COUNTS.reduce((sum, c) => sum + (amounts[c.key] ?? 0), 0);
@@ -310,6 +387,7 @@ export function ZeroFoodWasteForm({ today }: { today: string }) {
       const data = (await res.json().catch(() => ({}))) as { error?: string; total?: number };
       if (!res.ok) throw new Error(data.error || "Something went wrong, try again in a minute");
       setStatus({ kind: "done", outlet: name, total: data.total ?? total });
+      setLogged((n) => n + 1);
       setOutlet("");
       setAmounts({});
       setIncentives(0);
@@ -428,6 +506,8 @@ export function ZeroFoodWasteForm({ today }: { today: string }) {
           {status.kind === "sending" ? "Saving…" : "Log it"}
         </button>
       </form>
+
+      <ZfwTotals logged={logged} />
 
       {adding && (
         <AddSheet
