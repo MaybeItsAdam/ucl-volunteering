@@ -72,6 +72,7 @@
 .plan-planner > .plan-controls { grid-column: 1; }
 .plan-planner > .plan-toolbar { grid-column: 2; grid-row: 1; align-self: start; }
 .plan-overlay-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.plan-overlay-empty { flex-basis: 100%; }
 .plan-overlay-members { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .plan-member-toggle {
   display: inline-flex; align-items: center; gap: 6px;
@@ -333,6 +334,7 @@
   .plan-controls > * { flex: none; }
   .plan-overlay-legend, .plan-overlay-members { display: contents; }
   .plan-overlay-legend > .micro-label { display: none; }
+  .plan-overlay-empty { flex-basis: auto; align-self: center; white-space: nowrap; }
   .plan-controls :is(.button.small, .plan-member-toggle) { min-height: 34px; white-space: nowrap; }
 
   .plan-toolbar {
