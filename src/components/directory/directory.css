@@ -1,0 +1,52 @@
+/* The volunteering directory: /opportunities, its detail pages, and the committee's editor. */
+
+.dir { display: grid; gap: 12px; }
+.dir-filters { display: grid; gap: 10px; }
+.dir-search input { width: 100%; }
+.dir-filter-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.dir-filter-row label { display: grid; gap: 4px; }
+.dir-toggles { display: flex; flex-wrap: wrap; gap: 6px; }
+.dir-toggle {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 10px;
+  border: 1px solid var(--line); border-radius: 6px; font-size: 13px; cursor: pointer;
+}
+.dir-toggle[data-on] { border-color: color-mix(in srgb, var(--primary) 50%, transparent); background: color-mix(in srgb, var(--primary) 10%, transparent); }
+.dir-toggle input { width: 14px; height: 14px; margin: 0; }
+.dir-count { margin: 0; }
+
+.dir-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.dir-card { display: grid; gap: 6px; }
+.dir-card h2 { margin: 0; font-size: 18px; }
+.dir-card h2 a { color: var(--ink); text-decoration: none; }
+.dir-card h2 a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.dir-summary { margin: 0; color: var(--muted); }
+.dir-badges { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+
+.dir-facts { margin: 4px 0 0; display: grid; gap: 6px; }
+.dir-facts > div { display: grid; grid-template-columns: 72px 1fr; gap: 8px; align-items: baseline; }
+.dir-facts dt { margin: 0; }
+.dir-facts dd { margin: 0; overflow-wrap: anywhere; }
+.dir-facts-wide > div { grid-template-columns: 110px 1fr; }
+
+.dir-detail { gap: 14px; }
+.dir-back { display: inline-flex; align-items: center; gap: 4px; text-decoration: none; }
+.dir-signup { display: grid; gap: 8px; border-color: color-mix(in srgb, var(--primary) 40%, transparent); }
+.dir-signup-method { margin: 0; font-size: 18px; font-weight: 700; }
+.dir-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dir-pre { margin: 0; white-space: pre-wrap; }
+.dir-session { flex-wrap: wrap; }
+
+/* The committee's editor. */
+.dir-admin-row { flex-wrap: wrap; }
+.dir-admin-row .dir-admin-main { flex: 1 1 220px; display: grid; gap: 2px; min-width: 0; }
+.dir-admin-row .dir-admin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.dir-session-edit { display: grid; grid-template-columns: 80px 1fr 1fr auto; gap: 6px; align-items: center; margin-bottom: 6px; }
+.dir-session-edit .dir-session-extra { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.dir-checks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.dir-checks label { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+@media (max-width: 560px) {
+  .dir-session-edit { grid-template-columns: 1fr 1fr; }
+  .dir-session-edit select { grid-column: 1 / -1; }
+}
+.link-button { padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.link-button:hover { text-decoration: underline; text-underline-offset: 3px; }

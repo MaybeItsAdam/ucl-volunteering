@@ -3,11 +3,12 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { BookUser, CalendarRange, CircleCheckBig, HeartHandshake, ListChecks, Settings, Users } from "lucide-react";
+import { BookOpen, BookUser, CalendarRange, CircleCheckBig, HeartHandshake, ListChecks, Settings, Users } from "lucide-react";
 import { APP_PAGE_HREFS, type AppPage } from "@/lib/app-pages";
 
 export const PAGE_META: Record<AppPage, { label: string; icon: typeof Users }> = {
   my_tasks: { label: "My tasks", icon: CircleCheckBig },
+  directory: { label: "Directory", icon: BookOpen },
   calendar: { label: "Schedule", icon: CalendarRange },
   planner: { label: "Planner", icon: ListChecks },
   volunteers: { label: "Volunteers", icon: BookUser },
