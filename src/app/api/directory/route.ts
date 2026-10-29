@@ -4,6 +4,8 @@ import { audit } from "@/lib/audit";
 import { DIRECTORY_COLUMNS, fromRow, parseEntry, type DirectoryRow } from "@/lib/directory";
 import { freeSlug } from "@/lib/directoryStore";
 import { londonDayKey } from "@/lib/planTime";
+import { fillPlaces } from "@/lib/places";
+import { entryPlace } from "@/lib/directory";
 import { requireApiCapability } from "@/lib/session";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 
@@ -29,6 +31,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Couldn't save that, try again" }, { status: 500 });
   }
   const entry = fromRow(data as unknown as DirectoryRow);
+  await fillPlaces([entryPlace(entry)], { limit: 1 });
   await audit(auth.member.id, "directory.create", "directory_entry", entry.id, { title: `${entry.organisation} · ${entry.title}` });
   return NextResponse.json({ entry }, { status: 201 });
 }

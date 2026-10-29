@@ -1,0 +1,93 @@
+/* /timetable: the week of everything, with the map beside it. */
+
+.tt { display: grid; gap: 12px; }
+.tt-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.tt-week { display: flex; align-items: center; gap: 4px; }
+.tt-week-label { min-width: 120px; text-align: center; font-size: 16px; }
+
+.tt-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.tt-search { flex: 1 1 220px; min-width: 0; }
+.tt-filters select { flex: 0 1 auto; }
+
+.tt-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 38%); gap: 12px; align-items: start; }
+.tt-grid-col { display: grid; gap: 10px; min-width: 0; }
+.tt-map-col { display: grid; gap: 8px; position: sticky; top: 72px; }
+.tt-map { height: min(70vh, 640px); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--alt); }
+.tt-map-loading { animation: none; }
+
+/* The grid. */
+.tt-grid { --tt-gutter: 48px; overflow: hidden; }
+.tt-head, .tt-allday { display: grid; grid-template-columns: var(--tt-gutter) repeat(var(--tt-days), minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+.tt-head-day { padding: 8px 6px; font-size: 13px; text-align: center; border-left: 1px solid var(--line); }
+.tt-head-day[data-today] { color: var(--primary); font-weight: 700; }
+.tt-allday { grid-template-columns: var(--tt-gutter) 1fr; align-items: start; }
+.tt-allday > .micro-label { padding: 8px 4px; font-size: 9px; }
+.tt-allday-track { display: grid; grid-template-columns: repeat(var(--tt-days), minmax(0, 1fr)); gap: 2px; padding: 4px; border-left: 1px solid var(--line); }
+.tt-scroll { max-height: min(70vh, 640px); overflow-y: auto; }
+.tt-canvas { position: relative; display: grid; grid-template-columns: var(--tt-gutter) repeat(var(--tt-days), minmax(0, 1fr)); }
+.tt-gutter { position: relative; }
+.tt-gutter span { position: absolute; right: 6px; transform: translateY(-50%); font-variant-numeric: tabular-nums; font-size: 10px; color: var(--muted); }
+.tt-gutter span:first-child { transform: none; }
+.tt-day {
+  position: relative; border-left: 1px solid var(--line);
+  /* An hour line every 60px. */
+  background-image: linear-gradient(to bottom, var(--line) 1px, transparent 1px);
+  background-size: 100% 60px;
+}
+.tt-day[data-today] { background-color: color-mix(in srgb, var(--primary) 4%, transparent); }
+
+.tt-block {
+  --tt-colour: var(--primary);
+  position: absolute; display: grid; align-content: start; gap: 1px;
+  padding: 3px 5px; overflow: hidden; text-align: left; cursor: pointer;
+  font: inherit; font-size: 12px; line-height: 1.25; color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--tt-colour) 45%, transparent);
+  border-left-width: 3px; border-left-color: var(--tt-colour);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--tt-colour) 14%, var(--raised));
+}
+.tt-block[data-kind="session"] { --tt-colour: var(--success); }
+.tt-block:hover { background: color-mix(in srgb, var(--tt-colour) 24%, var(--raised)); }
+.tt-block[data-selected] { outline: 2px solid var(--tt-colour); outline-offset: 1px; }
+.tt-block-time { font-size: 10px; color: var(--muted); }
+.tt-block-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+.tt-block-host { color: var(--muted); font-size: 11px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tt-block-allday { position: static; white-space: nowrap; text-overflow: ellipsis; font-weight: 700; }
+
+/* The selected item. */
+.tt-detail { position: relative; display: grid; gap: 4px; }
+.tt-detail h2 { margin: 0; font-size: 18px; padding-right: 32px; }
+.tt-detail p { margin: 0; }
+.tt-detail .button { justify-self: start; margin-top: 4px; }
+.tt-detail-close { position: absolute; top: 8px; right: 8px; }
+
+/* Pins and popups. */
+.tt-pin-wrap { background: none; border: 0; }
+.tt-pin {
+  display: grid; place-items: center; width: 26px; height: 26px; border-radius: 9999px;
+  background: var(--primary); color: var(--on-primary); border: 2px solid var(--raised);
+  font-weight: 700; font-size: 11px; line-height: 1; font-variant-numeric: tabular-nums;
+}
+.tt-pin-session { background: var(--success); }
+.tt-popup strong { display: block; margin-bottom: 4px; }
+.tt-popup ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.tt-popup li { display: grid; }
+.tt-popup li span { color: #666; font-size: 11px; }
+.tt-popup p { margin: 4px 0 0; font-size: 11px; }
+
+/* Phones: one day at a time, timetable or map. */
+.tt-phone-switch { justify-self: start; }
+.tt-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.tt-days button {
+  display: grid; justify-items: center; gap: 2px; min-height: 44px; padding: 4px 0;
+  border: 1px solid var(--line); border-radius: 6px; background: var(--raised); color: var(--ink); font: inherit; cursor: pointer;
+}
+.tt-days button[aria-selected="true"] { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--raised)); }
+.tt-days button[data-today] span:last-child { color: var(--primary); font-weight: 700; }
+
+@media (max-width: 900px) {
+  .tt-body { grid-template-columns: 1fr; }
+  .tt-map-col { position: static; }
+  .tt-map { height: 60vh; }
+  .tt-scroll { max-height: none; }
+}
