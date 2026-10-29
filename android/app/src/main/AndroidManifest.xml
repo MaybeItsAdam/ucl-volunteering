@@ -46,4 +46,6 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Collection alerts; Android 13+ asks when the person taps "Notify me". -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

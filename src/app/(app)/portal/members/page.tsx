@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { isGovernanceRole, isMemberColour } from "@/lib/access";
 import { requireCapability } from "@/lib/session";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
+import { Handover } from "@/components/members/Handover";
 import { MembersAdmin } from "@/components/members/MembersAdmin";
+import { StaffAccounts, type StaffRow } from "@/components/staff/StaffAccounts";
 import { MEMBER_ROW_COLUMNS, sortMembers, type MemberRow } from "@/components/members/rules";
 
 export const metadata: Metadata = { title: "Members" };
@@ -23,10 +25,20 @@ async function loadMembers(): Promise<MemberRow[] | null> {
   );
 }
 
+/** CH&Co staff with a code, newest first, or [] when they couldn't be read. */
+async function loadStaff(): Promise<StaffRow[]> {
+  const { data, error } = await getSupabaseAdmin()
+    .from("partner_staff")
+    .select("id,name,organisation,created_at,last_seen_at,revoked_at")
+    .order("created_at", { ascending: false });
+  if (error) console.error(`[members] couldn't load the CH&Co staff: ${error.message}`);
+  return (data ?? []) as StaffRow[];
+}
+
 export default async function MembersPage() {
   const viewer = await requireCapability("manage_members");
   const configured = isSupabaseConfigured();
-  const members = configured ? await loadMembers() : [];
+  const [members, staff] = configured ? await Promise.all([loadMembers(), loadStaff()]) : [[], []];
 
   return (
     <section className="page">
@@ -53,7 +65,14 @@ export default async function MembersPage() {
           <p>Reload the page to try again</p>
         </div>
       ) : (
-        <MembersAdmin initialMembers={members} viewer={{ id: viewer.id, governanceRole: viewer.governance_role }} />
+        <>
+          <MembersAdmin initialMembers={members} viewer={{ id: viewer.id, governanceRole: viewer.governance_role }} />
+          <Handover
+            people={members.map((m) => ({ id: m.id, name: m.name }))}
+            committee={members.filter((m) => m.governance_role).map((m) => ({ id: m.id, name: m.name }))}
+          />
+          <StaffAccounts initial={staff} />
+        </>
       )}
     </section>
   );

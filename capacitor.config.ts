@@ -32,6 +32,8 @@ const config: CapacitorConfig = {
   },
   plugins: {
     Browser: { presentationStyle: "popover" },
+    // A collection alert should show even with the app open.
+    PushNotifications: { presentationOptions: ["badge", "sound", "alert"] },
   },
 };
 

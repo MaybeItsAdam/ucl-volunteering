@@ -41,6 +41,9 @@ function secret(): Uint8Array {
   return new TextEncoder().encode(value);
 }
 
+/** The key sessions are signed with; the CH&Co staff session (staff.ts) shares it under its own audience. */
+export const sessionSigningKey = secret;
+
 export async function createSessionToken(session: VolsocSession): Promise<string> {
   return new SignJWT({ ...session })
     .setProtectedHeader({ alg: "HS256" })

@@ -348,3 +348,23 @@
   color: var(--muted); font-size: 13px; font-weight: 700; text-decoration: none;
 }
 .segmented a.active { background: var(--raised); border-color: var(--line); color: var(--ink); }
+
+/* Collection alerts: CH&Co staff posting food, volunteers opting in to hear. */
+.col-optin { display: grid; gap: 10px; justify-items: start; }
+.col-optin p { margin: 0; display: flex; gap: 8px; align-items: center; }
+.col-form { display: grid; gap: 0; }
+.col-form .button { justify-self: start; }
+.col-error { margin: 8px 0 0; font-size: 13px; color: var(--danger-text); }
+.col-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.col-actions .button { gap: 6px; }
+.col-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; }
+.col-list > li { display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); }
+.col-list > li:first-child { border-top: 0; }
+.col-list > li > div:first-child { display: grid; gap: 2px; }
+.col-list .col-actions { margin: 0; }
+.col-available .col-list > li { border-color: color-mix(in srgb, var(--success) 40%, transparent); }
+.col-add { display: flex; flex-wrap: wrap; gap: 0 12px; align-items: end; }
+.col-add .field { flex: 1 1 200px; }
+.col-add .button { margin-bottom: 14px; }
+.col-link { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
+.col-posted { margin-bottom: 12px; }

@@ -56,6 +56,8 @@ without printing any value.
 | `TIMETABLE_FEED_KEY` | no | Encrypts saved UCL timetable links: `openssl rand -base64 32`. Unset, nobody can link one. Never rotate it casually: every saved link becomes unreadable and has to be pasted again |
 | `ZFW_SHEET_WEBHOOK_URL` | no | The `/exec` URL of `apps-script/zero-food-waste`, which appends `/zero-food-waste` logs to the team's sheet. Unset, the form says it isn't connected |
 | `ZFW_SHEET_SECRET` | no | Shared with that script's `ZFW_SECRET` property: `openssl rand -hex 32` |
+| `APNS_KEY`, `APNS_KEY_ID`, `APNS_TEAM_ID` | no | iPhone collection alerts: an APNs auth key (`.p8` contents, `\n` for newlines), its key id, and the Apple team id. Unset, iPhones are skipped. `APNS_HOST=api.sandbox.push.apple.com` for an Xcode debug install |
+| `FCM_SERVICE_ACCOUNT` | no | Android collection alerts: the Firebase service-account JSON, as is. Unset, Androids are skipped |
 
 If Vercel's Supabase integration is installed it owns the `SUPABASE_*` and
 `POSTGRES_*` names; keep those out of Doppler.
@@ -121,7 +123,16 @@ Events typed into the app are `volsoc` rows and fully editable.
   Volunteers tab (filter, CSV, copy emails).
 - `/zero-food-waste`: no sign-in. Shift leaders log what they collected; each
   log is a new row in the Zero Food Waste sheet via
-  `apps-script/zero-food-waste`.
+  `apps-script/zero-food-waste`. Shows any food CH&Co staff have said is ready.
+- `/staff`: CH&Co staff say there is food to collect. They have no UCL account:
+  a principal makes each person an access code on the Members page (only its
+  hash is stored; opening `/staff#<code>` signs in; switching one off signs
+  that person out at once). A post is saved, pushed to every phone that tapped
+  "Notify me" on `/zero-food-waste` in the app (`src/lib/push.ts`: APNs and FCM
+  direct, see the env table), and comes back with a WhatsApp message to share
+  into the group. Ten posts a day per person. Push needs the app build that
+  contains `@capacitor/push-notifications`; older builds just don't show the
+  button.
 
 ## Scripts
 
