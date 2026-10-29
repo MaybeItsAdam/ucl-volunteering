@@ -50,3 +50,19 @@
 }
 .link-button { padding: 0; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
 .link-button:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* Autofill: the box at the top of the editor, and the fields it filled. */
+.dir-autofill {
+  display: grid; gap: 6px; margin-bottom: 16px; padding: 12px;
+  border: 1px dashed color-mix(in srgb, var(--primary) 50%, transparent); border-radius: 8px;
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+.dir-autofill .micro-label { display: inline-flex; align-items: center; gap: 4px; }
+.dir-autofill textarea { width: 100%; min-height: 56px; }
+.dir-autofill-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dir-autofill-ok { margin: 0; color: var(--info-text); }
+[data-autofilled] { position: relative; padding-left: 10px; border-left: 2px solid var(--primary); }
+[data-autofilled] > label::after, [data-autofilled] > .micro-label::after {
+  content: " · filled in, check it"; text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--info-text);
+}
+.dir-find-station { margin: -6px 0 14px; }

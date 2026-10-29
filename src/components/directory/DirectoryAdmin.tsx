@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useId, useState, type FormEvent } from "react";
-import { CheckCheck, ExternalLink, Plus, Trash2, X } from "lucide-react";
+import { CheckCheck, ExternalLink, Plus, Sparkles, Train, Trash2, X } from "lucide-react";
 import { Sheet } from "@/components/Sheet";
 import {
   CAUSES,
@@ -101,6 +101,44 @@ function formOf(e: DirectoryEntry): Form {
     contactEmail: e.contactEmail ?? "",
     active: e.active,
   };
+}
+
+/** What autofill sends back: any of the form's fields, sessions without blanks. */
+type Draft = Partial<Omit<Form, "sessions" | "minAge">> & {
+  minAge?: number;
+  sessions?: { weekday: number; start: string; end: string; where: string | null; note: string | null }[];
+};
+
+/**
+ * Autofill into the form: a field takes the draft's value only if it's still
+ * empty (or untouched since it was blank), so nothing typed is overwritten.
+ * Returns the form and the fields it filled, for highlighting.
+ */
+function mergeDraft(form: Form, draft: Draft, isNew: boolean): { form: Form; filled: Set<keyof Form> } {
+  const next = { ...form };
+  const filled = new Set<keyof Form>();
+  const take = <K extends keyof Form>(key: K, value: Form[K]) => {
+    next[key] = value;
+    filled.add(key);
+  };
+  for (const [key, value] of Object.entries(draft) as [keyof Draft, unknown][]) {
+    if (value === undefined || value === null) continue;
+    if (key === "sessions") {
+      if (!form.sessions.length) take("sessions", (value as NonNullable<Draft["sessions"]>).map((x) => ({ ...x, where: x.where ?? "", note: x.note ?? "" })));
+    } else if (key === "causes") {
+      if (!form.causes.length) take("causes", value as string[]);
+    } else if (key === "minAge") {
+      if (isNew || !form.minAge) take("minAge", String(value));
+    } else if (typeof value === "boolean") {
+      if (value && !form[key as "remote" | "expensesPaid"]) take(key as "remote" | "expensesPaid", true);
+    } else if (key === "commitment" || key === "signupMethod" || key === "dbs") {
+      // These start with a default, so a new entry takes the page's answer.
+      if (isNew || form[key] === BLANK[key]) take(key, value as string);
+    } else if (typeof value === "string" && !(form[key as keyof Form] as string)) {
+      take(key as keyof Form, value as never);
+    }
+  }
+  return { form: next, filled };
 }
 
 async function send(url: string, method: string, body?: unknown): Promise<{ entry?: DirectoryEntry }> {
@@ -229,7 +267,56 @@ function EntrySheet({
   const [form, setForm] = useState<Form>(entry ? formOf(entry) : BLANK);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
+  const [filled, setFilled] = useState<Set<keyof Form>>(new Set());
+  const [source, setSource] = useState("");
+  const [reading, setReading] = useState(false);
+  const [autofillNote, setAutofillNote] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
+  const [findingStation, setFindingStation] = useState(false);
+  const set = <K extends keyof Form>(key: K, value: Form[K]) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    // Once someone edits a filled field, it's theirs.
+    setFilled((f) => (f.has(key) ? new Set([...f].filter((k) => k !== key)) : f));
+  };
+  const marked = (key: keyof Form) => (filled.has(key) ? "" : undefined);
+
+  async function autofill() {
+    const value = source.trim();
+    if (!value) return;
+    setReading(true);
+    setAutofillNote(null);
+    const isLink = /^https?:\/\/\S+$/i.test(value);
+    try {
+      const res = await fetch("/api/directory/autofill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(isLink ? { url: value } : { text: value }),
+      });
+      const data = (await res.json().catch(() => null)) as { draft?: Draft; error?: string } | null;
+      if (!res.ok || !data?.draft) throw new Error(data?.error || "Autofill didn't work, try again");
+      const merged = mergeDraft(form, data.draft, !entry);
+      setForm(merged.form);
+      setFilled((f) => new Set([...f, ...merged.filled]));
+      setAutofillNote(
+        merged.filled.size
+          ? { tone: "ok", text: `Filled ${merged.filled.size} ${merged.filled.size === 1 ? "field" : "fields"}, marked below. Check each one against the page before saving` }
+          : { tone: "bad", text: "Nothing new found there. Try their volunteering page itself, or paste the text" },
+      );
+    } catch (e) {
+      setAutofillNote({ tone: "bad", text: e instanceof Error ? e.message : String(e) });
+    }
+    setReading(false);
+  }
+
+  async function findStation() {
+    setFindingStation(true);
+    const res = await fetch(`/api/directory/station?postcode=${encodeURIComponent(form.postcode)}`).catch(() => null);
+    const data = (await res?.json().catch(() => null)) as { station?: string; error?: string } | null;
+    setFindingStation(false);
+    if (data?.station) {
+      setForm((f) => ({ ...f, nearestStation: data.station! }));
+      setFilled((f) => new Set([...f, "nearestStation"]));
+    } else setError(data?.error || "Couldn't find a station");
+  }
   const setSession = (i: number, patch: Partial<Form["sessions"][number]>) =>
     set(
       "sessions",
@@ -262,7 +349,7 @@ function EntrySheet({
   }
 
   const field = (key: keyof Form, label: string, props: { placeholder?: string; type?: string; hint?: string; maxLength?: number } = {}) => (
-    <div className="field">
+    <div className="field" data-autofilled={marked(key)}>
       <label htmlFor={`${id}-${key}`}>{label}</label>
       <input
         id={`${id}-${key}`}
@@ -276,13 +363,13 @@ function EntrySheet({
     </div>
   );
   const area = (key: keyof Form, label: string, placeholder: string, maxLength: number) => (
-    <div className="field">
+    <div className="field" data-autofilled={marked(key)}>
       <label htmlFor={`${id}-${key}`}>{label}</label>
       <textarea id={`${id}-${key}`} value={form[key] as string} onChange={(e) => set(key, e.target.value as never)} placeholder={placeholder} maxLength={maxLength} />
     </div>
   );
   const select = (key: keyof Form, label: string, options: readonly { key: string; label: string }[]) => (
-    <div className="field">
+    <div className="field" data-autofilled={marked(key)}>
       <label htmlFor={`${id}-${key}`}>{label}</label>
       <select id={`${id}-${key}`} value={form[key] as string} onChange={(e) => set(key, e.target.value as never)}>
         {options.map((o) => (
@@ -298,13 +385,36 @@ function EntrySheet({
     <Sheet onClose={onClose} labelledBy={`${id}-head`}>
       <form onSubmit={save} noValidate>
         <h3 id={`${id}-head`}>{entry ? `Edit ${entry.title}` : "Add a place"}</h3>
-        <fieldset disabled={busy}>
+        <div className="dir-autofill">
+          <label htmlFor={`${id}-source`} className="micro-label">
+            <Sparkles size={12} aria-hidden="true" /> Autofill
+          </label>
+          <textarea
+            id={`${id}-source`}
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+            placeholder="Paste their volunteering page's link, or the text of a listing or email"
+            rows={2}
+          />
+          <div className="dir-autofill-actions">
+            <button type="button" className="button small" onClick={autofill} disabled={reading || !source.trim()}>
+              {reading ? "Reading…" : "Fill in from this"}
+            </button>
+            <span className="muted small">Fills only what it finds, and never what you&apos;ve typed</span>
+          </div>
+          {autofillNote && (
+            <p className={autofillNote.tone === "bad" ? "planner-error" : "dir-autofill-ok small"} role="status">
+              {autofillNote.text}
+            </p>
+          )}
+        </div>
+        <fieldset disabled={busy || reading}>
           <div className="field-row">
             {field("organisation", "Organisation", { placeholder: "Crisis Skylight", maxLength: 120 })}
             {field("title", "Role", { placeholder: "Kitchen volunteer", maxLength: 120 })}
           </div>
           {field("summary", "One line", { placeholder: "Help cook and serve lunch for members", maxLength: 200 })}
-          <div className="field">
+          <div className="field" data-autofilled={marked("causes")}>
             <span className="micro-label">Causes</span>
             <div className="dir-checks">
               {CAUSES.map((c) => (
@@ -334,7 +444,7 @@ function EntrySheet({
           <h4 className="micro-label">When</h4>
           {field("timeNeeded", "Time needed", { placeholder: "3 hours a week, term time", maxLength: 120 })}
           {form.sessions.map((s, i) => (
-            <div key={i} className="dir-session-edit">
+            <div key={i} className="dir-session-edit" data-autofilled={marked("sessions")}>
               <select aria-label="Day" value={s.weekday} onChange={(e) => setSession(i, { weekday: Number(e.target.value) })}>
                 {WEEKDAYS.map((d, n) => (
                   <option key={d} value={n + 1}>
@@ -372,6 +482,11 @@ function EntrySheet({
             {field("postcode", "Postcode", { placeholder: "E1 6LT", maxLength: 10 })}
             {field("nearestStation", "Nearest station", { placeholder: "Aldgate East", maxLength: 80 })}
           </div>
+          {form.postcode.trim().length >= 5 && (
+            <button type="button" className="button small dir-find-station" onClick={findStation} disabled={findingStation}>
+              <Train size={14} aria-hidden="true" /> {findingStation ? "Looking…" : "Find the nearest station"}
+            </button>
+          )}
 
           <h4 className="micro-label">What you need</h4>
           <div className="field-row">
