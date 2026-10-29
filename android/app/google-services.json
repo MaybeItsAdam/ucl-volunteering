@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "464617360195",
+    "project_id": "uclvolunteering-d0671",
+    "storage_bucket": "uclvolunteering-d0671.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:464617360195:android:0013585577e027e755fdf6",
+        "android_client_info": {
+          "package_name": "org.uclvolunteering.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCSZkCZXz28DhdKTnEget38Xb8eqZmjxJ4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
