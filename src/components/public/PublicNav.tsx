@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarDays, HandHeart, LayoutDashboard, LogIn, Sprout } from "lucide-react";
+import { CalendarDays, Compass, HandHeart, LayoutDashboard, LogIn, Sprout } from "lucide-react";
 
 /** `short` is the phone's tab bar label. */
 export const PUBLIC_LINKS = [
   { href: "/calendar", label: "Calendar", short: "Calendar", icon: CalendarDays },
+  { href: "/opportunities", label: "Opportunities", short: "Explore", icon: Compass },
   { href: "/volunteer", label: "Volunteer", short: "Volunteer", icon: HandHeart },
   { href: "/zero-food-waste", label: "Zero Food Waste", short: "Food waste", icon: Sprout },
 ] as const;
