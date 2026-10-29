@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Collection alerts. TestFlight and App Store builds use production; Xcode debug installs get sandbox. -->
+	<key>aps-environment</key>
+	<string>production</string>
+</dict>
+</plist>

@@ -1,8 +1,9 @@
 import { can, type AccessProfile } from "@/lib/access";
 
-export type AppPage = "calendar" | "planner" | "volunteers" | "whats_on" | "members" | "settings";
+export type AppPage = "my_tasks" | "calendar" | "planner" | "volunteers" | "whats_on" | "members" | "settings";
 
 export const APP_PAGE_HREFS: Record<AppPage, string> = {
+  my_tasks: "/portal/my-tasks",
   calendar: "/portal/calendar",
   planner: "/portal/planner",
   volunteers: "/portal/volunteers",
@@ -18,7 +19,7 @@ export const APP_PAGE_HREFS: Record<AppPage, string> = {
  */
 export function availablePages(profile: AccessProfile | null): AppPage[] {
   const pages: AppPage[] = [];
-  if (can(profile, "view_plan")) pages.push("calendar", "planner", "volunteers");
+  if (can(profile, "view_plan")) pages.push("my_tasks", "calendar", "planner", "volunteers");
   if (can(profile, "view_whats_on")) pages.push("whats_on");
   if (can(profile, "manage_members")) pages.push("members");
   pages.push("settings");

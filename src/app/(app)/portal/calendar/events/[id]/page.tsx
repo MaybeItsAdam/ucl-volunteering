@@ -10,6 +10,7 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import type { CommitteeMember, PlanEvent } from "@/lib/types";
 import { EventDetail } from "@/components/plan/EventDetail";
 import { PlanSubnav } from "@/components/plan/PlanSubnav";
+import { ActivityFeed } from "@/components/planner/ActivityFeed";
 import { EventTasks } from "@/components/planner/EventTasks";
 
 type Params = Promise<{ id: string }>;
@@ -72,7 +73,14 @@ export default async function PlanEventPage({ params }: { params: Params }) {
         myId={member.id}
         canEdit={can(profileOf(member), "edit_plan")}
         backHref={`/portal/calendar?week=${week}`}
-        tasks={<EventTasks eventId={event.id} canEdit={can(profileOf(member), "edit_plan")} />}
+        tasks={
+          <>
+            <EventTasks eventId={event.id} canEdit={can(profileOf(member), "edit_plan")} />
+            <div className="panel">
+              <ActivityFeed type="event" id={event.id} />
+            </div>
+          </>
+        }
       />
     </section>
   );

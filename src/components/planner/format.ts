@@ -57,6 +57,10 @@ export type EventFilter = string;
 export interface TaskFilter {
   mine: boolean;
   event: EventFilter;
+  /** Only this member's items (ignored while `mine`). Empty or missing: anyone's. */
+  owner?: string;
+  /** Words to find in the title or notes. */
+  q?: string;
 }
 
 /** The event filter from the address bar. "none" was its name for actions before the boards split. */
@@ -67,6 +71,12 @@ export function readEventFilter(value: string | undefined, isEventId: (v: string
 
 export function matches(task: Task, filter: TaskFilter, myId: string): boolean {
   if (filter.mine && task.assigneeId !== myId) return false;
+  if (!filter.mine && filter.owner && task.assigneeId !== filter.owner) return false;
+  const words = (filter.q ?? "").toLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length) {
+    const haystack = `${task.title} ${task.notes ?? ""}`.toLowerCase();
+    if (!words.every((w) => haystack.includes(w))) return false;
+  }
   if (filter.event === "actions") return task.eventId === null;
   if (filter.event !== "all") return task.eventId === filter.event;
   return true;
@@ -96,6 +106,13 @@ export function nextStatus(board: TaskBoard, status: TaskStatus): TaskStatus | n
   return at >= 0 && at < statuses.length - 1 ? statuses[at + 1] : null;
 }
 
+/** The column before this one, or null in the first. The card's "back" button. */
+export function previousStatus(board: TaskBoard, status: TaskStatus): TaskStatus | null {
+  const statuses: readonly TaskStatus[] = BOARD_STATUSES[board];
+  const at = statuses.indexOf(status);
+  return at > 0 ? statuses[at - 1] : null;
+}
+
 /** What each empty column says. */
 export const EMPTY_COLUMN: Record<TaskStatus, string> = {
   backlog: "Nothing in the backlog",
@@ -120,4 +137,33 @@ export const COLUMN_HINT: Partial<Record<TaskStatus, string>> = {
 export function statusTag(board: TaskBoard, status: TaskStatus): string {
   if (status === finalStatus(board)) return "tag ok";
   return status === "backlog" ? "tag" : "tag info";
+}
+
+export type MineGroup = "overdue" | "week" | "later" | "undated";
+
+export const MINE_GROUP_LABELS: Record<MineGroup, string> = {
+  overdue: "Overdue",
+  week: "Due in the next week",
+  later: "Later",
+  undated: "No due date",
+};
+
+/**
+ * Someone's unfinished items for the My tasks page, in groups that read as a
+ * to-do list: overdue first, then the coming week, then later, then undated.
+ * Each group is soonest first.
+ */
+export function groupMine(tasks: Task[], myId: string, today: string): Record<MineGroup, Task[]> {
+  const out: Record<MineGroup, Task[]> = { overdue: [], week: [], later: [], undated: [] };
+  const weekEnd = shiftDayKey(today, 7);
+  for (const t of tasks) {
+    if (t.assigneeId !== myId || t.completedAt) continue;
+    if (!t.dueOn) out.undated.push(t);
+    else if (t.dueOn < today) out.overdue.push(t);
+    else if (t.dueOn <= weekEnd) out.week.push(t);
+    else out.later.push(t);
+  }
+  const byDue = (a: Task, b: Task) => (a.dueOn ?? "").localeCompare(b.dueOn ?? "") || a.createdAt.localeCompare(b.createdAt);
+  for (const group of Object.values(out)) group.sort(byDue);
+  return out;
 }

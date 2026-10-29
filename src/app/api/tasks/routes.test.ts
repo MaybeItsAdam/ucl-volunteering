@@ -137,6 +137,7 @@ describe("/api/tasks/[id]", () => {
     expect(response.status).toBe(200);
     expect(audit).toHaveBeenCalledWith("member-1", "planner.task.update", "task", "task-1", {
       title: "Book the minibus",
+      eventId: null,
       from: { status: "backlog" },
       to: { status: "done" },
     });

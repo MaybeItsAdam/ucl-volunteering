@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "@/lib/types";
-import { columns, dueState, matches, nextStatus, readEventFilter } from "./format";
+import { columns, dueState, groupMine, matches, nextStatus, previousStatus, readEventFilter } from "./format";
 
 const ME = "me";
 const TODAY = "2026-10-05"; // a Monday
@@ -65,6 +65,22 @@ describe("matches", () => {
     expect(matches(mineForEvent, { mine: false, event: "actions" }, ME)).toBe(false);
     expect(matches(theirAction, { mine: false, event: "actions" }, ME)).toBe(true);
   });
+
+  it("filters by any one owner, and by every word searched for in the title or notes", () => {
+    const minibus = task({ assigneeId: "them", title: "Book the minibus", notes: "Ask Priya about the deposit" });
+    expect(matches(minibus, { mine: false, event: "all", owner: "them" }, ME)).toBe(true);
+    expect(matches(minibus, { mine: false, event: "all", owner: "other" }, ME)).toBe(false);
+    expect(matches(minibus, { mine: true, event: "all", owner: "them" }, ME)).toBe(false);
+    expect(matches(minibus, { mine: false, event: "all", q: "MINIBUS priya" }, ME)).toBe(true);
+    expect(matches(minibus, { mine: false, event: "all", q: "minibus insurance" }, ME)).toBe(false);
+  });
+});
+
+describe("previousStatus", () => {
+  it("steps back a column, and stops at the first", () => {
+    expect(previousStatus("events", "ready_to_post")).toBe("planned");
+    expect(previousStatus("documents", "backlog")).toBeNull();
+  });
 });
 
 describe("columns", () => {
@@ -93,5 +109,28 @@ describe("nextStatus", () => {
     expect(nextStatus("documents", "backlog")).toBe("drafting");
     expect(nextStatus("documents", "submitted")).toBe("approved");
     expect(nextStatus("documents", "approved")).toBeNull();
+  });
+});
+
+describe("groupMine", () => {
+  it("groups my unfinished items by how soon they're due, soonest first", () => {
+    const mine = (id: string, dueOn: string | null, extra = {}) => task({ id, assigneeId: ME, dueOn, ...extra });
+    const groups = groupMine(
+      [
+        mine("late", "2026-10-01"),
+        mine("soon2", "2026-10-09"),
+        mine("soon1", "2026-10-06"),
+        mine("far", "2026-12-01"),
+        mine("none", null),
+        mine("done", "2026-10-01", { completedAt: "2026-10-02T00:00:00.000Z" }),
+        task({ id: "theirs", assigneeId: "them", dueOn: "2026-10-06" }),
+      ],
+      ME,
+      TODAY,
+    );
+    expect(groups.overdue.map((t) => t.id)).toEqual(["late"]);
+    expect(groups.week.map((t) => t.id)).toEqual(["soon1", "soon2"]);
+    expect(groups.later.map((t) => t.id)).toEqual(["far"]);
+    expect(groups.undated.map((t) => t.id)).toEqual(["none"]);
   });
 });

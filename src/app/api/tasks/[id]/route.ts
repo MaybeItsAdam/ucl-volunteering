@@ -42,7 +42,7 @@ export async function PATCH(request: Request, { params }: Params) {
       from[field] = before[field as keyof typeof before];
       to[field] = task[field as keyof typeof task];
     }
-    await audit(auth.member.id, "planner.task.update", "task", task.id, { title: task.title, from, to });
+    await audit(auth.member.id, "planner.task.update", "task", task.id, { title: task.title, eventId: task.eventId, from, to });
     return NextResponse.json({ task });
   } catch (e) {
     return errorResponse(e);
