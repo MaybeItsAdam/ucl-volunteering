@@ -99,6 +99,7 @@ export async function PlannerPage({ board, searchParams }: { board: TaskBoard; s
         today={today}
         initialFilter={filter}
         openNew={first(params.new) === "1"}
+        openTaskId={isUuid(first(params.task)) ? first(params.task) : undefined}
       />
     </section>
   );

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { FileText, Plus } from "lucide-react";
-import { listCommittee } from "@/lib/plan";
+import { listCommittee, listEvents } from "@/lib/plan";
 import { londonDayKey } from "@/lib/planTime";
 import { listTasks } from "@/lib/tasks";
 import { BOARD_STATUSES, TASK_BOARDS, TASK_BOARD_LABELS, TASK_STATUS_LABELS, type CommitteeMember, type Task } from "@/lib/types";
+import { CopyTasks } from "./CopyTasks";
 import { addTaskHref, boardEventHref, columns, DUE_TAG, dueState, statusTag } from "./format";
 import "./planner.css";
 
@@ -24,6 +25,20 @@ export async function EventTasks({ eventId, canEdit }: { eventId: string; canEdi
     loadError = true;
   }
   const names = new Map(committee.map((m) => [m.id, m.name]));
+  // Events to copy a checklist from: the last year's, newest first, with something to copy.
+  let copyFrom: { id: string; title: string; startsAt: string }[] = [];
+  if (canEdit && !loadError) {
+    try {
+      const now = Date.now();
+      const events = await listEvents(new Date(now - 365 * 86_400_000), new Date(now + 120 * 86_400_000));
+      copyFrom = events
+        .filter((e) => e.id !== eventId && e.status !== "cancelled")
+        .sort((a, b) => b.startsAt.localeCompare(a.startsAt))
+        .map((e) => ({ id: e.id, title: e.title, startsAt: e.startsAt }));
+    } catch (error) {
+      console.error("[planner] events to copy from", error);
+    }
+  }
   const today = londonDayKey(new Date());
   // Furthest along first within each board, events board before documents, finished items last.
   const open: Task[] = [];
@@ -75,6 +90,7 @@ export async function EventTasks({ eventId, canEdit }: { eventId: string; canEdi
         <Link href={boardEventHref("documents", eventId)} className="button small ghost">
           Documents board
         </Link>
+        {canEdit && copyFrom.length > 0 && <CopyTasks toEventId={eventId} events={copyFrom} />}
         {canEdit && (
           <>
             <Link href={addTaskHref("events", eventId)} className="button small">

@@ -1,7 +1,10 @@
 "use client";
 
 import { useId, useState, type FormEvent } from "react";
+import { MessageCircle } from "lucide-react";
 import { Sheet } from "@/components/Sheet";
+import { taskShareText } from "@/lib/activity";
+import { ActivityFeed } from "./ActivityFeed";
 import {
   BOARD_STATUSES,
   isBoardStatus,
@@ -14,7 +17,7 @@ import {
   type TaskStatus,
 } from "@/lib/types";
 import { createTask, deleteTask, patchTask } from "./api";
-import { COLUMN_HINT, eventOptionLabel, type EventOption } from "./format";
+import { boardHref, COLUMN_HINT, eventOptionLabel, type EventOption } from "./format";
 
 /** What a new item starts with: the board it's added on, the event the board is filtered to, and its owner (you by default). */
 export interface TaskDraft {
@@ -265,6 +268,20 @@ export function TaskSheet({
           </p>
         )}
 
+        {task && (
+          <a
+            className="button small planner-share"
+            href={`https://wa.me/?text=${encodeURIComponent(
+              taskShareText(task, committee.find((m) => m.id === task.assigneeId)?.name ?? null, `${process.env.NEXT_PUBLIC_APP_URL || "https://uclvolunteering.org"}${boardHref(task.board)}?task=${task.id}`),
+            )}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <MessageCircle size={14} aria-hidden="true" />
+            Share on WhatsApp
+          </a>
+        )}
+
         {error && (
           <p className="planner-error" role="alert">
             {error}
@@ -294,6 +311,7 @@ export function TaskSheet({
           )}
         </div>
       </form>
+      {task && <ActivityFeed type="task" id={task.id} canComment={canEdit} />}
     </Sheet>
   );
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { ArrowRight, FileText, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, FileText, Plus } from "lucide-react";
 import {
   BOARD_STATUSES,
   finalStatus,
@@ -24,6 +24,7 @@ import {
   eventOptionLabel,
   matches,
   nextStatus,
+  previousStatus,
   type EventOption,
   type TaskFilter,
 } from "./format";
@@ -57,6 +58,7 @@ export function PlannerBoard({
   today,
   initialFilter,
   openNew,
+  openTaskId,
 }: {
   board: TaskBoard;
   /** This board's items. */
@@ -71,6 +73,8 @@ export function PlannerBoard({
   initialFilter: TaskFilter;
   /** Open the add sheet at once (from an event's "Add"). */
   openNew: boolean;
+  /** Open this item's sheet at once (from a shared link). */
+  openTaskId?: string;
 }) {
   // Re-seed when the server sends a fresh list.
   const [seen, setSeen] = useState(initialTasks);
@@ -82,7 +86,11 @@ export function PlannerBoard({
   const statuses: readonly TaskStatus[] = BOARD_STATUSES[board];
   const [filter, setFilter] = useState(initialFilter);
   const [column, setColumn] = useState<TaskStatus>("backlog");
-  const [editing, setEditing] = useState<Task | "new" | null>(openNew && canEdit ? "new" : null);
+  const [editing, setEditing] = useState<Task | "new" | null>(
+    openNew && canEdit ? "new" : (initialTasks.find((t) => t.id === openTaskId) ?? null),
+  );
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [dropOn, setDropOn] = useState<TaskStatus | null>(null);
   const [quick, setQuick] = useState("");
   const [quickWho, setQuickWho] = useState(myId);
   const [adding, setAdding] = useState(false);
@@ -161,6 +169,30 @@ export function PlannerBoard({
             Mine
           </button>
         </div>
+        <label className="planner-search">
+          <span className="sr-only">Search items</span>
+          <input
+            type="search"
+            className="input"
+            value={filter.q ?? ""}
+            onChange={(e) => setFilter({ ...filter, q: e.target.value })}
+            placeholder="Search"
+            autoComplete="off"
+          />
+        </label>
+        {!filter.mine && (
+          <label>
+            <span className="sr-only">Owner</span>
+            <select className="input" value={filter.owner ?? ""} onChange={(e) => setFilter({ ...filter, owner: e.target.value })}>
+              <option value="">Anyone</option>
+              {committee.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="planner-event-filter">
           <span className="sr-only">Actions or an event</span>
           <select className="input" value={filter.event} onChange={(e) => changeFilter({ ...filter, event: e.target.value })}>
@@ -252,7 +284,21 @@ export function PlannerBoard({
             key={status}
             className="panel flush planner-column"
             data-active={column === status ? "" : undefined}
+            data-drop={dropOn === status ? "" : undefined}
             aria-label={TASK_STATUS_LABELS[status]}
+            onDragOver={(e) => {
+              if (!dragging) return;
+              e.preventDefault();
+              setDropOn(status);
+            }}
+            onDragLeave={() => setDropOn((on) => (on === status ? null : on))}
+            onDrop={(e) => {
+              e.preventDefault();
+              const task = tasks.find((t) => t.id === dragging);
+              setDragging(null);
+              setDropOn(null);
+              if (task && task.status !== status) void advance(task, status);
+            }}
           >
             <div className="panel-head">
               <span className="micro-label">{TASK_STATUS_LABELS[status]}</span>
@@ -265,8 +311,20 @@ export function PlannerBoard({
                   const due = dueState(task, today);
                   const who = names.get(task.assigneeId);
                   const next = nextStatus(board, task.status);
+                  const back = previousStatus(board, task.status);
                   return (
-                    <li key={task.id} className="planner-task" data-finished={task.completedAt ? "" : undefined}>
+                    <li
+                      key={task.id}
+                      className="planner-task"
+                      data-finished={task.completedAt ? "" : undefined}
+                      data-dragging={dragging === task.id ? "" : undefined}
+                      draggable={canEdit}
+                      onDragStart={() => setDragging(task.id)}
+                      onDragEnd={() => {
+                        setDragging(null);
+                        setDropOn(null);
+                      }}
+                    >
                       <button type="button" className="planner-task-title" onClick={() => setEditing(task)}>
                         {task.title}
                       </button>
@@ -295,16 +353,30 @@ export function PlannerBoard({
                           </span>
                           {task.assigneeId === myId ? "You" : (who?.name ?? "Former member")}
                         </span>
-                        {canEdit && next && (
-                          <button
-                            type="button"
-                            className="button small"
-                            onClick={() => advance(task, next)}
-                            aria-label={`Move ${task.title} to ${TASK_STATUS_LABELS[next]}`}
-                          >
-                            {TASK_STATUS_LABELS[next]}
-                            <ArrowRight size={14} aria-hidden="true" />
-                          </button>
+                        {canEdit && (back || next) && (
+                          <span className="planner-task-moves">
+                            {back && (
+                              <button
+                                type="button"
+                                className="button small ghost"
+                                onClick={() => advance(task, back)}
+                                aria-label={`Move ${task.title} back to ${TASK_STATUS_LABELS[back]}`}
+                              >
+                                <ArrowLeft size={14} aria-hidden="true" />
+                              </button>
+                            )}
+                            {next && (
+                              <button
+                                type="button"
+                                className="button small"
+                                onClick={() => advance(task, next)}
+                                aria-label={`Move ${task.title} to ${TASK_STATUS_LABELS[next]}`}
+                              >
+                                {TASK_STATUS_LABELS[next]}
+                                <ArrowRight size={14} aria-hidden="true" />
+                              </button>
+                            )}
+                          </span>
                         )}
                       </div>
                     </li>
