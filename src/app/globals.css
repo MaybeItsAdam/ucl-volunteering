@@ -654,6 +654,46 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); widt
 .account-settings { max-width: 720px; }
 .account-settings .panel .theme-setting { margin-bottom: 8px; }
 .account-settings form { margin: 0; }
+.account-settings .panel > p + .button,
+.account-settings .panel > p + form,
+.account-settings .panel > ul + .button { margin-top: 4px; }
+.account-settings .panel > .details + .button { margin-top: 0; }
+.account-settings .details dd a { text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--dim); }
+
+/* One row per kind of notification: what it is, and a switch. */
+.settings-switches { list-style: none; margin: 0 0 12px; padding: 0; border-top: 1px solid var(--line); }
+.settings-switches li { border-bottom: 1px solid var(--line); }
+.settings-switches label {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  min-height: 56px; padding: 10px 0; cursor: pointer;
+}
+.settings-switches label > span { display: grid; gap: 2px; min-width: 0; }
+
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 8px; }
+.settings-row > span { display: inline-flex; align-items: center; gap: 8px; }
+.settings-error { color: var(--danger-text); font-size: 13px; margin: 8px 0; }
+.settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.settings-confirm p { margin: 6px 0 0; }
+
+/* A toggle switch: a checkbox with role="switch". The track and knob are
+   genuinely round; checked fills azure. */
+.switch {
+  appearance: none; -webkit-appearance: none; flex: none; position: relative;
+  width: 40px; height: 24px; margin: 0;
+  border: 1px solid var(--line-input); border-radius: 9999px;
+  background: var(--well); cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.switch::before {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 18px; height: 18px; border-radius: 9999px;
+  background: var(--raised); border: 1px solid var(--line-input);
+  transition: transform .15s ease;
+}
+.switch:checked { background: var(--primary); border-color: var(--primary); }
+.switch:checked::before { transform: translateX(16px); border-color: var(--primary); }
+.switch:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.switch:disabled { opacity: .5; cursor: default; }
 
 
 /* The phone app, swapping a UCL sign-in for a session (NativeAuthBridge). */

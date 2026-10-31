@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CollectionAlerts } from "@/components/CollectionAlerts";
 import { MyTaskDone } from "@/components/planner/MyTaskDone";
 import { boardHref, DUE_TAG, dueState, eventOptionLabel, groupMine, MINE_GROUP_LABELS, type MineGroup } from "@/components/planner/format";
 import { can, profileOf } from "@/lib/access";
@@ -47,11 +46,6 @@ export default async function MyTasksPage() {
           <p>Reload the page to try again</p>
         </div>
       )}
-
-      <CollectionAlerts
-        blurb="Get a nudge each morning when something of yours is overdue or due soon, and when a café has food ready to collect"
-        onBlurb="You'll get a nudge when something of yours is overdue or due soon, and when food is ready to collect"
-      />
 
       {!loadError && total === 0 && (
         <div className="panel">

@@ -188,3 +188,11 @@ export interface Task {
   updatedAt: string;
   completedAt: string | null;
 }
+
+/** Which kinds of notification one phone gets (push_devices, set in Settings). */
+export interface PushPreferences {
+  /** A café has food ready to collect. */
+  food_alerts: boolean;
+  /** The committee's morning nudge about their own tasks. */
+  task_reminders: boolean;
+}
