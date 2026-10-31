@@ -315,6 +315,11 @@ export function parseEntry(body: unknown): Result<Omit<DirectoryRow, "id" | "slu
 
 // ── Reading ────────────────────────────────────────────────────────────────
 
+/** The text the map looks an entry's place up by: its address and postcode. */
+export function entryPlace(e: Pick<DirectoryEntry, "address" | "postcode">): string | null {
+  return [e.address, e.postcode].filter(Boolean).join(", ") || null;
+}
+
 /** "Tue 18:00–20:00" */
 export function sessionLabel(s: Pick<Session, "weekday" | "start" | "end">): string {
   return `${WEEKDAYS[s.weekday - 1]} ${s.start}–${s.end}`;

@@ -4,6 +4,8 @@ import { audit } from "@/lib/audit";
 import { DIRECTORY_COLUMNS, fromRow, parseEntry, type DirectoryRow } from "@/lib/directory";
 import { isUuid } from "@/lib/plan";
 import { londonDayKey } from "@/lib/planTime";
+import { fillPlaces } from "@/lib/places";
+import { entryPlace } from "@/lib/directory";
 import { requireApiCapability } from "@/lib/session";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 
@@ -43,6 +45,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
   if (!data) return NextResponse.json({ error: "No such entry" }, { status: 404 });
   const entry = fromRow(data as unknown as DirectoryRow);
+  await fillPlaces([entryPlace(entry)], { limit: 1 });
   await audit(auth.member.id, Object.keys(update).length === 1 ? "directory.verify" : "directory.update", "directory_entry", id, {
     title: `${entry.organisation} · ${entry.title}`,
   });

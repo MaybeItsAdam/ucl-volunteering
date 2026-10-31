@@ -31,7 +31,8 @@ export default async function OpportunitiesPage() {
       </header>
       <p className="muted pub-lede">
         Places we know UCL students can volunteer, with when to turn up, how to sign up and what you&apos;ll need. Checked by
-        the committee. Know somewhere that should be here? <Link href="/volunteer">Tell us</Link>
+        the committee. See them all by day on the <Link href="/timetable">timetable and map</Link>. Know somewhere that
+        should be here? <Link href="/volunteer">Tell us</Link>
       </p>
       {failed ? (
         <div className="notice bad" role="alert">

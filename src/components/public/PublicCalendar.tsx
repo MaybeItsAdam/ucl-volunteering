@@ -10,10 +10,12 @@ import {
   Link2,
   ListFilter,
   MapPin,
+  MapPinned,
   Search,
   Ticket,
   X,
 } from "lucide-react";
+import Link from "next/link";
 import { Sheet } from "@/components/Sheet";
 import { CalendarLinks } from "@/components/plan/CalendarLinks";
 import { dayLabel, googleAddUrl, hourLabel, timeRange, WEEKDAYS_SHORT, weekRange } from "@/components/plan/format";
@@ -398,6 +400,10 @@ export function PublicCalendar({
               List
             </button>
           </div>
+          <Link className="button small" href="/timetable" title="Everything this week, with drop-ins and a map">
+            <MapPinned size={15} aria-hidden="true" />
+            Map
+          </Link>
           <CalendarLinks
             feeds={[
               {

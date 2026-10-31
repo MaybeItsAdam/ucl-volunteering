@@ -4,7 +4,8 @@ import { cronBearerMatches, cronOrCommittee } from "@/lib/cronAuth";
 import { getCurrentMember } from "@/lib/session";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { runOrganiserSync } from "@/lib/toolboxEvents";
-import { runCommunitySync } from "@/lib/communityEvents";
+import { listCommunityEvents, runCommunitySync } from "@/lib/communityEvents";
+import { fillPlaces } from "@/lib/places";
 import { can, profileOf } from "@/lib/access";
 
 /**
@@ -30,6 +31,13 @@ async function run(actorId: string | null) {
   }
   const result = await runOrganiserSync();
   const community = await runCommunitySync();
+  // Pins for /timetable's map: new event locations, looked up once and kept.
+  try {
+    const { events } = await listCommunityEvents();
+    await fillPlaces(events.map((e) => e.location));
+  } catch (error) {
+    console.error(`[sync] places: ${error instanceof Error ? error.message : error}`);
+  }
   if (actorId) {
     await audit(actorId, "sync.organiser_events", "sync_run", result.runId ?? "unrecorded", result.ok ? { ...result.summary } : { error: result.error });
     await audit(actorId, "sync.community_events", "sync_run", community.runId ?? "unrecorded", community.ok ? { ...community.summary } : { error: community.error });
