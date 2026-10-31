@@ -18,12 +18,14 @@ describe("recognising places", () => {
   it("knows UCL's buildings, the specific name before plain UCL", () => {
     expect(knownPlace("Student Centre, room 3.01")).toEqual({ lat: 51.5253, lng: -0.1326 });
     expect(knownPlace("UCL Cruciform Building B404")).toEqual({ lat: 51.5242, lng: -0.135 });
+    expect(knownPlace("Room 130 Foster Court")).toEqual({ lat: 51.5234, lng: -0.1328 });
     expect(knownPlace("Some hall in Hackney")).toBeNull();
   });
 
   it("doesn't pin online events", () => {
     expect(isPlaceless("Online (Zoom)")).toBe(true);
     expect(isPlaceless("Location TBC")).toBe(true);
+    expect(isPlaceless("TBD")).toBe(true);
     expect(isPlaceless("Bloomsbury Theatre")).toBe(false);
   });
 });

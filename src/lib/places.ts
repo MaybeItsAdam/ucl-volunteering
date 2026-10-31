@@ -23,7 +23,7 @@ export function extractPostcode(text: string): string | null {
 
 /** Text that means "no place to pin": online, TBC and the like. */
 export function isPlaceless(text: string): boolean {
-  return /\b(online|zoom|teams|virtual|remote|google meet|tbc|tba|to be confirmed|various|see description)\b/i.test(text);
+  return /\b(online|zoom|teams|virtual|remote|google meet|tbc|tba|tbd|to be (confirmed|decided|announced)|various|see description)\b/i.test(text);
 }
 
 /**
@@ -36,6 +36,7 @@ export const KNOWN_PLACES: { match: RegExp; point: Point }[] = [
   { match: /bloomsbury theatre/i, point: { lat: 51.5249, lng: -0.1323 } },
   { match: /cruciform/i, point: { lat: 51.5242, lng: -0.135 } },
   { match: /\bioe\b|institute of education|20 bedford way/i, point: { lat: 51.5225, lng: -0.1296 } },
+  { match: /foster court|malet place/i, point: { lat: 51.5234, lng: -0.1328 } },
   { match: /bentham house/i, point: { lat: 51.5262, lng: -0.1311 } },
   { match: /ucl east|marshgate|one pool street/i, point: { lat: 51.5395, lng: -0.0138 } },
   { match: /wilkins|main quad|north cloisters|south cloisters|gustave tuck|darwin (building|lecture)|\bjz young\b|chadwick|roberts building|pearson building|medawar/i, point: { lat: 51.5246, lng: -0.134 } },
@@ -91,6 +92,13 @@ export async function cachedPlaces(texts: (string | null | undefined)[]): Promis
     const { data, error } = await getSupabaseAdmin().from("places").select("query,lat,lng").in("query", keys.slice(i, i + 200)).not("lat", "is", null);
     if (error) throw new Error(`places: ${error.message}`);
     for (const row of data ?? []) out[row.query as string] = { lat: row.lat as number, lng: row.lng as number };
+  }
+  // A UCL building we know by name needs no lookup, so it pins even when the
+  // cache holds an older miss for that text (misses wait a month to retry).
+  for (const key of keys) {
+    if (out[key] || isPlaceless(key)) continue;
+    const known = knownPlace(key);
+    if (known) out[key] = known;
   }
   return out;
 }
