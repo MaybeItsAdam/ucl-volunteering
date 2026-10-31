@@ -43,6 +43,7 @@ const dayName = new Intl.DateTimeFormat("en-GB", { weekday: "short", timeZone: "
 const dayNum = new Intl.DateTimeFormat("en-GB", { day: "numeric", timeZone: "UTC" });
 const monthName = new Intl.DateTimeFormat("en-GB", { month: "short", timeZone: "UTC" });
 const clock = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" });
+const pinTime = new Intl.DateTimeFormat("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" });
 const longDay = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: "Europe/London" });
 
 const asDate = (key: string) => new Date(`${key}T12:00:00Z`);
@@ -97,7 +98,22 @@ export function Timetable({
   const shown = useMemo(() => all.filter((i) => matchesTimetable(i, filter)), [all, filter]);
   const visibleDays = useMemo(() => (phone ? [days[phoneDay]] : days), [phone, days, phoneDay]);
   const layout = useMemo(() => layoutWeek(shown, visibleDays), [shown, visibleDays]);
-  const groups = useMemo(() => groupByPlace(shown, places), [shown, places]);
+  const groups = useMemo(
+    () =>
+      groupByPlace(shown, places).map((g) => ({
+        ...g,
+        items: g.items.map((i) => ({
+          id: i.id,
+          title: i.title,
+          href: i.href,
+          external: i.external,
+          kind: i.kind,
+          location: i.location,
+          detail: `${i.allDay ? "All day" : pinTime.format(new Date(i.startsAt))} · ${i.host}`,
+        })),
+      })),
+    [shown, places],
+  );
   const unplaced = shown.filter((i) => !i.place || !places[i.place]).length;
   const selected = shown.find((i) => i.id === selectedId) ?? null;
 

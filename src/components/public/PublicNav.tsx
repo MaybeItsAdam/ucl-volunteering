@@ -12,7 +12,7 @@ import { CalendarDays, Compass, HandHeart, LayoutDashboard, LogIn, MapPinned, Sp
 export const PUBLIC_LINKS = [
   { href: "/calendar", label: "Calendar", short: "Calendar", icon: CalendarDays },
   { href: "/timetable", label: "Timetable", short: "Timetable", icon: MapPinned, wideOnly: true },
-  { href: "/opportunities", label: "Opportunities", short: "Explore", icon: Compass },
+  { href: "/opportunities", label: "Volunteer in London", short: "Explore", icon: Compass },
   { href: "/volunteer", label: "Volunteer", short: "Volunteer", icon: HandHeart },
   { href: "/zero-food-waste", label: "Zero Food Waste", short: "Food waste", icon: Sprout },
 ] as const;

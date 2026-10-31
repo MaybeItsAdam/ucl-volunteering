@@ -4,12 +4,24 @@ import { useEffect, useRef, useState } from "react";
 import type { LayerGroup, Map as LeafletMap, Marker } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Point } from "@/lib/placeKey";
-import type { TimetableItem } from "@/lib/timetable";
+
+/** One thing listed in a pin's popup. */
+export interface PinItem {
+  id: string;
+  title: string;
+  href: string;
+  external: boolean;
+  /** Regular sessions and directory places are green; events are blue. */
+  kind: "session" | "place" | "event";
+  location: string | null;
+  /** The grey line under the title: when, and who runs it. */
+  detail: string;
+}
 
 export interface PinGroup {
   key: string;
   point: Point;
-  items: TimetableItem[];
+  items: PinItem[];
 }
 
 // UCL's main quad: where the map starts when nothing is pinned yet.
@@ -27,15 +39,13 @@ const isDark = () =>
 
 const escape = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-const time = new Intl.DateTimeFormat("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/London" });
-
 function popupHtml(group: PinGroup): string {
   const rows = group.items
     .slice(0, 8)
     .map(
       (i) =>
         `<li><a href="${escape(i.href)}"${i.external ? ' target="_blank" rel="noreferrer"' : ""}>${escape(i.title)}</a>` +
-        `<span>${escape(i.allDay ? "All day" : time.format(new Date(i.startsAt)))} · ${escape(i.host)}</span></li>`,
+        `<span>${escape(i.detail)}</span></li>`,
     )
     .join("");
   const more = group.items.length > 8 ? `<p>and ${group.items.length - 8} more</p>` : "";
@@ -43,7 +53,7 @@ function popupHtml(group: PinGroup): string {
 }
 
 /**
- * The week's places on a map. One pin per spot, numbered when several things
+ * Places on a map (the timetable's week, or /opportunities). One pin per spot, numbered when several things
  * happen there; the selected item's pin is highlighted and opened. Leaflet
  * touches `window`, so it is loaded inside the effect, never on the server.
  */
@@ -51,10 +61,14 @@ export function TimetableMap({
   groups,
   selectedId,
   onSelect,
+  className = "tt-map",
+  label = "Map of this week's places",
 }: {
   groups: PinGroup[];
   selectedId: string | null;
   onSelect: (itemId: string) => void;
+  className?: string;
+  label?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<LeafletMap | null>(null);
@@ -111,7 +125,7 @@ export function TimetableMap({
       const count = group.items.length;
       const icon = L.divIcon({
         className: "tt-pin-wrap",
-        html: `<span class="tt-pin${group.items.some((i) => i.kind === "session") ? " tt-pin-session" : ""}">${count > 1 ? count : ""}</span>`,
+        html: `<span class="tt-pin${group.items.some((i) => i.kind !== "event") ? " tt-pin-session" : ""}">${count > 1 ? count : ""}</span>`,
         iconSize: [26, 26],
         iconAnchor: [13, 13],
       });
@@ -138,5 +152,5 @@ export function TimetableMap({
     marker.openPopup();
   }, [selectedId, groups, ready]);
 
-  return <div ref={box} className="tt-map" role="region" aria-label="Map of this week's places" />;
+  return <div ref={box} className={className} role="region" aria-label={label} />;
 }

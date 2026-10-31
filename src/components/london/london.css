@@ -1,0 +1,56 @@
+/* /opportunities: volunteering in London. The list and its filters on the
+   left, the map on the right and held in view; on a phone, only the map. */
+
+.pub-main > .vl-page { max-width: 1400px; }
+
+.vl { display: grid; grid-template-columns: minmax(340px, 460px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.vl-list-col { display: grid; gap: 12px; min-width: 0; }
+
+/* The filters stay put while the list scrolls under them. */
+.vl-filters { position: sticky; top: 72px; z-index: 2; }
+.vl-filters .segmented { justify-self: start; }
+
+.vl-section { display: grid; gap: 8px; }
+.vl-section > h2 { margin: 0; }
+.dir-card h3 { margin: 0; font-size: 18px; }
+.dir-card h3 a { color: var(--ink); text-decoration: none; }
+.dir-card h3 a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.dir-card[data-selected] { border-color: var(--primary); outline: 1px solid var(--primary); outline-offset: -2px; }
+.vl-event { border-left: 3px solid var(--vl-colour, var(--primary)); }
+.vl-locate { justify-self: start; gap: 4px; }
+.vl-locate[aria-pressed="true"] { color: var(--info-text); }
+
+.vl-map-col { position: sticky; top: 72px; isolation: isolate; }
+.vl-map-search { display: none; }
+.vl-map {
+  height: calc(100vh - 96px); height: calc(100dvh - 96px); min-height: 420px;
+  border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--alt);
+}
+
+/* Narrow laptops: a little less list. */
+@media (max-width: 1000px) {
+  .vl { grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); }
+}
+
+/* Phones: the map and nothing else, from the top of the screen to the tab bar. */
+@media (max-width: 768px) {
+  .pub-main:has(> .vl-page) { padding: 0; }
+  .vl-page > .page-head, .vl-page > .pub-lede, .vl-list-col { display: none; }
+  .vl { display: block; }
+  .vl-map-col {
+    position: fixed; z-index: 0;
+    top: 0; left: 0; right: 0;
+    /* The tab bar: 4px above, 46px of tab, the larger of 4px or the home indicator below, and its hairline. */
+    bottom: calc(51px + max(4px, var(--safe-bottom)));
+  }
+  .vl-map { height: 100%; min-height: 0; border: 0; border-radius: 0; }
+  /* Search across the top; Leaflet's zoom buttons drop below it. */
+  .vl-map-search {
+    display: flex; align-items: center; gap: 8px;
+    position: absolute; z-index: 1000;
+    top: calc(var(--safe-top) + 12px); left: 16px; right: 16px;
+  }
+  .vl-map-search .input { flex: 1; min-width: 0; font-size: 16px; min-height: 44px; background: var(--surface); }
+  .vl-map-count { flex: none; background: var(--surface); }
+  .vl-map .leaflet-top { top: calc(var(--safe-top) + 64px); }
+}
