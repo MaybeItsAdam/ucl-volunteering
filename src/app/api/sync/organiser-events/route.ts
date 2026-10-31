@@ -6,6 +6,8 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { runOrganiserSync } from "@/lib/toolboxEvents";
 import { listCommunityEvents, runCommunitySync } from "@/lib/communityEvents";
 import { fillPlaces } from "@/lib/places";
+import { listDirectory } from "@/lib/directoryStore";
+import { entryPlace } from "@/lib/directory";
 import { can, profileOf } from "@/lib/access";
 
 /**
@@ -31,10 +33,13 @@ async function run(actorId: string | null) {
   }
   const result = await runOrganiserSync();
   const community = await runCommunitySync();
-  // Pins for /timetable's map: new event locations, looked up once and kept.
+  // Pins for the maps on /timetable and /opportunities: directory places,
+  // their session venues and event locations not yet looked up. Each is
+  // looked up once and kept, so entries made before the cache existed catch
+  // up here.
   try {
-    const { events } = await listCommunityEvents();
-    await fillPlaces(events.map((e) => e.location));
+    const [{ events }, entries] = await Promise.all([listCommunityEvents(), listDirectory({ activeOnly: true })]);
+    await fillPlaces([...entries.flatMap((e) => [entryPlace(e), ...e.sessions.map((s) => s.where)]), ...events.map((e) => e.location)]);
   } catch (error) {
     console.error(`[sync] places: ${error instanceof Error ? error.message : error}`);
   }
