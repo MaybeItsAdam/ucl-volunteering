@@ -212,8 +212,11 @@ async function deliver(devices: Device[], message: PushMessage): Promise<PushRes
   return result;
 }
 
-async function devicesWhere(memberId?: string): Promise<Device[]> {
-  let query = getSupabaseAdmin().from("push_devices").select("token,platform");
+/** Each kind of notification a phone can switch off on its own (Settings). */
+export type PushTopic = "food_alerts" | "task_reminders";
+
+async function devicesWhere(topic: PushTopic, memberId?: string): Promise<Device[]> {
+  let query = getSupabaseAdmin().from("push_devices").select("token,platform").eq(topic, true);
   if (memberId) query = query.eq("member_id", memberId);
   const { data, error } = await query;
   if (error) {
@@ -223,12 +226,12 @@ async function devicesWhere(memberId?: string): Promise<Device[]> {
   return (data ?? []) as Device[];
 }
 
-/** Notify every device that opted in. */
+/** Notify every device that opted in to food alerts. */
 export async function pushToEveryone(message: PushMessage): Promise<PushResult> {
-  return deliver(await devicesWhere(), message);
+  return deliver(await devicesWhere("food_alerts"), message);
 }
 
-/** Notify one member's phones: the ones they opted in while signed in. */
+/** Send one member their task reminders: the phones they opted in while signed in. */
 export async function pushToMember(memberId: string, message: PushMessage): Promise<PushResult> {
-  return deliver(await devicesWhere(memberId), message);
+  return deliver(await devicesWhere("task_reminders", memberId), message);
 }
