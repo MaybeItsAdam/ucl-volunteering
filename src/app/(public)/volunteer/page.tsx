@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ReviewerTap } from "@/components/public/ReviewerTap";
 import { VolunteerForm } from "@/components/public/VolunteerForm";
 import { getCurrentMember } from "@/lib/session";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
@@ -40,10 +41,10 @@ export default async function VolunteerPage() {
       ) : (
         <div className="panel pub-signin">
           <span className="micro-label">Sign in first</span>
-          <p>
+          <ReviewerTap next="/volunteer">
             Signing up takes your UCL login, so we know every name on the list is a UCL student and you can come back and
             change your answers any time
-          </p>
+          </ReviewerTap>
           <a className="button primary" href="/api/auth/start?next=/volunteer">
             Continue with UCL sign-in
           </a>
