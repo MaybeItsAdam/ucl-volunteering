@@ -713,3 +713,51 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); widt
   .app-shell.has-tabs .app-main { padding-bottom: calc(76px + var(--safe-bottom)); }
   .app-main .page { gap: 12px; grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ==========================================================================
+   OFFLINE BANNER AND DEAD ENDS
+
+   The banner floats above the tab bar (OfflineBanner measures it into
+   --offline-lift) while the phone has no connection: a warning-tinted tag,
+   then a brief success one when it's back. Dead ends are the 404 and error
+   pages: the hand, a heading, a one-liner and a way out.
+   ========================================================================== */
+
+.offline-banner {
+  position: fixed; z-index: 90;
+  left: max(12px, var(--safe-left)); right: max(12px, var(--safe-right));
+  bottom: calc(var(--offline-lift, 0px) + max(12px, var(--safe-bottom)));
+  margin: 0 auto; max-width: 440px;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--warn-line); border-radius: var(--radius-control);
+  background: color-mix(in srgb, var(--warning) 14%, var(--raised));
+  color: var(--ink); font-size: 13px; line-height: 1.4;
+  animation: offline-in .2s ease-out;
+}
+.offline-banner > svg { flex: none; margin-top: 1px; color: var(--warning-text); }
+.offline-banner.is-back {
+  border-color: color-mix(in srgb, var(--success) 55%, transparent);
+  background: color-mix(in srgb, var(--success) 14%, var(--raised));
+}
+.offline-banner.is-back > svg { color: var(--success-text); }
+.offline-banner-text { flex: 1; min-width: 0; }
+.offline-banner-text > span { color: var(--muted); }
+.offline-banner-close {
+  position: relative; flex: none; display: grid; place-items: center;
+  width: 22px; height: 22px; margin: -2px -4px 0 0; padding: 0;
+  border: 0; border-radius: var(--radius-control); background: none; color: var(--muted); cursor: pointer;
+}
+.offline-banner-close::after { content: ""; position: absolute; inset: -11px; } /* 44px hit area */
+@keyframes offline-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .offline-banner { animation-duration: 1ms; } }
+
+.dead-end-page {
+  min-height: 100vh; min-height: 100dvh; display: grid; place-items: center;
+  padding: calc(24px + var(--safe-top)) max(16px, var(--safe-right)) calc(24px + var(--safe-bottom)) max(16px, var(--safe-left));
+}
+.dead-end { display: grid; justify-items: center; gap: 6px; max-width: 420px; margin: 48px auto; text-align: center; }
+.dead-end-mark { width: 64px; height: auto; margin-bottom: 12px; color: var(--ink); }
+.dead-end h1 { font-size: 28px; letter-spacing: -.01em; }
+.dead-end-quip { margin: 2px 0 18px; color: var(--muted); }
+.dead-end-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
