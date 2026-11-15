@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
     // Keep a tab the committee has just looked at for 30s, so flicking back to
     // it is instant instead of another round trip.
     staleTimes: { dynamic: 30 },
+    // A tap on a link with no signal waits and retries when the connection is
+    // back, instead of a full reload that fails into the browser's own
+    // ERR_INTERNET_DISCONNECTED page. OfflineBanner says why it's waiting.
+    useOffline: true,
   },
   outputFileTracingExcludes: {
     "*": ["legacy/**", "apps-script/**", "maps/**"],

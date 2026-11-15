@@ -8,7 +8,7 @@ const appUrl = process.env.CAPACITOR_APP_URL || "https://uclvolunteering.org";
 const config: CapacitorConfig = {
   appId: "org.uclvolunteering.app",
   appName: "VolSoc",
-  // Only shown when the first launch has no connection.
+  // Holds only the error page below; the app itself is the live site.
   webDir: "capacitor-dist",
   // Lets the site tell the app apart from a phone browser.
   appendUserAgent: "VolSocApp",
@@ -29,6 +29,10 @@ const config: CapacitorConfig = {
     // the app's is what's on.
     url: `${appUrl.replace(/\/+$/, "")}/calendar`,
     cleartext: appUrl.startsWith("http://"),
+    // Shown from the app bundle whenever a whole page fails to load (no signal,
+    // the site down; on Android any HTTP error too), instead of the WebView's
+    // own ERR_INTERNET_DISCONNECTED screen. Retries by itself once back online.
+    errorPath: "index.html",
   },
   plugins: {
     Browser: { presentationStyle: "popover" },

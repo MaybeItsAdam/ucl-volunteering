@@ -3,6 +3,7 @@ import { League_Spartan, Work_Sans } from "next/font/google";
 import { NativeAuthBridge } from "@/components/NativeAuthBridge";
 import { NativePushBridge } from "@/components/NativePushBridge";
 import { NativeSystemBars } from "@/components/NativeSystemBars";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { themeScript } from "@/lib/theme";
 import "./globals.css";
 
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <NativeAuthBridge />
         <NativePushBridge />
         <NativeSystemBars />
+        <OfflineBanner />
       </body>
     </html>
   );
