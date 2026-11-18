@@ -14,7 +14,8 @@
     "env:check": "node scripts/check-env.mjs",
     "cap:sync": "cap sync",
     "cap:ios": "cap open ios",
-    "cap:android": "cap open android"
+    "cap:android": "cap open android",
+    "indexnow": "node scripts/indexnow.mjs"
   },
   "dependencies": {
     "@capacitor-community/safe-area": "^7.0.0",

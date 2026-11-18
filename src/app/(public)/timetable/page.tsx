@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { JsonLd } from "@/components/JsonLd";
+import { breadcrumbs, pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { Timetable } from "@/components/timetable/Timetable";
 import { listCommunityEvents, type CommunityEvent, type CommunitySociety } from "@/lib/communityEvents";
@@ -10,10 +12,12 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import "@/components/directory/directory.css";
 import "@/components/timetable/timetable.css";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Volunteering timetable",
-  description: "Every regular session, drop-in and volunteering event in London this week, on one timetable with a map",
-};
+  description:
+    "Every regular volunteering session, drop-in and event in London this week on one timetable with a map, gathered by UCL Volunteering Society. No sign-in needed.",
+  path: "/timetable",
+});
 
 // The sync and the committee change it; a five-minute-old copy is fine.
 export const revalidate = 300;
@@ -36,6 +40,7 @@ export default async function TimetablePage() {
 
   return (
     <section className="page tt-page">
+      <JsonLd data={breadcrumbs([{ name: "Volunteering timetable", path: "/timetable" }])} />
       <header className="page-head">
         <span className="micro-label">This week</span>
         <h1>Volunteering timetable</h1>

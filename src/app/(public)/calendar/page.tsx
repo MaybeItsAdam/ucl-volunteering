@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { JsonLd } from "@/components/JsonLd";
+import { breadcrumbs, pageMetadata } from "@/lib/seo";
 import { PublicCalendar } from "@/components/public/PublicCalendar";
 import { listCommunityEvents, type CommunityEvent, type CommunitySociety } from "@/lib/communityEvents";
 import { isDayKey, isoWeekday, londonDayKey, mondayOf } from "@/lib/planTime";
@@ -6,10 +8,12 @@ import { isSupabaseConfigured } from "@/lib/supabase";
 import { toolboxUrl } from "@/lib/toolbox";
 import "@/components/plan/plan.css";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Volunteering calendar",
-  description: "Volunteering at UCL in one calendar: VolSoc, Student Social Impact, Street Aid and more",
-};
+  description:
+    "Volunteering at UCL in one calendar: events from VolSoc, UCL Student Social Impact, Street Aid and more, by week or as a list, with a feed to subscribe to.",
+  path: "/calendar",
+});
 
 type SearchParams = { [key: string]: string | string[] | undefined };
 
@@ -39,6 +43,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   return (
     <section className="page cal-page">
+      <JsonLd data={breadcrumbs([{ name: "Volunteering calendar", path: "/calendar" }])} />
       {loadError ? (
         <div className="notice bad" role="alert">
           <strong>Couldn&apos;t load the events</strong>

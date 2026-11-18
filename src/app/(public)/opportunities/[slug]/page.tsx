@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink, Mail } from "lucide-react";
 import { badges, CAUSES, isStale, labelOf, sessionLabel, SIGNUP_METHODS } from "@/lib/directory";
 import { getDirectoryEntry } from "@/lib/directoryStore";
+import { JsonLd } from "@/components/JsonLd";
+import { breadcrumbs, pageMetadata } from "@/lib/seo";
 import { londonDayKey, shortDate } from "@/lib/planTime";
 import "@/components/directory/directory.css";
 
@@ -18,8 +20,11 @@ async function load(slug: string) {
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const entry = await load((await params).slug);
-  return entry ? { title: `${entry.title} · ${entry.organisation}`, description: entry.summary } : { title: "Not found" };
+  const { slug } = await params;
+  const entry = await load(slug);
+  if (!entry) return { title: "Not found" };
+  const title = `${entry.title} · ${entry.organisation}`;
+  return { ...pageMetadata({ title, description: entry.summary, path: `/opportunities/${slug}` }), title: { absolute: `${title} | VolSoc` } };
 }
 
 export default async function OpportunityPage({ params }: Props) {
@@ -30,6 +35,12 @@ export default async function OpportunityPage({ params }: Props) {
 
   return (
     <article className="page narrow dir-detail">
+      <JsonLd
+        data={breadcrumbs([
+          { name: "Volunteer in London", path: "/opportunities" },
+          { name: entry.title, path: `/opportunities/${entry.slug}` },
+        ])}
+      />
       <Link href="/opportunities" className="dir-back muted small">
         <ArrowLeft size={14} aria-hidden="true" /> All places
       </Link>

@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/AppShell";
+import { noIndex } from "@/lib/seo";
+
+/** The committee portal, behind UCL sign-in: kept out of search. */
+export const metadata = noIndex;
 
 /**
  * The signed-in tabs share one frame. Living in a layout, it is rendered once

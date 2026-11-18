@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
+import { JsonLd } from "@/components/JsonLd";
+import { breadcrumbs, pageMetadata } from "@/lib/seo";
 import { ReviewerTap } from "@/components/public/ReviewerTap";
 import { VolunteerForm } from "@/components/public/VolunteerForm";
 import { getCurrentMember } from "@/lib/session";
 import { getSupabaseAdmin, isSupabaseConfigured } from "@/lib/supabase";
 import { VOLUNTEER_COLUMNS, type Volunteer } from "@/lib/volunteers";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Volunteer with us",
-  description: "Join UCL Volunteering Society's volunteer list: tell us when you're free and what you'd like to do",
-};
+  description:
+    "Join UCL Volunteering Society's volunteer list with your UCL login: say how often and when you're free and what you'd like to do, from food rescue to tutoring.",
+  path: "/volunteer",
+});
 
 /** Your sign-up so far, to fill the form with, or null for a first one. */
 async function loadOwn(memberId: string): Promise<Volunteer | null> {
@@ -28,6 +32,7 @@ export default async function VolunteerPage() {
 
   return (
     <section className="page narrow">
+      <JsonLd data={breadcrumbs([{ name: "Volunteer with us", path: "/volunteer" }])} />
       <header className="page-head">
         <span className="micro-label">Join in</span>
         <h1>Volunteer with us</h1>

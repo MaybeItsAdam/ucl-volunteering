@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SITE_DESCRIPTION } from "@/lib/seo";
 import { VolSocHand } from "./VolSocHand";
 
 /**
@@ -11,6 +12,8 @@ export function HomeIntro() {
     <>
       <VolSocHand className="uvs-hero-logo" />
       <h1>UCL Volunteering Society</h1>
+      {/* The plain answer to "what is this?" for screen readers, search and AI assistants. */}
+      <p className="sr-only">{SITE_DESCRIPTION}</p>
       <div className="uvs-cta-row">
         <Link className="uvs-cta uvs-cta-primary" href="/calendar">
           What&apos;s on

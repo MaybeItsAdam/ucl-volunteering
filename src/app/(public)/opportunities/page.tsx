@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { JsonLd } from "@/components/JsonLd";
+import { breadcrumbs, pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { LondonBrowser } from "@/components/london/LondonBrowser";
 import { listCommunityEvents } from "@/lib/communityEvents";
@@ -11,11 +13,12 @@ import "@/components/directory/directory.css";
 import "@/components/timetable/timetable.css";
 import "@/components/london/london.css";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Volunteer in London",
   description:
-    "Places to volunteer across London and volunteering events coming up, on one list and one map: drop-in times, how to sign up and whether you need a DBS, checked by UCL Volunteering Society",
-};
+    "Places to volunteer across London and upcoming volunteering events on one list and map: drop-in times, how to sign up and whether you need a DBS check.",
+  path: "/opportunities",
+});
 
 // The committee and the sync change it; a five-minute-old copy is fine.
 export const revalidate = 300;
@@ -45,6 +48,7 @@ export default async function OpportunitiesPage() {
 
   return (
     <section className="page vl-page">
+      <JsonLd data={breadcrumbs([{ name: "Volunteer in London", path: "/opportunities" }])} />
       <header className="page-head">
         <span className="micro-label">Directory and events</span>
         <h1>Volunteer in London</h1>

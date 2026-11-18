@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
+import { JsonLd } from "@/components/JsonLd";
+import { breadcrumbs, pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Privacy",
-  description: "What UCL Volunteering Society's website and VolSoc app collect, why, and how to delete it",
-};
+  description:
+    "What UCL Volunteering Society's website and the UCL Volunteering app for iOS and Android collect, why, how long it is kept, and how to delete it.",
+  path: "/privacy",
+});
 
 /** The privacy policy both store listings link to. Change it when what's collected changes. */
 export default function PrivacyPage() {
   return (
     <article className="page narrow prose">
+      <JsonLd data={breadcrumbs([{ name: "Privacy", path: "/privacy" }])} />
       <header className="page-head">
         <span className="micro-label">Updated 7 November 2026</span>
         <h1>Privacy</h1>

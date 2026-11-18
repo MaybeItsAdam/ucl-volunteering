@@ -11,6 +11,16 @@ const nextConfig: NextConfig = {
     // ERR_INTERNET_DISCONNECTED page. OfflineBanner says why it's waiting.
     useOffline: true,
   },
+  async headers() {
+    // Only the canonical host (src/lib/seo.ts) is indexed: previews and the
+    // *.vercel.app host say noindex on every response.
+    const noindex = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
+    return [
+      process.env.VERCEL_ENV === "preview"
+        ? { source: "/:path*", headers: noindex }
+        : { source: "/:path*", has: [{ type: "host", value: ".*\\.vercel\\.app" }], headers: noindex },
+    ];
+  },
   outputFileTracingExcludes: {
     "*": ["legacy/**", "apps-script/**", "maps/**"],
   },
