@@ -16,8 +16,8 @@ Secrets live in Doppler: project `volsoc-webapp`, config `prd`.
 
 ```bash
 doppler login                    # or doppler-volsoc login, see below
-npm install
-npm run dev                      # next dev on volsoc-webapp/prd
+pnpm install
+pnpm dev                         # next dev on volsoc-webapp/prd
 ```
 
 If your own Doppler login is for another workplace, keep VolSoc's apart with a
@@ -26,7 +26,7 @@ wrapper on your PATH called `doppler-volsoc`
 `doppler-volsoc login` once. `scripts/doppler.sh` uses it when it's there,
 plain `doppler` otherwise.
 
-`npm run dev:no-doppler` runs without any secrets: with no Supabase configured,
+`pnpm dev:no-doppler` runs without any secrets: with no Supabase configured,
 the portal runs off the session alone, and the sign-in page offers a dev
 sign-in as committee, principal, admin or nobody (`/api/auth/dev-login?role=`).
 Never available in production.
@@ -36,7 +36,7 @@ Local dev runs on `prd`: it reads the production database either way.
 ## Environment
 
 Change secrets in Doppler, never in Vercel directly (the next sync overwrites
-them). `npm run env:check` checks `prd` has them all, in the right shape,
+them). `pnpm env:check` checks `prd` has them all, in the right shape,
 without printing any value.
 
 | Variable | Required | What |
@@ -64,7 +64,7 @@ If Vercel's Supabase integration is installed it owns the `SUPABASE_*` and
 
 ## Migrations
 
-SQL lives in `supabase/migrations/`. `npm run build` runs
+SQL lives in `supabase/migrations/`. `pnpm build` runs
 `scripts/deploy-migrate.mjs` before `next build`: on a Vercel **production**
 build it applies every file not yet recorded in `public.schema_migrations`,
 each in one transaction with its ledger row. A failure fails the build and the
@@ -72,7 +72,7 @@ previous deployment keeps serving. Preview and local builds skip it; run it by
 hand with
 
 ```bash
-MIGRATE_DATABASE_URL=postgres://... npm run db:migrate
+MIGRATE_DATABASE_URL=postgres://... pnpm db:migrate
 ```
 
 Add a new migration as a new file; never edit an applied one (edits are
@@ -138,7 +138,7 @@ Events typed into the app are `volsoc` rows and fully editable.
 
 | | |
 | --- | --- |
-| `npm run dev` | Dev server on Doppler `prd` |
-| `npm run build` | Migrate (production only), then build |
-| `npm run typecheck` / `lint` / `test` | `tsc`, ESLint, Vitest |
-| `npm run env:check` | Check Doppler `prd` |
+| `pnpm dev` | Dev server on Doppler `prd` |
+| `pnpm build` | Migrate (production only), then build |
+| `pnpm typecheck` / `lint` / `test` | `tsc`, ESLint, Vitest |
+| `pnpm env:check` | Check Doppler `prd` |

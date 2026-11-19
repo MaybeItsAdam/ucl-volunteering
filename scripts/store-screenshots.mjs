@@ -14,10 +14,10 @@
 // - Playwright with Chromium. Not a repo dependency: point PLAYWRIGHT_DIR at any
 //   folder with node_modules/playwright (default /tmp/shots)
 // - ImageMagick (magick) to strip alpha
-// - The app on VOLSOC_BASE (default http://localhost:3130), e.g. `npm run dev`
+// - The app on VOLSOC_BASE (default http://localhost:3130), e.g. `pnpm dev`
 // - Optional, for the signed-in volunteer form: a second dev server with NO
 //   secrets on VOLSOC_FORM_BASE (default http://localhost:3131), started with
-//   `env -i HOME=$HOME PATH=$PATH npx next dev --webpack -p 3131` from a copy of
+//   `env -i HOME=$HOME PATH=$PATH pnpm exec next dev --webpack -p 3131` from a copy of
 //   the repo without .env files. It signs a demo session with the public
 //   local-development secret, which only a secret-free dev server accepts, so
 //   nothing touches the real database. Without it the signed-out page is used

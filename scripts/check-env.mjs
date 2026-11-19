@@ -4,8 +4,8 @@
  * before a deploy finds out the hard way. Values are read in memory and never
  * printed.
  *
- *   npm run env:check            # production (local dev runs on it too)
- *   npm run env:check -- dev     # a dev config, if one is ever made
+ *   pnpm env:check         # production (local dev runs on it too)
+ *   pnpm env:check dev     # a dev config, if one is ever made
  */
 import { execFileSync } from "node:child_process";
 
